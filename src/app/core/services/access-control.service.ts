@@ -13,7 +13,7 @@ export class AccessControlService {
 
     const user = this.authSession.currentUser();
 
-    return !!user && [...user.platformPermissions, ...user.tenantPermissions].includes(permission);
+    return !!user && [...(user.platformPermissions ?? []), ...(user.tenantPermissions ?? [])].includes(permission);
   }
 
   hasFeature(feature?: string): boolean {
@@ -21,7 +21,7 @@ export class AccessControlService {
       return true;
     }
 
-    return this.authSession.currentUser()?.featureEntitlements.includes(feature) ?? false;
+    return this.authSession.currentUser()?.featureEntitlements?.includes(feature) ?? false;
   }
 
   canAccess(requiredPermission?: string, requiredFeature?: string): boolean {
