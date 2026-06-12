@@ -18,7 +18,7 @@ export class AuthSessionService {
       return false;
     }
 
-    return new Date(session.expiresAt).getTime() > Date.now();
+    return new Date(session.accessTokenExpiresAt).getTime() > Date.now();
   });
 
   setSession(session: AuthSession): void {

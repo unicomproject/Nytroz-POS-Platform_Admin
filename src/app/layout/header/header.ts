@@ -13,7 +13,7 @@ import { TenantContextService } from '../../core/services/tenant-context.service
         <strong>{{ tenantContext.selectedTenant()?.tenantName ?? 'No tenant selected' }}</strong>
       </div>
       <div class="user-summary">
-        <span>{{ authSession.currentUser()?.displayName ?? 'Platform session required' }}</span>
+        <span>{{ authSession.currentUser()?.fullName ?? 'Platform session required' }}</span>
       </div>
     </header>
   `,

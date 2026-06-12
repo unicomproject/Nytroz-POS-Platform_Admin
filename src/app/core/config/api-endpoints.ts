@@ -1,6 +1,6 @@
 export const apiEndpoints = {
   auth: {
-    login: '/auth/login',
+    login: '/auth/platform-login',
     logout: '/auth/logout',
     refresh: '/auth/refresh'
   },
