@@ -88,19 +88,6 @@ import { AuthApiService } from '../../services/auth-api.service';
       </section>
 
       <section class="auth-panel" aria-label="Platform Admin sign in">
-        <div class="language-selector" aria-label="Language selector">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="12" r="9" />
-            <path d="M3 12h18" />
-            <path d="M12 3a14 14 0 0 1 0 18" />
-            <path d="M12 3a14 14 0 0 0 0 18" />
-          </svg>
-          <span>English (UK)</span>
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="m7 10 5 5 5-5" />
-          </svg>
-        </div>
-
         <section class="login-card">
           <h2>Welcome Back</h2>
           <p class="subtitle">Sign in to your Platform Admin account</p>
@@ -272,7 +259,6 @@ import { AuthApiService } from '../../services/auth-api.service';
 
     .shield svg,
     .feature-list svg,
-    .language-selector svg,
     .input-shell svg,
     .icon-button svg {
       width: 100%;
@@ -448,28 +434,11 @@ import { AuthApiService } from '../../services/auth-api.service';
 
     .auth-panel {
       display: grid;
-      grid-template-rows: auto minmax(0, 1fr) auto;
+      grid-template-rows: minmax(0, 1fr) auto;
       height: 100%;
       min-height: 0;
       overflow: hidden;
       padding: clamp(0.75rem, 2.3vh, 2rem) clamp(1.25rem, 5vw, 5rem);
-    }
-
-    .language-selector {
-      align-items: center;
-      color: #263650;
-      display: inline-flex;
-      font-weight: 700;
-      gap: 0.55rem;
-      justify-self: end;
-      min-height: 2.5rem;
-    }
-
-    .language-selector svg {
-      color: #263650;
-      height: 1.15rem;
-      stroke-width: 2.2;
-      width: 1.15rem;
     }
 
     .login-card {
@@ -748,10 +717,6 @@ import { AuthApiService } from '../../services/auth-api.service';
 
       .auth-panel {
         padding: 1rem;
-      }
-
-      .language-selector {
-        justify-self: start;
       }
 
       .login-card {
