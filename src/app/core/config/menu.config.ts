@@ -21,30 +21,33 @@ export const platformMenuConfig: MenuSectionConfig[] = [
       { label: 'Dashboard', path: '/admin/dashboard', requiresTenant: false },
       { label: 'Tenants', path: '/admin/tenants', requiresTenant: false, requiredPermission: platformPermissions.tenantUpdate },
       {
-        label: 'Subscription Plans',
+        label: 'Subscriptions',
         path: '/admin/subscriptions',
         requiresTenant: false,
         requiredPermission: platformPermissions.subscriptionManage
       },
       {
-        label: 'Modules and Features',
+        label: 'Features & Modules',
         path: '/admin/modules',
         requiresTenant: false,
         requiredPermission: platformPermissions.featureEntitle
       },
+      { label: 'Roles & Permissions', path: '/admin/roles-permissions', requiresTenant: false },
       {
         label: 'Platform Users',
         path: '/admin/platform-users',
         requiresTenant: false,
         requiredPermission: platformPermissions.tenantUpdate
       },
+      { label: 'Billing', path: '/admin/billing', requiresTenant: false, requiredPermission: platformPermissions.subscriptionManage },
+      { label: 'Audit Logs', path: '/admin/audit-logs', requiresTenant: false, requiredPermission: platformPermissions.auditView },
+      { label: 'Reports', path: '/admin/reports', requiresTenant: false },
       {
         label: 'System Settings',
         path: '/admin/settings/system',
         requiresTenant: false,
         requiredPermission: platformPermissions.tenantUpdate
-      },
-      { label: 'Audit Logs', path: '/admin/audit-logs', requiresTenant: false, requiredPermission: platformPermissions.auditView }
+      }
     ]
   }
 ];
