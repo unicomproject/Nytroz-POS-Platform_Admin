@@ -1,7 +1,10 @@
-import { Component } from '@angular/core';
+import { Component, signal } from '@angular/core';
+import { Router } from '@angular/router';
+import { finalize } from 'rxjs';
 
 import { AuthSessionService } from '../../core/services/auth-session.service';
 import { TenantContextService } from '../../core/services/tenant-context.service';
+import { AuthApiService } from '../../features/auth/services/auth-api.service';
 
 @Component({
   selector: 'app-header',
@@ -14,6 +17,9 @@ import { TenantContextService } from '../../core/services/tenant-context.service
       </div>
       <div class="user-summary">
         <span>{{ authSession.currentUser()?.fullName ?? 'Platform session required' }}</span>
+        <button type="button" [disabled]="isLoggingOut()" (click)="logout()">
+          {{ isLoggingOut() ? 'Signing out' : 'Sign out' }}
+        </button>
       </div>
     </header>
   `,
@@ -42,14 +48,58 @@ import { TenantContextService } from '../../core/services/tenant-context.service
     }
 
     .user-summary {
+      align-items: flex-end;
       color: #566575;
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
       text-align: right;
+    }
+
+    button {
+      background: transparent;
+      border: 0;
+      color: #0b5cff;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.82rem;
+      font-weight: 750;
+      padding: 0;
+    }
+
+    button:disabled {
+      color: #8a94a3;
+      cursor: wait;
     }
   `
 })
 export class Header {
+  readonly isLoggingOut = signal(false);
+
   constructor(
+    private readonly authApi: AuthApiService,
+    private readonly router: Router,
     readonly authSession: AuthSessionService,
     readonly tenantContext: TenantContextService
   ) {}
+
+  logout(): void {
+    if (this.isLoggingOut()) {
+      return;
+    }
+
+    this.isLoggingOut.set(true);
+    this.authApi
+      .logout()
+      .pipe(
+        finalize(() => {
+          this.authSession.clearSession();
+          this.isLoggingOut.set(false);
+          void this.router.navigate(['/login']);
+        })
+      )
+      .subscribe({
+        error: () => undefined
+      });
+  }
 }

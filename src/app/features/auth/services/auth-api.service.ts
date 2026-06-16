@@ -14,7 +14,27 @@ export class AuthApiService {
 
   login(request: LoginRequest): Observable<AuthSession> {
     return this.http
-      .post<ApiResponse<AuthSession>>(`${appSettings.apiBaseUrl}${apiEndpoints.auth.login}`, request)
+      .post<ApiResponse<AuthSession>>(`${appSettings.apiBaseUrl}${apiEndpoints.auth.login}`, request, {
+        withCredentials: true
+      })
       .pipe(map((response) => response.data));
+  }
+
+  refresh(): Observable<AuthSession> {
+    return this.http
+      .post<ApiResponse<AuthSession>>(
+        `${appSettings.apiBaseUrl}${apiEndpoints.auth.refresh}`,
+        {},
+        { withCredentials: true }
+      )
+      .pipe(map((response) => response.data));
+  }
+
+  logout(): Observable<void> {
+    return this.http.post<void>(
+      `${appSettings.apiBaseUrl}${apiEndpoints.auth.logout}`,
+      {},
+      { withCredentials: true }
+    );
   }
 }

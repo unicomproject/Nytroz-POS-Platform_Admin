@@ -92,6 +92,10 @@ import { AuthApiService } from '../../services/auth-api.service';
           <h2>Welcome Back</h2>
           <p class="subtitle">Sign in to your Platform Admin account</p>
 
+          @if (authSession.loginNotice()) {
+            <p class="session-notice" role="alert">{{ authSession.loginNotice() }}</p>
+          }
+
           <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
             <div class="field-group">
               <label for="email">Email Address</label>
@@ -583,6 +587,18 @@ import { AuthApiService } from '../../services/auth-api.service';
       padding: 0.85rem 1rem;
     }
 
+    .session-notice {
+      background: #fff8e8;
+      border: 1px solid #f2d28b;
+      border-radius: 8px;
+      color: #7a4d00;
+      font-size: 0.9rem;
+      font-weight: 650;
+      line-height: 1.45;
+      margin: 1rem 0 0;
+      padding: 0.85rem 1rem;
+    }
+
     .submit-button {
       align-items: center;
       background: #0b5cff;
@@ -745,7 +761,7 @@ export class LoginPage {
   constructor(
     private readonly apiError: ApiErrorService,
     private readonly authApi: AuthApiService,
-    private readonly authSession: AuthSessionService,
+    readonly authSession: AuthSessionService,
     private readonly router: Router
   ) {}
 
