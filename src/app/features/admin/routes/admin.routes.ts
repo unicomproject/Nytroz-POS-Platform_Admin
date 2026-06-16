@@ -10,8 +10,8 @@ export const adminRoutes: Routes = [
   },
   {
     path: 'tenants',
-    loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
-    data: { title: 'Tenants', requiredPermission: platformPermissions.tenantUpdate }
+    loadComponent: () =>
+      import('../pages/platform-tenant-list-page/platform-tenant-list-page').then((m) => m.PlatformTenantListPage)
   },
   {
     path: 'outlets',
