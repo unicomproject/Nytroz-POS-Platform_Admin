@@ -14,6 +14,26 @@ export const adminRoutes: Routes = [
     data: { title: 'Tenants', requiredPermission: platformPermissions.tenantUpdate }
   },
   {
+    path: 'outlets',
+    loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
+    data: { title: 'Outlets' }
+  },
+  {
+    path: 'tills-devices',
+    loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
+    data: { title: 'Tills & Devices' }
+  },
+  {
+    path: 'products',
+    loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
+    data: { title: 'Products' }
+  },
+  {
+    path: 'alerts',
+    loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
+    data: { title: 'Alerts Center' }
+  },
+  {
     path: 'tenants/create',
     loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
     data: { title: 'Create Tenant', requiredPermission: platformPermissions.tenantCreate }

@@ -1,12 +1,11 @@
-import { catalogPermissions, platformPermissions, reportPermissions, tenantPermissions } from './permission-keys';
-import { featureKeys } from './feature-keys';
-
 export interface MenuItemConfig {
   label: string;
   path: string;
   requiresTenant: boolean;
   requiredPermission?: string;
   requiredFeature?: string;
+  icon: PlatformMenuIcon;
+  hasSubmenu?: boolean;
 }
 
 export interface MenuSectionConfig {
@@ -14,79 +13,50 @@ export interface MenuSectionConfig {
   items: MenuItemConfig[];
 }
 
+export type PlatformMenuIcon =
+  | 'dashboard'
+  | 'tenants'
+  | 'subscriptions'
+  | 'outlets'
+  | 'tills'
+  | 'users'
+  | 'roles'
+  | 'products'
+  | 'billing'
+  | 'reports'
+  | 'audit'
+  | 'alerts'
+  | 'settings';
+
 export const platformMenuConfig: MenuSectionConfig[] = [
   {
     label: 'Platform',
     items: [
-      { label: 'Dashboard', path: '/admin/dashboard', requiresTenant: false },
-      { label: 'Tenants', path: '/admin/tenants', requiresTenant: false, requiredPermission: platformPermissions.tenantUpdate },
+      { label: 'Dashboard', path: '/admin/dashboard', requiresTenant: false, icon: 'dashboard' },
+      { label: 'Tenants', path: '/admin/tenants', requiresTenant: false, icon: 'tenants', hasSubmenu: true },
       {
         label: 'Subscriptions',
         path: '/admin/subscriptions',
         requiresTenant: false,
-        requiredPermission: platformPermissions.subscriptionManage
+        icon: 'subscriptions',
+        hasSubmenu: true
       },
-      {
-        label: 'Features & Modules',
-        path: '/admin/modules',
-        requiresTenant: false,
-        requiredPermission: platformPermissions.featureEntitle
-      },
-      { label: 'Roles & Permissions', path: '/admin/roles-permissions', requiresTenant: false },
-      {
-        label: 'Platform Users',
-        path: '/admin/platform-users',
-        requiresTenant: false,
-        requiredPermission: platformPermissions.tenantUpdate
-      },
-      { label: 'Billing', path: '/admin/billing', requiresTenant: false, requiredPermission: platformPermissions.subscriptionManage },
-      { label: 'Audit Logs', path: '/admin/audit-logs', requiresTenant: false, requiredPermission: platformPermissions.auditView },
-      { label: 'Reports', path: '/admin/reports', requiresTenant: false },
+      { label: 'Outlets', path: '/admin/outlets', requiresTenant: false, icon: 'outlets' },
+      { label: 'Tills & Devices', path: '/admin/tills-devices', requiresTenant: false, icon: 'tills' },
+      { label: 'Users', path: '/admin/platform-users', requiresTenant: false, icon: 'users', hasSubmenu: true },
+      { label: 'Roles & Permissions', path: '/admin/roles-permissions', requiresTenant: false, icon: 'roles' },
+      { label: 'Products', path: '/admin/products', requiresTenant: false, icon: 'products' },
+      { label: 'Billing', path: '/admin/billing', requiresTenant: false, icon: 'billing', hasSubmenu: true },
+      { label: 'Reports', path: '/admin/reports', requiresTenant: false, icon: 'reports', hasSubmenu: true },
+      { label: 'Audit Logs', path: '/admin/audit-logs', requiresTenant: false, icon: 'audit' },
+      { label: 'Alerts Center', path: '/admin/alerts', requiresTenant: false, icon: 'alerts' },
       {
         label: 'System Settings',
         path: '/admin/settings/system',
         requiresTenant: false,
-        requiredPermission: platformPermissions.tenantUpdate
+        icon: 'settings',
+        hasSubmenu: true
       }
-    ]
-  }
-];
-
-export const tenantMenuConfig: MenuSectionConfig[] = [
-  {
-    label: 'Selected Tenant',
-    items: [
-      { label: 'Tenant Users', path: '/admin/tenant/:tenantId/users', requiresTenant: true, requiredPermission: tenantPermissions.userManage },
-      {
-        label: 'Roles and Permissions',
-        path: '/admin/tenant/:tenantId/roles-permissions',
-        requiresTenant: true,
-        requiredPermission: tenantPermissions.roleManage
-      },
-      { label: 'Outlets', path: '/admin/tenant/:tenantId/outlets', requiresTenant: true, requiredPermission: tenantPermissions.outletManage },
-      { label: 'Tills', path: '/admin/tenant/:tenantId/tills', requiresTenant: true, requiredPermission: tenantPermissions.tillManage },
-      {
-        label: 'Products',
-        path: '/admin/tenant/:tenantId/products',
-        requiresTenant: true,
-        requiredPermission: catalogPermissions.productView,
-        requiredFeature: featureKeys.productCatalog
-      },
-      {
-        label: 'Categories',
-        path: '/admin/tenant/:tenantId/categories',
-        requiresTenant: true,
-        requiredPermission: catalogPermissions.categoryView,
-        requiredFeature: featureKeys.categories
-      },
-      {
-        label: 'Reports',
-        path: '/admin/tenant/:tenantId/reports',
-        requiresTenant: true,
-        requiredPermission: reportPermissions.reportView,
-        requiredFeature: featureKeys.reports
-      },
-      { label: 'Tenant Settings', path: '/admin/tenant/:tenantId/settings', requiresTenant: true, requiredPermission: tenantPermissions.userManage }
     ]
   }
 ];
