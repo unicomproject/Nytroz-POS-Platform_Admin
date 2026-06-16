@@ -21,9 +21,9 @@ import { Sidebar } from '../sidebar/sidebar';
   `,
   styles: `
     .admin-shell {
-      background: #f4f7f8;
+      background: #f7f9fc;
       display: grid;
-      grid-template-columns: 17rem minmax(0, 1fr);
+      grid-template-columns: 15.5rem minmax(0, 1fr);
       min-height: 100dvh;
     }
 
@@ -32,7 +32,7 @@ import { Sidebar } from '../sidebar/sidebar';
     }
 
     main {
-      padding: 1.5rem;
+      padding: 1.5rem 1.6rem 2rem;
     }
 
     @media (max-width: 820px) {

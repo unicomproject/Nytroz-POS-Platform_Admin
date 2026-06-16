@@ -6,8 +6,7 @@ import { tenantContextGuard } from '../../../core/guards/tenant-context.guard';
 export const adminRoutes: Routes = [
   {
     path: 'dashboard',
-    loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
-    data: { title: 'Dashboard', description: 'Tenant setup, entitlement, billing, activation, and audit visibility.' }
+    loadComponent: () => import('../pages/platform-dashboard-page/platform-dashboard-page').then((m) => m.PlatformDashboardPage)
   },
   {
     path: 'tenants',
@@ -30,9 +29,24 @@ export const adminRoutes: Routes = [
     data: { title: 'Modules and Features', requiredPermission: platformPermissions.featureEntitle }
   },
   {
+    path: 'roles-permissions',
+    loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
+    data: { title: 'Roles and Permissions' }
+  },
+  {
     path: 'platform-users',
     loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
     data: { title: 'Platform Users', requiredPermission: platformPermissions.tenantUpdate }
+  },
+  {
+    path: 'billing',
+    loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
+    data: { title: 'Billing', requiredPermission: platformPermissions.subscriptionManage }
+  },
+  {
+    path: 'reports',
+    loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
+    data: { title: 'Platform Reports' }
   },
   {
     path: 'settings/system',

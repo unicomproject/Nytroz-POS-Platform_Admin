@@ -5,6 +5,7 @@ export const apiEndpoints = {
     refresh: '/auth/refresh'
   },
   platform: {
+    dashboard: '/platform-admin/dashboard',
     tenants: '/tenants',
     subscriptions: '/subscriptions',
     features: '/features',
