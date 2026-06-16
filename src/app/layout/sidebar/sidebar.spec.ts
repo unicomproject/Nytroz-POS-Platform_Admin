@@ -36,6 +36,32 @@ describe('Sidebar', () => {
     expect(dashboardLink?.classList.contains('active')).toBe(true);
   });
 
+  it('renders the tenants menu route and marks it active on /admin/tenants', async () => {
+    await TestBed.configureTestingModule({
+      imports: [Sidebar],
+      providers: [
+        provideRouter([{ path: 'admin/tenants', component: BlankRouteComponent }]),
+        {
+          provide: AuthSessionService,
+          useValue: { currentUser: () => createAuthSession().user }
+        }
+      ]
+    }).compileComponents();
+
+    const router = TestBed.inject(Router);
+    await router.navigateByUrl('/admin/tenants');
+
+    const fixture = TestBed.createComponent(Sidebar);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const tenantsLink = [...(fixture.nativeElement as HTMLElement).querySelectorAll('a.menu-item')]
+      .find((link) => link.textContent?.includes('Tenants'));
+
+    expect(tenantsLink?.getAttribute('href')).toBe('/admin/tenants');
+    expect(tenantsLink?.classList.contains('active')).toBe(true);
+  });
+
   it('renders all 13 platform sidebar menu items', async () => {
     await TestBed.configureTestingModule({
       imports: [Sidebar],

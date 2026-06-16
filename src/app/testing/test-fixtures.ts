@@ -1,5 +1,10 @@
 import { AuthSession } from '../core/models/auth-session.model';
 import { PlatformDashboard } from '../features/admin/models/platform-dashboard.model';
+import {
+  PlatformTenantFilterOptions,
+  PlatformTenantListResponse,
+  PlatformTenantSummary
+} from '../features/admin/models/platform-tenant.model';
 
 export function createAuthSession(overrides: Partial<AuthSession> = {}): AuthSession {
   return {
@@ -67,6 +72,55 @@ export function createDashboard(overrides: Partial<PlatformDashboard> = {}): Pla
         { status: 'Inactive', count: 0, percentage: 0 }
       ]
     },
+    ...overrides
+  };
+}
+
+export function createTenantSummary(overrides: Partial<PlatformTenantSummary> = {}): PlatformTenantSummary {
+  return {
+    totalTenants: 3,
+    activeTenants: 2,
+    suspendedTenants: 0,
+    inactiveTenants: 0,
+    trialTenants: 1,
+    ...overrides
+  };
+}
+
+export function createTenantListResponse(
+  overrides: Partial<PlatformTenantListResponse> = {}
+): PlatformTenantListResponse {
+  return {
+    items: [
+      {
+        id: 'tenant-1',
+        name: 'Demo Tenant Alpha',
+        email: 'alpha@example.com',
+        ownerName: 'Owner Alpha',
+        planName: 'Professional',
+        region: 'Sri Lanka / Western',
+        status: 'Active',
+        userCount: 4,
+        outletCount: 2,
+        createdOn: '2026-06-01T00:00:00Z',
+        lastActivityAt: '2026-06-12T00:00:00Z'
+      }
+    ],
+    pageNumber: 1,
+    pageSize: 10,
+    totalCount: 1,
+    totalPages: 1,
+    ...overrides
+  };
+}
+
+export function createTenantFilterOptions(
+  overrides: Partial<PlatformTenantFilterOptions> = {}
+): PlatformTenantFilterOptions {
+  return {
+    plans: ['Starter', 'Professional', 'Enterprise'],
+    regions: ['Sri Lanka / Western', 'Australia / NSW'],
+    statuses: ['Active', 'Suspended', 'Inactive', 'Trial'],
     ...overrides
   };
 }

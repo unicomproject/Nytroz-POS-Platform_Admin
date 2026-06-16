@@ -6,7 +6,9 @@ export const apiEndpoints = {
   },
   platform: {
     dashboard: '/platform-admin/dashboard',
-    tenants: '/tenants',
+    tenants: '/platform-admin/tenants',
+    tenantSummary: '/platform-admin/tenants/summary',
+    tenantFilterOptions: '/platform-admin/tenants/filter-options',
     subscriptions: '/subscriptions',
     features: '/features',
     auditLogs: '/platform/audit-logs',
