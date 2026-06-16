@@ -14,7 +14,7 @@ export class AuthSessionService {
   readonly isAuthenticated = computed(() => {
     const session = this.sessionState();
 
-    if (!session) {
+    if (!session?.accessToken?.trim()) {
       return false;
     }
 
