@@ -3,6 +3,12 @@ export const platformPermissions = {
   tenantUpdate: 'platform.tenant.update',
   tenantActivate: 'platform.tenant.activate',
   subscriptionManage: 'platform.subscription.manage',
+  subscriptionPlansView: 'platform.subscription_plans.view',
+  subscriptionPlansCreate: 'platform.subscription_plans.create',
+  subscriptionPlansEdit: 'platform.subscription_plans.edit',
+  subscriptionPlansDuplicate: 'platform.subscription_plans.duplicate',
+  subscriptionPlansArchive: 'platform.subscription_plans.archive',
+  subscriptionPlansDelete: 'platform.subscription_plans.delete',
   featureEntitle: 'platform.feature.entitle',
   auditView: 'platform.audit.view'
 } as const;

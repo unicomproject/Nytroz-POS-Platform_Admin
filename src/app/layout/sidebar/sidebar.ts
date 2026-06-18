@@ -35,7 +35,7 @@ import { SidebarMenuIcon } from './sidebar-menu-icon';
               class="menu-item"
               [routerLink]="item.path"
               routerLinkActive="active"
-              [routerLinkActiveOptions]="{ exact: item.path === '/admin/dashboard' }"
+              [routerLinkActiveOptions]="linkActiveOptions(item.path)"
             >
               <app-sidebar-menu-icon [icon]="item.icon" />
               <span class="menu-label">{{ item.label }}</span>
@@ -284,4 +284,16 @@ export class Sidebar {
   );
 
   constructor(readonly authSession: AuthSessionService) {}
+
+  linkActiveOptions(path: string): { exact: boolean } {
+    if (path === '/admin/dashboard') {
+      return { exact: true };
+    }
+
+    if (path === '/admin/subscriptions' || path === '/admin/tenants') {
+      return { exact: false };
+    }
+
+    return { exact: true };
+  }
 }

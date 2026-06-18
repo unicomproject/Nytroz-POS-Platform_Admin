@@ -9,7 +9,7 @@ export const apiEndpoints = {
     tenants: '/platform-admin/tenants',
     tenantSummary: '/platform-admin/tenants/summary',
     tenantFilterOptions: '/platform-admin/tenants/filter-options',
-    subscriptions: '/subscriptions',
+    subscriptionPlans: '/platform/subscription-plans',
     features: '/features',
     auditLogs: '/platform/audit-logs',
     users: '/platform/users',

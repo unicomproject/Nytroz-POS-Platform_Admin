@@ -34,7 +34,55 @@ describe('AuthApiService', () => {
     expect(request.request.body).toEqual({ email: 'admin@nytroz.local', password: 'Admin@12345' });
     expect('rememberMe' in request.request.body).toBe(false);
 
-    request.flush({ success: true, message: 'ok', data: session });
+    request.flush({
+      success: true,
+      message: 'ok',
+      data: {
+        accessToken: session.accessToken,
+        tokenType: session.tokenType,
+        accessTokenExpiresAt: session.accessTokenExpiresAt,
+        sessionExpiresAt: session.refreshTokenExpiresAt,
+        user: {
+          id: session.user.id,
+          email: session.user.email,
+          fullName: session.user.fullName,
+          status: session.user.status,
+          platformPermissions: session.user.platformPermissions
+        }
+      }
+    });
     expect(result).toBe('mapped-token');
+  });
+
+  it('maps platformPermissions from the login response user payload', () => {
+    let permissions: string[] = [];
+
+    service.login({ email: 'admin@nytroz.local', password: 'Admin@12345' }).subscribe((response) => {
+      permissions = response.user.platformPermissions ?? [];
+    });
+
+    const request = httpTesting.expectOne('/api/v1/auth/platform-login');
+    request.flush({
+      success: true,
+      message: 'ok',
+      data: {
+        accessToken: 'token',
+        tokenType: 'Bearer',
+        accessTokenExpiresAt: new Date(Date.now() + 60_000).toISOString(),
+        sessionExpiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+        user: {
+          id: 'platform-user-1',
+          email: 'admin@nytroz.local',
+          fullName: 'Platform Admin',
+          status: 'active',
+          platformPermissions: ['platform.subscription_plans.view', 'platform.subscription_plans.create']
+        }
+      }
+    });
+
+    expect(permissions).toEqual([
+      'platform.subscription_plans.view',
+      'platform.subscription_plans.create'
+    ]);
   });
 });

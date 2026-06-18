@@ -62,11 +62,11 @@ describe('Sidebar', () => {
     expect(tenantsLink?.classList.contains('active')).toBe(true);
   });
 
-  it('renders all 13 platform sidebar menu items', async () => {
+  it('marks Subscriptions active on /admin/subscriptions/create', async () => {
     await TestBed.configureTestingModule({
       imports: [Sidebar],
       providers: [
-        provideRouter([]),
+        provideRouter([{ path: 'admin/subscriptions/create', component: BlankRouteComponent }]),
         {
           provide: AuthSessionService,
           useValue: { currentUser: () => createAuthSession().user }
@@ -74,14 +74,21 @@ describe('Sidebar', () => {
       ]
     }).compileComponents();
 
+    const router = TestBed.inject(Router);
+    await router.navigateByUrl('/admin/subscriptions/create');
+
     const fixture = TestBed.createComponent(Sidebar);
     fixture.detectChanges();
+    await fixture.whenStable();
 
-    const menuItems = [...(fixture.nativeElement as HTMLElement).querySelectorAll('a.menu-item')];
-    expect(menuItems).toHaveLength(13);
+    const subscriptionsLink = [...(fixture.nativeElement as HTMLElement).querySelectorAll('a.menu-item')]
+      .find((link) => link.textContent?.includes('Subscriptions'));
+
+    expect(subscriptionsLink?.getAttribute('href')).toBe('/admin/subscriptions');
+    expect(subscriptionsLink?.classList.contains('active')).toBe(true);
   });
 
-  it('renders Alerts Center without a numeric badge', async () => {
+  it('renders all 13 platform sidebar menu items', async () => {
     await TestBed.configureTestingModule({
       imports: [Sidebar],
       providers: [

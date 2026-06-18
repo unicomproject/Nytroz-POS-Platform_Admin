@@ -5,6 +5,7 @@ import {
   PlatformTenantListResponse,
   PlatformTenantSummary
 } from '../features/admin/models/platform-tenant.model';
+import { SubscriptionPlanListResponse } from '../features/admin/models/platform-subscription-plan.model';
 
 export function createAuthSession(overrides: Partial<AuthSession> = {}): AuthSession {
   return {
@@ -18,7 +19,13 @@ export function createAuthSession(overrides: Partial<AuthSession> = {}): AuthSes
       email: 'admin@nytroz.local',
       fullName: 'Nytroz Platform Admin',
       status: 'active',
-      platformPermissions: ['platform.tenant.update', 'platform.subscription.manage', 'platform.audit.view']
+      platformPermissions: [
+        'platform.tenant.update',
+        'platform.subscription.manage',
+        'platform.subscription_plans.view',
+        'platform.subscription_plans.create',
+        'platform.audit.view'
+      ]
     },
     ...overrides
   };
@@ -121,6 +128,46 @@ export function createTenantFilterOptions(
     plans: ['Starter', 'Professional', 'Enterprise'],
     regions: ['Sri Lanka / Western', 'Australia / NSW'],
     statuses: ['Active', 'Suspended', 'Inactive', 'Trial'],
+    ...overrides
+  };
+}
+
+export function createSubscriptionPlanListResponse(
+  overrides: Partial<SubscriptionPlanListResponse> = {}
+): SubscriptionPlanListResponse {
+  return {
+    items: [
+      {
+        id: 'plan-1',
+        planName: 'Professional Plus',
+        planCode: 'PROF-PLUS',
+        planType: 'paid',
+        billingCycle: 'both',
+        currencyCode: 'LKR',
+        tenantMonthlyPrice: 12900,
+        tenantAnnualPrice: 129000,
+        annualDiscountPercentage: 17,
+        includedModulesCount: 8,
+        addOnsCount: 0,
+        activeTenantsCount: 2,
+        status: 'published',
+        isDefault: false,
+        lastUpdatedAt: '2026-06-01T00:00:00Z',
+        canView: true,
+        canEdit: true,
+        canDuplicate: true,
+        canArchive: true,
+        canDelete: false,
+        deleteBlockedReason: 'Plan has active tenants'
+      }
+    ],
+    pageNumber: 1,
+    pageSize: 10,
+    totalItems: 1,
+    totalPages: 1,
+    hasPreviousPage: false,
+    hasNextPage: false,
+    statusCounts: { all: 1, draft: 0, published: 1, archived: 0 },
     ...overrides
   };
 }
