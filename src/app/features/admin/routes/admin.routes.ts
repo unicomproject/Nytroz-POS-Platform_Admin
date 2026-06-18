@@ -39,9 +39,18 @@ export const adminRoutes: Routes = [
     data: { title: 'Create Tenant', requiredPermission: platformPermissions.tenantCreate }
   },
   {
+    path: 'subscriptions/create',
+    loadComponent: () =>
+      import('../pages/platform-create-subscription-plan-page/platform-create-subscription-plan-page').then(
+        (m) => m.PlatformCreateSubscriptionPlanPage
+      )
+  },
+  {
     path: 'subscriptions',
-    loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
-    data: { title: 'Subscription Plans', requiredPermission: platformPermissions.subscriptionManage }
+    loadComponent: () =>
+      import('../pages/platform-subscription-plans-page/platform-subscription-plans-page').then(
+        (m) => m.PlatformSubscriptionPlansPage
+      )
   },
   {
     path: 'modules',
