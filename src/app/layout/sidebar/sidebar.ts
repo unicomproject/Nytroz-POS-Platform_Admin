@@ -57,9 +57,23 @@ import { SidebarMenuIcon } from './sidebar-menu-icon';
           <span class="user-chevron" aria-hidden="true">›</span>
         </div>
 
-        <div class="footer-bar">
-          <p class="copyright">© 2025 SCS-TIX. All rights reserved.</p>
-          <button class="collapse-toggle" type="button" aria-label="Collapse sidebar">«</button>
+        <div class="version-card">
+          <div class="version-copy">
+            <strong>SCS TIX Platform</strong>
+            <span>Version 2.4.0</span>
+          </div>
+          <span class="version-art" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M12 4 4 8v8l8 4 8-4V8z" stroke="url(#cubeGrad)" stroke-width="1.2" />
+              <path d="M12 4v16M4 8l8 4 8-4" stroke="url(#cubeGrad)" stroke-width="1.2" opacity="0.85" />
+              <defs>
+                <linearGradient id="cubeGrad" x1="4" y1="4" x2="20" y2="20">
+                  <stop stop-color="#5b9dff" />
+                  <stop offset="1" stop-color="#0b5cff" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </span>
         </div>
       </div>
     </aside>
@@ -232,30 +246,35 @@ import { SidebarMenuIcon } from './sidebar-menu-icon';
       font-size: 0.68rem;
     }
 
-    .footer-bar {
+    .version-card {
       align-items: center;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
       display: flex;
       gap: 0.65rem;
       justify-content: space-between;
-      padding: 0.75rem 0.35rem 0;
+      padding: 0.75rem 0.85rem;
     }
 
-    .copyright {
-      color: #8fa4be;
-      font-size: 0.62rem;
-      line-height: 1.35;
-      margin: 0;
+    .version-copy {
+      display: grid;
+      gap: 0.12rem;
     }
 
-    .collapse-toggle {
-      background: transparent;
-      border: 0;
-      color: #b8c9dc;
-      cursor: default;
-      font-size: 1rem;
-      line-height: 1;
-      padding: 0;
+    .version-copy strong {
+      color: #fff;
+      font-size: 0.78rem;
+    }
+
+    .version-copy span {
+      color: #9eb2cb;
+      font-size: 0.68rem;
+    }
+
+    .version-art svg {
+      height: 2.1rem;
+      width: 2.1rem;
     }
 
     @media (max-width: 820px) {

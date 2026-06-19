@@ -9,7 +9,7 @@ import { PlatformSubscriptionPlanApiService } from '../../services/platform-subs
 import { PlatformSubscriptionPlansPage } from './platform-subscription-plans-page';
 
 describe('PlatformSubscriptionPlansPage', () => {
-  let api: { getPlans: ReturnType<typeof vi.fn> };
+  let api: { getSubscriptionPlans: ReturnType<typeof vi.fn> };
 
   async function createComponent(): Promise<ComponentFixture<PlatformSubscriptionPlansPage>> {
     await TestBed.configureTestingModule({
@@ -31,19 +31,19 @@ describe('PlatformSubscriptionPlansPage', () => {
   }
 
   beforeEach(() => {
-    api = { getPlans: vi.fn() };
+    api = { getSubscriptionPlans: vi.fn() };
   });
 
   it('shows skeleton rows while loading', async () => {
-    api.getPlans.mockReturnValue(new Subject().asObservable());
+    api.getSubscriptionPlans.mockReturnValue(new Subject().asObservable());
 
     const fixture = await createComponent();
     expect(fixture.nativeElement.querySelector('.skeleton-row')).toBeTruthy();
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('—');
   });
 
-  it('renders plan rows returned by the backend response', async () => {
-    api.getPlans.mockReturnValue(of(createSubscriptionPlanListResponse()));
+  it('renders plan rows returned by the backend response with mapped status label', async () => {
+    api.getSubscriptionPlans.mockReturnValue(of(createSubscriptionPlanListResponse()));
 
     const fixture = await createComponent();
     await fixture.whenStable();
@@ -51,12 +51,66 @@ describe('PlatformSubscriptionPlansPage', () => {
 
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain('Subscription Plans');
-    expect(text).toContain('Professional Plus');
-    expect(text).toContain('PROF-PLUS');
+    expect(text).toContain('Test Subscription Plan');
+    expect(text).toContain('TEST-PLAN');
+    expect(text).toContain('Published');
+    expect(text).not.toContain('published');
+  });
+
+  it('sends active status filter when Published tab is selected', async () => {
+    api.getSubscriptionPlans.mockReturnValue(of(createSubscriptionPlanListResponse()));
+
+    const fixture = await createComponent();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    fixture.componentInstance.onTabChange('published');
+    await fixture.whenStable();
+
+    expect(api.getSubscriptionPlans).toHaveBeenLastCalledWith(
+      expect.objectContaining({ status: 'active' })
+    );
+  });
+
+  it('sends retired status filter when Archived tab is selected', async () => {
+    api.getSubscriptionPlans.mockReturnValue(of(createSubscriptionPlanListResponse()));
+
+    const fixture = await createComponent();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    fixture.componentInstance.onTabChange('archived');
+    await fixture.whenStable();
+
+    expect(api.getSubscriptionPlans).toHaveBeenLastCalledWith(
+      expect.objectContaining({ status: 'retired' })
+    );
+  });
+
+  it('maps backend status values to UI labels', async () => {
+    api.getSubscriptionPlans.mockReturnValue(
+      of(createSubscriptionPlanListResponse({
+        items: [
+          { ...createSubscriptionPlanListResponse().items[0], id: 'draft-plan', status: 'draft' },
+          { ...createSubscriptionPlanListResponse().items[0], id: 'active-plan', status: 'active' },
+          { ...createSubscriptionPlanListResponse().items[0], id: 'retired-plan', status: 'retired' }
+        ],
+        totalItems: 3
+      }))
+    );
+
+    const fixture = await createComponent();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Draft');
+    expect(text).toContain('Published');
+    expect(text).toContain('Archived');
   });
 
   it('shows empty state when no plans are returned', async () => {
-    api.getPlans.mockReturnValue(
+    api.getSubscriptionPlans.mockReturnValue(
       of(createSubscriptionPlanListResponse({ items: [], totalItems: 0, statusCounts: { all: 0, draft: 0, published: 0, archived: 0 } }))
     );
 
@@ -68,7 +122,7 @@ describe('PlatformSubscriptionPlansPage', () => {
   });
 
   it('shows error state with retry when API fails', async () => {
-    api.getPlans.mockReturnValue(throwError(() => new Error('network')));
+    api.getSubscriptionPlans.mockReturnValue(throwError(() => new Error('network')));
 
     const fixture = await createComponent();
     await fixture.whenStable();
@@ -80,7 +134,7 @@ describe('PlatformSubscriptionPlansPage', () => {
   });
 
   it('links Create Plan to /admin/subscriptions/create', async () => {
-    api.getPlans.mockReturnValue(of(createSubscriptionPlanListResponse()));
+    api.getSubscriptionPlans.mockReturnValue(of(createSubscriptionPlanListResponse()));
 
     const fixture = await createComponent();
     await fixture.whenStable();

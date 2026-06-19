@@ -1,21 +1,26 @@
 import { DatePipe } from '@angular/common';
-import { Component, DestroyRef, inject, signal } from '@angular/core';
+import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 
 import { platformPermissions } from '../../../../core/config/permission-keys';
 import { AccessControlService } from '../../../../core/services/access-control.service';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
+import { SubscriptionPlanListResponse } from '../../models/platform-subscription-plan.model';
 import {
-  SubscriptionPlanListResponse,
-  SubscriptionPlanStatus
-} from '../../models/platform-subscription-plan.model';
+  subscriptionPlanApiStatusFilterToTab,
+  subscriptionPlanStatusBadgeClass,
+  subscriptionPlanStatusFilterToApiValue,
+  subscriptionPlanStatusLabel,
+  subscriptionPlanTabToApiStatusFilter,
+  SubscriptionPlanStatusTab
+} from '../../models/subscription-plan-status.util';
 import { PlatformSubscriptionPlanApiService } from '../../services/platform-subscription-plan-api.service';
 
-type StatusTab = 'all' | SubscriptionPlanStatus;
+type StatusTab = SubscriptionPlanStatusTab;
 
 @Component({
   selector: 'app-platform-subscription-plans-page',
@@ -23,6 +28,10 @@ type StatusTab = 'all' | SubscriptionPlanStatus;
   imports: [DatePipe, FormsModule, RouterLink],
   template: `
     <section class="plans-page">
+      @if (successMessage()) {
+        <div class="toast success" role="status">{{ successMessage() }}</div>
+      }
+
       <header class="page-heading">
         <div class="title-block">
           <nav class="breadcrumb" aria-label="Breadcrumb">
@@ -75,8 +84,8 @@ type StatusTab = 'all' | SubscriptionPlanStatus;
           <select [ngModel]="statusFilter()" (ngModelChange)="onStatusChange($event)">
             <option value="">All</option>
             <option value="draft">Draft</option>
-            <option value="published">Published</option>
-            <option value="archived">Archived</option>
+            <option value="active">Published</option>
+            <option value="retired">Archived</option>
           </select>
         </label>
         <label class="filter-field">
@@ -202,7 +211,7 @@ type StatusTab = 'all' | SubscriptionPlanStatus;
                       <td class="cell-text">{{ plan.addOnsCount }} add-ons</td>
                       <td class="cell-num">{{ plan.activeTenantsCount }}</td>
                       <td>
-                        <span class="status-badge" [class]="statusClass(plan.status)">{{ titleCase(plan.status) }}</span>
+                        <span class="status-badge" [class]="statusBadgeClass(plan.status)">{{ statusLabel(plan.status) }}</span>
                       </td>
                       <td class="cell-text">{{ plan.lastUpdatedAt | date: 'mediumDate' }}</td>
                       <td class="actions-cell">
@@ -283,6 +292,17 @@ type StatusTab = 'all' | SubscriptionPlanStatus;
     * { box-sizing: border-box; }
 
     .plans-page { display: grid; gap: 1.15rem; }
+
+    .toast {
+      background: #ecfdf3;
+      border: 1px solid #abefc6;
+      border-radius: 12px;
+      box-shadow: 0 10px 24px rgba(16, 24, 40, 0.12);
+      color: #027a48;
+      font-size: 0.88rem;
+      font-weight: 600;
+      padding: 0.85rem 1rem;
+    }
 
     .page-heading {
       align-items: flex-start;
@@ -654,11 +674,12 @@ type StatusTab = 'all' | SubscriptionPlanStatus;
     }
   `
 })
-export class PlatformSubscriptionPlansPage {
+export class PlatformSubscriptionPlansPage implements OnInit {
   private readonly api = inject(PlatformSubscriptionPlanApiService);
   private readonly apiError = inject(ApiErrorService);
   private readonly accessControl = inject(AccessControlService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly router = inject(Router);
   private readonly searchChanges$ = new Subject<string>();
 
   readonly skeletonRows = [1, 2, 3, 4, 5];
@@ -683,6 +704,17 @@ export class PlatformSubscriptionPlansPage {
   readonly pageNumber = signal(1);
   readonly pageSize = signal(10);
   readonly openMenuId = signal<string | null>(null);
+  readonly successMessage = signal<string | null>(null);
+
+  ngOnInit(): void {
+    const navigationState = this.router.currentNavigation()?.extras.state
+      ?? history.state as { successMessage?: string };
+
+    if (navigationState?.successMessage) {
+      this.successMessage.set(navigationState.successMessage);
+      history.replaceState({}, '');
+    }
+  }
 
   constructor() {
     this.searchChanges$
@@ -707,7 +739,19 @@ export class PlatformSubscriptionPlansPage {
       return 0;
     }
 
-    return counts[tab];
+    if (tab === 'all') {
+      return counts.all;
+    }
+
+    if (tab === 'draft') {
+      return counts.draft;
+    }
+
+    if (tab === 'published') {
+      return counts.published;
+    }
+
+    return counts.archived;
   }
 
   tabCountLabel(tab: StatusTab): string {
@@ -720,7 +764,7 @@ export class PlatformSubscriptionPlansPage {
 
   onTabChange(tab: StatusTab): void {
     this.activeTab.set(tab);
-    this.statusFilter.set(tab === 'all' ? '' : tab);
+    this.statusFilter.set(subscriptionPlanTabToApiStatusFilter(tab) ?? '');
     this.pageNumber.set(1);
     this.loadPage();
   }
@@ -737,7 +781,7 @@ export class PlatformSubscriptionPlansPage {
 
   onStatusChange(value: string): void {
     this.statusFilter.set(value);
-    this.activeTab.set(value === '' ? 'all' : (value as StatusTab));
+    this.activeTab.set(value === '' ? 'all' : subscriptionPlanApiStatusFilterToTab(value));
     this.pageNumber.set(1);
     this.loadPage();
   }
@@ -770,12 +814,12 @@ export class PlatformSubscriptionPlansPage {
     this.errorMessage.set(null);
     this.openMenuId.set(null);
 
-    this.api.getPlans({
+    this.api.getSubscriptionPlans({
       pageNumber: this.pageNumber(),
       pageSize: this.pageSize(),
       search: this.searchTerm(),
       planType: this.planTypeFilter(),
-      status: this.statusFilter(),
+      status: this.statusFilter() ? subscriptionPlanStatusFilterToApiValue(this.statusFilter()) : undefined,
       billingCycle: this.billingCycleFilter(),
       currencyCode: this.currencyFilter(),
       sortBy: 'updatedAt',
@@ -841,17 +885,12 @@ export class PlatformSubscriptionPlansPage {
     return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
   }
 
-  statusClass(status: string): string {
-    const normalized = status.toLowerCase();
-    if (normalized === 'published' || normalized === 'active') {
-      return 'published';
-    }
+  statusLabel(status: string): string {
+    return subscriptionPlanStatusLabel(status);
+  }
 
-    if (normalized === 'draft') {
-      return 'draft';
-    }
-
-    return 'archived';
+  statusBadgeClass(status: string): string {
+    return subscriptionPlanStatusBadgeClass(status);
   }
 
   planColor(name: string): string {

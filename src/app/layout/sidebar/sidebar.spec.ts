@@ -110,4 +110,26 @@ describe('Sidebar', () => {
     expect(fixture.nativeElement.querySelector('.alert-badge')).toBeNull();
     expect(alertsLink?.textContent).not.toMatch(/\b12\b/);
   });
+
+  it('does not render a sidebar collapse button', async () => {
+    await TestBed.configureTestingModule({
+      imports: [Sidebar],
+      providers: [
+        provideRouter([]),
+        {
+          provide: AuthSessionService,
+          useValue: { currentUser: () => createAuthSession().user }
+        }
+      ]
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(Sidebar);
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.textContent).not.toContain('Collapse');
+    expect(root.querySelector('.collapse-btn, [aria-label="Collapse sidebar"]')).toBeNull();
+    expect(root.textContent).toContain('SCS TIX Platform');
+    expect(root.textContent).toContain('Version 2.4.0');
+  });
 });
