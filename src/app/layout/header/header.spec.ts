@@ -46,4 +46,31 @@ describe('Header', () => {
     expect(searchInput).toBeTruthy();
     expect(searchInput?.getAttribute('placeholder')).toBe('Search tenants, owners, email...');
   });
+
+  it('shows breadcrumb and system status on /admin/subscriptions/create without hamburger menu', async () => {
+    await TestBed.configureTestingModule({
+      imports: [Header],
+      providers: [
+        provideRouter([{ path: 'admin/subscriptions/create', component: BlankRouteComponent }]),
+        { provide: AuthSessionService, useValue: { currentUser: () => createAuthSession().user } }
+      ]
+    }).compileComponents();
+
+    const router = TestBed.inject(Router);
+    await router.navigateByUrl('/admin/subscriptions/create');
+
+    const fixture = TestBed.createComponent(Header);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const breadcrumb = root.querySelector('.header-breadcrumb');
+
+    expect(breadcrumb?.textContent).toContain('Subscriptions');
+    expect(breadcrumb?.textContent).toContain('Create Plan');
+    expect(root.textContent).toContain('All Systems Operational');
+    expect(root.querySelector('.menu-toggle, .hamburger, [aria-label="Open menu"]')).toBeNull();
+    expect(root.querySelector('.help')).toBeNull();
+    expect(root.querySelector('.settings')).toBeNull();
+  });
 });

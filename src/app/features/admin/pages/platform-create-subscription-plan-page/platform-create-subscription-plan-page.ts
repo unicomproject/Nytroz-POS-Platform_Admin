@@ -1,12 +1,13 @@
-import { DatePipe } from '@angular/common';
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 
+import { ApiErrorService } from '../../../../core/services/api-error.service';
 import {
   ModuleAvailability,
   PlatformFeatureOption,
   PlatformModuleOption,
+  SubscriptionDbBillingCycle,
   SubscriptionPlanDraft
 } from '../../models/platform-subscription-plan.model';
 import { PlatformSubscriptionPlanApiService } from '../../services/platform-subscription-plan-api.service';
@@ -16,121 +17,193 @@ type WizardStep = 'basics' | 'modules' | 'features' | 'pricing' | 'limits' | 're
 @Component({
   selector: 'app-platform-create-subscription-plan-page',
   standalone: true,
-  imports: [DatePipe, FormsModule, ReactiveFormsModule, RouterLink],
+  imports: [FormsModule, ReactiveFormsModule],
   template: `
     <section class="wizard-page">
+      @if (successMessage()) {
+        <div class="toast success" role="status">{{ successMessage() }}</div>
+      }
+      @if (errorMessage()) {
+        <div class="toast error" role="alert">{{ errorMessage() }}</div>
+      }
+
       <header class="page-heading">
-        <div class="title-block">
-          <a class="back-link" routerLink="/admin/subscriptions" aria-label="Back to subscription plans">← Back</a>
-          <nav class="breadcrumb" aria-label="Breadcrumb">
-            <span>Subscriptions</span>
-            <span aria-hidden="true">/</span>
-            <span class="current">Create Plan</span>
-          </nav>
-          <h1>Create Subscription Plan</h1>
-          <p>Configure plan package, pricing, features, and limits.</p>
+        <div class="heading-row">
+          <div class="heading-copy">
+            <h1>Create Subscription Plan</h1>
+            <p>Build a subscription package for your tenants.</p>
+          </div>
+          <div class="top-actions action-group">
+            <button type="button" class="btn outline back-btn" (click)="goBack()">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Back
+            </button>
+            <button type="button" class="btn outline save-btn" (click)="saveDraft()" [disabled]="isSaving()">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5zM8 5V3h8v2M12 11v5M9.5 13.5L12 11l2.5 2.5" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+              Save Draft
+            </button>
+            @if (currentStep() !== 'review') {
+              <button type="button" class="btn primary next-btn" (click)="nextStep()">
+                Next
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+            }
+          </div>
         </div>
-        <button type="button" class="btn outline" (click)="saveDraft()" [disabled]="isSaving()">
-          Save Draft
-        </button>
       </header>
+
+      <ol class="stepper" aria-label="Create plan steps">
+        @for (step of steps; track step.key; let index = $index) {
+          <li
+            [class.active]="currentStep() === step.key"
+            [class.done]="stepIndex(currentStep()) > index"
+          >
+            <span class="step-num">{{ index + 1 }}</span>
+            <span class="step-label">{{ step.label }}</span>
+          </li>
+        }
+      </ol>
 
       <div class="wizard-layout">
         <div class="wizard-main">
-          <ol class="stepper" aria-label="Create plan steps">
-            @for (step of steps; track step.key; let index = $index) {
-              <li [class.active]="currentStep() === step.key" [class.done]="stepIndex(currentStep()) > index">
-                <span class="step-num">{{ index + 1 }}</span>
-                <span class="step-label">{{ step.label }}</span>
-              </li>
-            }
-          </ol>
-
           <section class="step-card card">
             @switch (currentStep()) {
               @case ('basics') {
-                <header class="step-header">
-                  <h2>Plan Basics</h2>
-                  <p>Define the basic information about this plan.</p>
+                <header class="step-header with-icon">
+                  <span class="step-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none">
+                      <path d="M8 4h8a2 2 0 0 1 2 2v14H6V6a2 2 0 0 1 2-2z" stroke="currentColor" stroke-width="1.6" />
+                      <path d="M9 9h6M9 13h6M9 17h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                    </svg>
+                  </span>
+                  <div>
+                    <h2>Plan Basics</h2>
+                    <p>Define the basic information about this plan.</p>
+                  </div>
                 </header>
-                <form class="step-form" [formGroup]="basicsForm">
+                <form class="step-form basics-form" [formGroup]="basicsForm">
                   <label>
-                    <span>Plan Name</span>
-                    <input formControlName="planName" placeholder="Professional Plus" />
+                    <span>Plan Name <em>*</em></span>
+                    <div class="field-shell">
+                      <span class="field-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><path d="M8 4h8v16H8zM10 8h4M10 12h4M10 16h3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+                      </span>
+                      <input formControlName="planName" placeholder="Enter plan name" />
+                    </div>
                     @if (basicsForm.controls.planName.touched && basicsForm.controls.planName.invalid) {
                       <small class="error">Plan name is required.</small>
+                    } @else {
+                      <small>This name will be visible to tenants.</small>
                     }
                   </label>
+
                   <label>
-                    <span>Plan Code</span>
-                    <input formControlName="planCode" placeholder="PROF-PLUS" (input)="onPlanCodeInput($event)" />
-                    <small>Unique code for internal reference. Cannot be changed after publish.</small>
+                    <span>Plan Code <em>*</em></span>
+                    <div class="field-shell">
+                      <span class="field-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><path d="M8 8l-2 2 2 2M16 8l2 2-2 2M14 6l-4 12" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+                      </span>
+                      <input formControlName="planCode" placeholder="Enter plan code" (input)="onPlanCodeInput($event)" />
+                    </div>
+                    @if (basicsForm.controls.planCode.touched && basicsForm.controls.planCode.invalid) {
+                      <small class="error">Plan code is required.</small>
+                    } @else {
+                      <small>Unique code for internal reference. Cannot be changed after publish.</small>
+                    }
                   </label>
+
                   <label class="full">
                     <span>Description</span>
-                    <textarea formControlName="description" rows="4" maxlength="500"></textarea>
-                    <small>{{ basicsForm.controls.description.value.length }}/500</small>
+                    <div class="field-shell textarea-shell">
+                      <span class="field-icon top" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><path d="M4 20h16M7 16l9-9 3 3-9 9H7z" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+                      </span>
+                      <textarea formControlName="description" rows="4" maxlength="500" placeholder="Enter description about this plan"></textarea>
+                    </div>
+                    <div class="field-meta">
+                      @if (basicsForm.controls.description.touched && basicsForm.controls.description.invalid) {
+                        <small class="error">Description cannot exceed 500 characters.</small>
+                      } @else {
+                        <small>Short description about this plan.</small>
+                      }
+                      <small class="char-count">{{ basicsForm.controls.description.value.length }}/500</small>
+                    </div>
                   </label>
-                  <label>
-                    <span>Plan Type</span>
-                    <select formControlName="planType">
-                      <option value="free">Free</option>
-                      <option value="trial">Trial</option>
-                      <option value="paid">Paid</option>
-                      <option value="custom">Custom</option>
-                    </select>
-                  </label>
-                  <label>
-                    <span>Currency</span>
-                    <select formControlName="currencyCode">
-                      <option value="LKR">LKR - Sri Lankan Rupee</option>
-                      <option value="USD">USD - US Dollar</option>
-                      <option value="GBP">GBP - British Pound</option>
-                      <option value="EUR">EUR - Euro</option>
-                    </select>
-                  </label>
-                  <label>
-                    <span>Tax Mode</span>
-                    <select formControlName="taxMode">
-                      <option value="excluded">Excluded</option>
-                      <option value="included">Included</option>
-                    </select>
-                  </label>
-                  <fieldset class="full">
-                    <legend>Visibility</legend>
-                    <label class="radio"><input type="radio" formControlName="visibility" value="public" /> Public</label>
-                    <label class="radio"><input type="radio" formControlName="visibility" value="internal" /> Internal</label>
-                  </fieldset>
-                  <label>
-                    <span>Effective Date</span>
-                    <input type="date" formControlName="effectiveFrom" />
-                  </label>
+
+                  <div class="row-three">
+                    <label>
+                      <span>Billing Cycle <em>*</em></span>
+                      <div class="field-shell">
+                        <span class="field-icon" aria-hidden="true">
+                          <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M8 3v4M16 3v4M4 10h16" stroke="currentColor" stroke-width="1.5"/></svg>
+                        </span>
+                        <select formControlName="billingCycle">
+                          <option value="">Select billing cycle</option>
+                          @for (option of billingCycleOptions; track option.value) {
+                            <option [value]="option.value">{{ option.label }}</option>
+                          }
+                        </select>
+                      </div>
+                      @if (basicsForm.controls.billingCycle.touched && basicsForm.controls.billingCycle.invalid) {
+                        <small class="error">Billing cycle is required.</small>
+                      } @else {
+                        <small>Choose how this plan will be billed.</small>
+                      }
+                    </label>
+
+                    <label>
+                      <span>Currency <em>*</em></span>
+                      <div class="field-shell">
+                        <span class="field-icon" aria-hidden="true">
+                          <svg viewBox="0 0 24 24"><path d="M12 3v18M8 7h6a3 3 0 0 1 0 6H8M8 13h7a3 3 0 0 1 0 6H8" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+                        </span>
+                        <select formControlName="baseCurrency">
+                          <option value="">Select currency</option>
+                          <option value="LKR">LKR - Sri Lankan Rupee</option>
+                          <option value="USD">USD - US Dollar</option>
+                          <option value="GBP">GBP - British Pound</option>
+                          <option value="EUR">EUR - Euro</option>
+                        </select>
+                      </div>
+                      @if (basicsForm.controls.baseCurrency.touched && basicsForm.controls.baseCurrency.invalid) {
+                        <small class="error">Currency is required.</small>
+                      } @else {
+                        <small>Default currency for pricing.</small>
+                      }
+                    </label>
+
+                    <label>
+                      <span>Status</span>
+                      <div class="field-shell readonly status-field">
+                        <span class="status-dot draft" aria-hidden="true"></span>
+                        <span class="status-value">Draft</span>
+                      </div>
+                      <small>Plan is in draft until you publish it.</small>
+                    </label>
+                  </div>
+
                   <div class="alert draft full">
-                    <strong>Status: Draft</strong>
-                    <span>Plan is in Draft until you publish it. Only published plans can be assigned to tenants.</span>
+                    <span class="alert-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24"><path d="M8 4h8v16H8zM10 8h4M10 12h4" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+                    </span>
+                    <div>
+                      <strong>Plan Status: Draft</strong>
+                      <span>Plan is in draft until you publish it. Only active plans can be assigned to tenants.</span>
+                    </div>
                   </div>
                 </form>
               }
               @case ('modules') {
-                <header class="step-header">
-                  <h2>Modules</h2>
-                  <p>Select which modules are included or available as add-ons.</p>
-                </header>
+                <header class="step-header"><h2>Modules</h2><p>Select which modules are included or available as add-ons.</p></header>
                 @if (modulesLoading()) {
                   <p class="muted">Loading modules from platform catalog...</p>
                 } @else if (!modules().length) {
-                  <div class="empty-step">
-                    <strong>Module catalog unavailable</strong>
-                    <span>Modules will load from the platform API when the catalog endpoint is available.</span>
-                  </div>
+                  <div class="empty-step"><strong>Module catalog unavailable</strong><span>Modules will load from the platform API when the catalog endpoint is available.</span></div>
                 } @else {
                   <div class="module-grid">
                     @for (module of modules(); track module.id) {
                       <article class="module-card" [class.selected]="moduleAvailability()[module.id] !== 'not_available'">
-                        <div class="module-head">
-                          <strong>{{ module.name }}</strong>
-                          <p>{{ module.description || 'No description provided.' }}</p>
-                        </div>
+                        <div class="module-head"><strong>{{ module.name }}</strong><p>{{ module.description || 'No description provided.' }}</p></div>
                         <select [ngModel]="moduleAvailability()[module.id]" (ngModelChange)="setModuleAvailability(module.id, $event)">
                           <option value="included">Included</option>
                           <option value="addon">Add-on</option>
@@ -142,42 +215,22 @@ type WizardStep = 'basics' | 'modules' | 'features' | 'pricing' | 'limits' | 're
                 }
               }
               @case ('features') {
-                <header class="step-header">
-                  <h2>Features</h2>
-                  <p>Configure feature entitlements grouped by module.</p>
-                </header>
+                <header class="step-header"><h2>Features</h2><p>Configure feature entitlements grouped by module.</p></header>
                 @if (!features().length) {
-                  <div class="empty-step">
-                    <strong>Feature catalog unavailable</strong>
-                    <span>Features will load from the platform API when the catalog endpoint is available.</span>
-                  </div>
+                  <div class="empty-step"><strong>Feature catalog unavailable</strong><span>Features will load from the platform API when the catalog endpoint is available.</span></div>
                 } @else {
                   @for (group of featureGroups(); track group.moduleId) {
                     <section class="feature-group">
                       <h3>{{ group.moduleName }}</h3>
                       <table>
-                        <thead>
-                          <tr>
-                            <th>Feature</th>
-                            <th>Included</th>
-                            <th>Add-on</th>
-                            <th>Not Available</th>
-                          </tr>
-                        </thead>
+                        <thead><tr><th>Feature</th><th>Included</th><th>Add-on</th><th>Not Available</th></tr></thead>
                         <tbody>
                           @for (feature of group.features; track feature.id) {
                             <tr [class.disabled]="isFeatureDisabled(feature)">
                               <td><strong>{{ feature.name }}</strong></td>
                               @for (option of availabilityOptions; track option) {
                                 <td class="radio-cell">
-                                  <input
-                                    type="radio"
-                                    [name]="feature.id"
-                                    [value]="option"
-                                    [checked]="featureAvailability()[feature.id] === option"
-                                    [disabled]="isFeatureDisabled(feature)"
-                                    (change)="setFeatureAvailability(feature.id, option)"
-                                  />
+                                  <input type="radio" [name]="feature.id" [value]="option" [checked]="featureAvailability()[feature.id] === option" [disabled]="isFeatureDisabled(feature)" (change)="setFeatureAvailability(feature.id, option)" />
                                 </td>
                               }
                             </tr>
@@ -189,91 +242,147 @@ type WizardStep = 'basics' | 'modules' | 'features' | 'pricing' | 'limits' | 're
                 }
               }
               @case ('pricing') {
-                <header class="step-header">
-                  <h2>Pricing</h2>
-                  <p>Set tenant monthly and annual pricing for this plan.</p>
+                <header class="step-header with-icon">
+                  <span class="step-icon pricing-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none">
+                      <path d="M4 7h16v10H4z" stroke="currentColor" stroke-width="1.6" />
+                      <path d="M8 11h8M8 14h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                    </svg>
+                  </span>
+                  <div>
+                    <h2>Base Pricing</h2>
+                    <p>Define the base price for this subscription plan.</p>
+                  </div>
                 </header>
-                <form class="step-form" [formGroup]="pricingForm">
-                  <label><span>Tenant Monthly Price</span><input type="number" formControlName="monthlyPrice" min="0" step="0.01" /></label>
-                  <label><span>Tenant Annual Price</span><input type="number" formControlName="annualPrice" min="0" step="0.01" /></label>
-                  @if (annualDiscount() != null) {
-                    <p class="discount-note full">Annual discount: {{ annualDiscount() }}%</p>
-                  }
-                  <label><span>Trial Days</span><input type="number" formControlName="trialDays" min="0" /></label>
-                  <label>
-                    <span>Billing Cycle</span>
-                    <select formControlName="billingCycle">
-                      <option value="monthly">Monthly</option>
-                      <option value="annual">Annual</option>
-                      <option value="both">Both</option>
-                    </select>
-                  </label>
-                  <label><span>Setup Fee (optional)</span><input type="number" formControlName="setupFee" min="0" step="0.01" /></label>
+                <form class="pricing-form" [formGroup]="pricingForm">
+                  <div class="row-three">
+                    <label>
+                      <span>Billing Cycle</span>
+                      <div class="field-shell readonly">
+                        <span class="field-icon" aria-hidden="true">
+                          <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M8 3v4M16 3v4M4 10h16" stroke="currentColor" stroke-width="1.5"/></svg>
+                        </span>
+                        <span class="readonly-value">{{ billingCycleLabel() }}</span>
+                      </div>
+                      <small>Selected in Basics step.</small>
+                    </label>
+
+                    <label>
+                      <span>Currency</span>
+                      <div class="field-shell readonly">
+                        <span class="field-icon" aria-hidden="true">
+                          <svg viewBox="0 0 24 24"><path d="M12 3v18M8 7h6a3 3 0 0 1 0 6H8M8 13h7a3 3 0 0 1 0 6H8" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+                        </span>
+                        <span class="readonly-value">{{ currencyLabel() }}</span>
+                      </div>
+                      <small>Selected in Basics step.</small>
+                    </label>
+
+                    <label>
+                      <span>Base Price <em>*</em></span>
+                      <div class="field-shell" [class.invalid]="pricingForm.controls.basePrice.touched && pricingForm.controls.basePrice.invalid">
+                        <span class="currency-prefix">{{ basicsForm.controls.baseCurrency.value || 'LKR' }}</span>
+                        <input
+                          [value]="basePriceInput()"
+                          placeholder="0.00"
+                          inputmode="decimal"
+                          (input)="onBasePriceInput($event)"
+                          (blur)="onBasePriceBlur()"
+                        />
+                      </div>
+                      @if (pricingForm.controls.basePrice.touched && pricingForm.controls.basePrice.invalid) {
+                        <small class="error">Base price is required and cannot be negative.</small>
+                      } @else {
+                        <small>This is the base subscription price for the selected billing cycle.</small>
+                      }
+                    </label>
+                  </div>
+
+                  <div class="alert info full">
+                    <span class="alert-icon info" aria-hidden="true">
+                      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M12 10v6M12 7h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                    </span>
+                    <span>This base price will be used for tenant subscription billing based on the selected billing cycle.</span>
+                  </div>
                 </form>
               }
               @case ('limits') {
-                <header class="step-header">
-                  <h2>Limits</h2>
-                  <p>Define usage limits for tenants on this plan.</p>
-                </header>
+                <header class="step-header"><h2>Limits</h2><p>Define usage limits for tenants on this plan.</p></header>
                 <form class="step-form" [formGroup]="limitsForm">
-                  <label><span>Outlet Limit</span><input type="number" formControlName="outletLimit" min="0" /></label>
-                  <label><span>Till Limit</span><input type="number" formControlName="tillLimit" min="0" /></label>
-                  <label><span>User Limit</span><input type="number" formControlName="userLimit" min="0" /></label>
+                  <label><span>Outlet Limit</span><input type="number" formControlName="maxOutlets" min="0" /></label>
+                  <label><span>Till Limit</span><input type="number" formControlName="maxTills" min="0" /></label>
+                  <label><span>User Limit</span><input type="number" formControlName="maxUsers" min="0" /></label>
                 </form>
               }
               @case ('review') {
-                <header class="step-header">
-                  <h2>Review &amp; Publish</h2>
-                  <p>Review plan configuration before publishing.</p>
-                </header>
+                <header class="step-header"><h2>Review &amp; Publish</h2><p>Review plan configuration before publishing.</p></header>
                 <dl class="review-list">
                   <div><dt>Plan Name</dt><dd>{{ basicsForm.controls.planName.value || '—' }}</dd></div>
                   <div><dt>Plan Code</dt><dd>{{ basicsForm.controls.planCode.value || '—' }}</dd></div>
-                  <div><dt>Tenant Monthly Price</dt><dd>{{ pricingForm.controls.monthlyPrice.value ?? '—' }}</dd></div>
-                  <div><dt>Tenant Annual Price</dt><dd>{{ pricingForm.controls.annualPrice.value ?? '—' }}</dd></div>
+                  <div><dt>Billing Cycle</dt><dd>{{ billingCycleLabel() }}</dd></div>
+                  <div><dt>Currency</dt><dd>{{ basicsForm.controls.baseCurrency.value || '—' }}</dd></div>
+                  <div><dt>Base Price</dt><dd>{{ pricingForm.controls.basePrice.value ?? '—' }}</dd></div>
                 </dl>
-                <div class="review-actions">
-                  <button type="button" class="btn outline" (click)="saveDraft()" [disabled]="isSaving()">Save Draft</button>
-                  <button type="button" class="btn outline" disabled title="Preview tenant view API pending">Preview Tenant View</button>
-                  <button type="button" class="btn primary" (click)="openPublishModal()">Publish Plan</button>
-                </div>
+                <button type="button" class="btn primary" (click)="openPublishModal()">Publish Plan</button>
               }
             }
           </section>
-
-          <footer class="wizard-nav">
-            <button type="button" class="btn outline" [disabled]="stepIndex(currentStep()) === 0" (click)="prevStep()">Previous</button>
-            @if (currentStep() !== 'review') {
-              <button type="button" class="btn primary" (click)="nextStep()">Next</button>
-            }
-          </footer>
         </div>
 
         <aside class="draft-summary card" aria-label="Draft summary">
-          <h2>Draft Summary</h2>
-          <dl>
+          <header class="summary-head">
+            <span class="summary-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M8 4h8v16H8zM10 8h4M10 12h4" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+            </span>
+            <h2>Draft Summary</h2>
+          </header>
+          <dl class="summary-rows">
             <div><dt>Plan Name</dt><dd>{{ basicsForm.controls.planName.value || '—' }}</dd></div>
             <div><dt>Plan Code</dt><dd>{{ basicsForm.controls.planCode.value || '—' }}</dd></div>
-            <div><dt>Plan Type</dt><dd>{{ basicsForm.controls.planType.value || '—' }}</dd></div>
+            <div><dt>Billing Cycle</dt><dd>{{ billingCycleLabel() }}</dd></div>
+            <div><dt>Currency</dt><dd>{{ currencyLabel() }}</dd></div>
+            @if (showBasePriceInSummary()) {
+              <div><dt>Base Price</dt><dd>{{ basePriceSummaryLabel() }}</dd></div>
+            }
             <div><dt>Status</dt><dd><span class="status-dot draft">Draft</span></dd></div>
-            <div><dt>Modules</dt><dd>{{ includedModulesCount() || '—' }}</dd></div>
-            <div><dt>Tenant Monthly Price</dt><dd>{{ pricingForm.controls.monthlyPrice.value ?? '—' }}</dd></div>
-            <div><dt>Tenant Annual Price</dt><dd>{{ pricingForm.controls.annualPrice.value ?? '—' }}</dd></div>
-            <div><dt>Effective Date</dt><dd>{{ basicsForm.controls.effectiveFrom.value | date: 'mediumDate' }}</dd></div>
           </dl>
-          <p class="summary-note">Complete all steps to see full summary.</p>
+          <div class="summary-progress">
+            <div><span>Modules</span><strong [class]="modulesSummaryClass()">{{ modulesSummary() }}</strong></div>
+            <div><span>Features</span><strong [class]="featuresSummaryClass()">{{ featuresSummary() }}</strong></div>
+            <div><span>Pricing</span><strong [class]="pricingSummaryClass()">{{ pricingSummary() }}</strong></div>
+            <div><span>Limits</span><strong [class]="limitsSummaryClass()">{{ limitsSummary() }}</strong></div>
+          </div>
+          <p class="summary-note">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M12 10v6M12 7h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            Complete all steps to see full summary.
+          </p>
         </aside>
       </div>
+
+      <footer class="action-bar">
+        <button type="button" class="btn outline back-btn" (click)="goBack()">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Back
+        </button>
+        <div class="action-group">
+          <button type="button" class="btn outline save-btn" (click)="saveDraft()" [disabled]="isSaving()">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5zM8 5V3h8v2M12 11v5M9.5 13.5L12 11l2.5 2.5" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+            Save Draft
+          </button>
+          @if (currentStep() !== 'review') {
+            <button type="button" class="btn primary next-btn" (click)="nextStep()">
+              Next
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          }
+        </div>
+      </footer>
 
       @if (showPublishModal()) {
         <div class="modal-backdrop" role="presentation" (click)="closePublishModal()"></div>
         <dialog class="modal" open aria-labelledby="publish-title">
           <h3 id="publish-title">Publish subscription plan?</h3>
-          <p>
-            Once published, this plan can be assigned to tenants. Some fields cannot be edited directly after publishing.
-            Pricing, feature, or limit changes should create a new plan version. Do you want to continue?
-          </p>
+          <p>Once published, this plan can be assigned to tenants. Some fields cannot be edited directly after publishing.</p>
           <div class="modal-actions">
             <button type="button" class="btn outline" (click)="closePublishModal()">Cancel</button>
             <button type="button" class="btn primary" (click)="confirmPublish()" [disabled]="isSaving()">Publish Plan</button>
@@ -283,77 +392,137 @@ type WizardStep = 'basics' | 'modules' | 'features' | 'pricing' | 'limits' | 're
     </section>
   `,
   styles: `
-    :host { color: #14213d; display: block; }
+    :host { color: #14213d; display: block; padding-bottom: 5.75rem; }
     * { box-sizing: border-box; }
-    .wizard-page { display: grid; gap: 1rem; }
-    .page-heading { align-items: flex-start; display: flex; gap: 1rem; justify-content: space-between; }
-    .back-link { color: #667085; font-size: 0.82rem; text-decoration: none; }
-    .breadcrumb { color: #667085; display: flex; font-size: 0.78rem; gap: 0.35rem; margin: 0.35rem 0; }
-    .breadcrumb .current { color: #344054; font-weight: 600; }
-    h1 { color: #101a38; font-size: clamp(1.5rem, 2.2vw, 1.95rem); font-weight: 800; margin: 0; }
-    .title-block p { color: #667085; font-size: 0.9rem; margin: 0.35rem 0 0; }
-    .wizard-layout { align-items: start; display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr) 18rem; }
-    .stepper { display: flex; flex-wrap: wrap; gap: 0.5rem; list-style: none; margin: 0 0 0.85rem; padding: 0; }
-    .stepper li { align-items: center; color: #667085; display: inline-flex; font-size: 0.78rem; gap: 0.4rem; }
-    .step-num { align-items: center; background: #f2f4f7; border-radius: 50%; display: inline-flex; font-weight: 700; height: 1.5rem; justify-content: center; width: 1.5rem; }
+    .wizard-page { display: grid; gap: 1.25rem; }
+    .toast { border-radius: 12px; box-shadow: 0 10px 24px rgba(16, 24, 40, 0.12); font-size: 0.88rem; font-weight: 600; padding: 0.85rem 1rem; position: fixed; right: 1.6rem; top: 5.5rem; z-index: 30; }
+    .toast.success { background: #ecfdf3; border: 1px solid #abefc6; color: #027a48; }
+    .toast.error { background: #fef3f2; border: 1px solid #fecdca; color: #b42318; }
+    .page-heading { display: grid; gap: 0.4rem; margin-top: 0.15rem; }
+    .heading-row { align-items: flex-start; display: flex; gap: 1rem; justify-content: space-between; }
+    .heading-copy { display: grid; gap: 0.4rem; min-width: 0; }
+    .top-actions { flex-shrink: 0; }
+    h1 { color: #101828; font-size: clamp(1.65rem, 2.2vw, 2.05rem); font-weight: 800; letter-spacing: -0.02em; margin: 0; }
+    .page-heading p { color: #667085; font-size: 0.92rem; margin: 0; }
+    .stepper { align-items: center; display: flex; flex-wrap: wrap; gap: 0; list-style: none; margin: 0; padding: 0; }
+    .stepper li { align-items: center; color: #667085; display: inline-flex; font-size: 0.82rem; gap: 0.5rem; position: relative; }
+    .stepper li:not(:last-child) { margin-right: 0.35rem; padding-right: 2.15rem; }
+    .stepper li:not(:last-child)::after { background: #eaecf0; content: ''; height: 1px; position: absolute; right: 0; top: 50%; transform: translateY(-50%); width: 1.65rem; }
+    .step-num { align-items: center; background: #f2f4f7; border-radius: 50%; color: #667085; display: inline-flex; flex-shrink: 0; font-size: 0.74rem; font-weight: 700; height: 1.65rem; justify-content: center; width: 1.65rem; }
     .stepper li.active .step-num, .stepper li.done .step-num { background: #0b5cff; color: #fff; }
     .stepper li.active { color: #0b5cff; font-weight: 700; }
-    .card { background: #fff; border: 1px solid #eaecf0; border-radius: 14px; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04); padding: 1.15rem; }
-    .step-header h2 { font-size: 1.1rem; margin: 0; }
-    .step-header p { color: #667085; font-size: 0.86rem; margin: 0.35rem 0 1rem; }
-    .step-form { display: grid; gap: 0.85rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .step-form label, .step-form fieldset { display: grid; gap: 0.35rem; }
-    .step-form .full { grid-column: 1 / -1; }
-    .step-form span, .step-form legend { color: #344054; font-size: 0.82rem; font-weight: 600; }
-    .step-form input, .step-form select, .step-form textarea { border: 1px solid #d0d5dd; border-radius: 10px; font-size: 0.86rem; min-height: 2.5rem; padding: 0.45rem 0.75rem; width: 100%; }
-    .step-form small { color: #667085; font-size: 0.75rem; }
-    .step-form small.error { color: #b42318; }
-    .radio { align-items: center; display: inline-flex; gap: 0.35rem; margin-right: 1rem; }
-    .alert.draft { background: #fff6ed; border: 1px solid #fedf89; border-radius: 10px; color: #7a2e0e; padding: 0.75rem; }
+    .stepper li.done { color: #344054; }
+    .wizard-layout { align-items: start; display: grid; gap: 1.15rem; grid-template-columns: minmax(0, 7fr) minmax(17rem, 3fr); }
+    .card { background: #fff; border: 1px solid #eaecf0; border-radius: 16px; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05); padding: 1.35rem 1.4rem; }
+    .step-header h2 { color: #101828; font-size: 1.05rem; font-weight: 700; margin: 0; }
+    .step-header p { color: #667085; font-size: 0.84rem; margin: 0.3rem 0 0; }
+    .step-header.with-icon { align-items: flex-start; display: flex; gap: 0.85rem; margin-bottom: 1.15rem; }
+    .step-icon { align-items: center; background: #eef4ff; border-radius: 50%; color: #175cd3; display: inline-flex; flex-shrink: 0; height: 2.35rem; justify-content: center; width: 2.35rem; }
+    .step-icon svg { height: 1.1rem; width: 1.1rem; }
+    .basics-form { display: grid; gap: 1.1rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .basics-form label { display: grid; gap: 0.42rem; }
+    .basics-form .full, .basics-form .row-three { grid-column: 1 / -1; }
+    .row-three { display: grid; gap: 1.1rem; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .basics-form span { color: #344054; font-size: 0.82rem; font-weight: 600; }
+    .basics-form em { color: #d92d20; font-style: normal; }
+    .field-shell { align-items: center; background: #fff; border: 1px solid #d0d5dd; border-radius: 12px; display: flex; gap: 0.55rem; min-height: 2.85rem; padding: 0 0.85rem; transition: border-color 0.15s ease; }
+    .field-shell:focus-within { border-color: #84adff; box-shadow: 0 0 0 3px rgba(11, 92, 255, 0.12); }
+    .field-shell.readonly { background: #f9fafb; box-shadow: none; }
+    .field-shell.status-field { gap: 0.5rem; }
+    .status-value { color: #344054; font-size: 0.88rem; font-weight: 600; }
+    .field-shell textarea, .field-shell input, .field-shell select { background: transparent; border: 0; color: #101828; flex: 1; font-size: 0.88rem; min-height: 2.4rem; outline: none; width: 100%; }
+    .field-shell select { cursor: pointer; }
+    .textarea-shell { align-items: stretch; min-height: auto; padding-top: 0.7rem; }
+    .textarea-shell textarea { min-height: 6.25rem; resize: vertical; }
+    .field-icon { align-items: center; color: #98a2b3; display: inline-flex; flex: 0 0 auto; }
+    .field-icon svg { height: 1rem; width: 1rem; }
+    .field-icon.top { align-self: flex-start; margin-top: 0.2rem; }
+    .field-meta { align-items: baseline; display: flex; justify-content: space-between; gap: 0.75rem; }
+    .char-count { color: #98a2b3; flex-shrink: 0; }
+    .basics-form small { color: #667085; font-size: 0.75rem; line-height: 1.35; }
+    .basics-form small.error { color: #b42318; }
+    .status-dot.draft::before { background: #f79009; border-radius: 50%; content: ''; display: inline-block; height: 0.45rem; margin-right: 0.35rem; width: 0.45rem; vertical-align: middle; }
+    .status-field .status-dot.draft::before { margin-right: 0; }
+    .alert.draft { align-items: flex-start; background: #fff6ed; border: 1px solid #fedf89; border-radius: 12px; color: #7a2e0e; display: flex; gap: 0.75rem; padding: 0.9rem 1rem; }
+    .alert-icon { align-items: center; background: #ffead5; border-radius: 50%; color: #f79009; display: inline-flex; flex-shrink: 0; height: 2rem; justify-content: center; width: 2rem; }
+    .alert-icon svg { height: 1rem; width: 1rem; }
+    .alert.draft strong { color: #7a2e0e; display: block; font-size: 0.84rem; margin-bottom: 0.2rem; }
+    .alert.draft span { color: #93370d; display: block; font-size: 0.78rem; line-height: 1.45; }
+    .step-icon.pricing-icon { background: #eef4ff; color: #175cd3; }
+    .pricing-form { display: grid; gap: 1.1rem; }
+    .pricing-form label { display: grid; gap: 0.42rem; }
+    .pricing-form span { color: #344054; font-size: 0.82rem; font-weight: 600; }
+    .pricing-form em { color: #d92d20; font-style: normal; }
+    .pricing-form small { color: #667085; font-size: 0.75rem; line-height: 1.35; }
+    .pricing-form small.error { color: #b42318; }
+    .readonly-value { color: #344054; flex: 1; font-size: 0.88rem; font-weight: 500; }
+    .currency-prefix { border-right: 1px solid #eaecf0; color: #667085; font-size: 0.82rem; font-weight: 600; margin-right: 0.35rem; padding-right: 0.65rem; }
+    .field-shell.invalid { border-color: #fda29b; }
+    .alert.info { align-items: flex-start; background: #eff8ff; border: 1px solid #b2ddff; border-radius: 12px; color: #175cd3; display: flex; gap: 0.75rem; padding: 0.9rem 1rem; }
+    .alert-icon.info { align-items: center; background: #d1e9ff; border-radius: 50%; color: #175cd3; display: inline-flex; flex-shrink: 0; height: 2rem; justify-content: center; width: 2rem; }
+    .alert.info span { color: #175cd3; font-size: 0.78rem; line-height: 1.45; }
+    .module-grid, .empty-step, .feature-group, .review-list, .summary-progress { margin-top: 0.5rem; }
     .module-grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); }
     .module-card { border: 1px solid #eaecf0; border-radius: 12px; display: grid; gap: 0.65rem; padding: 0.85rem; }
     .module-card.selected { border-color: #84adff; box-shadow: 0 0 0 3px rgba(11, 92, 255, 0.12); }
-    .module-head p { color: #667085; font-size: 0.78rem; margin: 0.2rem 0 0; }
-    .feature-group { margin-bottom: 1rem; }
-    .feature-group h3 { font-size: 0.95rem; margin: 0 0 0.5rem; }
+    .module-head p, .muted, .empty-step span { color: #667085; font-size: 0.78rem; }
+    .empty-step { background: #f9fafb; border: 1px dashed #d0d5dd; border-radius: 12px; display: grid; gap: 0.35rem; padding: 1.25rem; }
     table { border-collapse: collapse; width: 100%; }
     th, td { border-bottom: 1px solid #f2f4f7; padding: 0.55rem 0.35rem; text-align: left; }
     th { color: #667085; font-size: 0.72rem; text-transform: uppercase; }
     tr.disabled { opacity: 0.5; }
     .radio-cell { text-align: center; width: 5rem; }
-    .empty-step, .muted { color: #667085; }
-    .empty-step { background: #f9fafb; border: 1px dashed #d0d5dd; border-radius: 12px; display: grid; gap: 0.35rem; padding: 1.25rem; }
-    .discount-note { color: #027a48; font-size: 0.82rem; font-weight: 600; }
-    .review-list { display: grid; gap: 0.65rem; margin: 0 0 1rem; }
+    .review-list { display: grid; gap: 0.65rem; margin-bottom: 1rem; }
     .review-list div { display: grid; gap: 0.15rem; grid-template-columns: 10rem 1fr; }
     .review-list dt { color: #667085; font-size: 0.78rem; font-weight: 600; }
     .review-list dd { margin: 0; }
-    .review-actions, .wizard-nav, .modal-actions { display: flex; flex-wrap: wrap; gap: 0.65rem; justify-content: flex-end; }
-    .wizard-nav { justify-content: space-between; margin-top: 0.5rem; }
     .draft-summary { position: sticky; top: 1rem; }
-    .draft-summary h2 { font-size: 0.95rem; margin: 0 0 0.75rem; }
-    .draft-summary dl { display: grid; gap: 0.55rem; margin: 0; }
-    .draft-summary dt { color: #667085; font-size: 0.72rem; font-weight: 600; }
-    .draft-summary dd { font-size: 0.82rem; margin: 0; }
-    .status-dot.draft::before { background: #f79009; border-radius: 50%; content: ''; display: inline-block; height: 0.45rem; margin-right: 0.35rem; width: 0.45rem; }
-    .summary-note { background: #eef4ff; border-radius: 8px; color: #175cd3; font-size: 0.75rem; margin: 0.85rem 0 0; padding: 0.55rem 0.65rem; }
-    .btn { align-items: center; border-radius: 10px; cursor: pointer; display: inline-flex; font-size: 0.84rem; font-weight: 600; gap: 0.45rem; min-height: 2.5rem; padding: 0.55rem 1rem; }
+    .summary-head { align-items: center; border-bottom: 1px solid #f2f4f7; display: flex; gap: 0.55rem; margin-bottom: 1rem; padding-bottom: 0.85rem; }
+    .summary-icon { align-items: center; color: #667085; display: inline-flex; }
+    .summary-icon svg { height: 1rem; width: 1rem; }
+    .summary-head h2 { color: #101828; font-size: 0.95rem; font-weight: 700; margin: 0; }
+    .summary-rows { display: grid; gap: 0.65rem; margin: 0; }
+    .summary-rows div { align-items: center; display: flex; gap: 0.5rem; justify-content: space-between; }
+    .summary-rows dt { color: #667085; font-size: 0.76rem; font-weight: 500; }
+    .summary-rows dd { color: #344054; font-size: 0.8rem; font-weight: 600; margin: 0; text-align: right; }
+    .summary-progress { border-top: 1px solid #f2f4f7; display: grid; gap: 0.65rem; margin-top: 1rem; padding-top: 1rem; }
+    .summary-progress div { align-items: center; display: flex; justify-content: space-between; gap: 0.75rem; }
+    .summary-progress span { color: #667085; font-size: 0.76rem; }
+    .summary-progress strong { color: #98a2b3; font-size: 0.76rem; font-weight: 500; }
+    .summary-progress strong.status-success { color: #027a48; font-weight: 600; }
+    .summary-progress strong.status-info { color: #175cd3; font-weight: 600; }
+    .summary-progress strong.status-progress { color: #175cd3; font-weight: 600; }
+    .summary-progress strong.status-muted { color: #98a2b3; font-weight: 500; }
+    .summary-note { align-items: center; background: #eef4ff; border-radius: 10px; color: #175cd3; display: flex; font-size: 0.75rem; gap: 0.45rem; line-height: 1.35; margin: 1rem 0 0; padding: 0.65rem 0.75rem; }
+    .summary-note svg { flex-shrink: 0; height: 1rem; stroke: currentColor; stroke-width: 1.5; fill: none; width: 1rem; }
+    .action-bar { align-items: center; background: #fff; border-top: 1px solid #eaecf0; bottom: 0; box-shadow: 0 -4px 18px rgba(16, 24, 40, 0.06); display: flex; gap: 0.75rem; justify-content: space-between; left: 16.5rem; padding: 0.95rem 1.6rem; position: fixed; right: 0; z-index: 10; }
+    .action-group { align-items: center; display: flex; flex-wrap: wrap; gap: 0.65rem; justify-content: flex-end; }
+    .btn { align-items: center; border-radius: 10px; cursor: pointer; display: inline-flex; font-size: 0.86rem; font-weight: 600; gap: 0.45rem; justify-content: center; min-height: 2.65rem; padding: 0.55rem 1.05rem; }
+    .btn svg { height: 1rem; stroke: currentColor; stroke-width: 1.75; fill: none; width: 1rem; }
     .btn.primary { background: #0b5cff; border: 1px solid #0b5cff; color: #fff; }
     .btn.outline { background: #fff; border: 1px solid #d0d5dd; color: #344054; }
     .btn:disabled { cursor: not-allowed; opacity: 0.5; }
     .modal-backdrop { background: rgba(16, 24, 40, 0.45); inset: 0; position: fixed; z-index: 20; }
     .modal { background: #fff; border: 0; border-radius: 14px; box-shadow: 0 20px 40px rgba(16, 24, 40, 0.18); left: 50%; margin: 0; max-width: 32rem; padding: 1.25rem; position: fixed; top: 50%; transform: translate(-50%, -50%); width: calc(100% - 2rem); z-index: 21; }
-    .modal p { color: #475467; font-size: 0.88rem; line-height: 1.5; }
+    .modal-actions { display: flex; gap: 0.65rem; justify-content: flex-end; }
+    @media (max-width: 1100px) {
+      .row-three { grid-template-columns: 1fr; }
+    }
     @media (max-width: 960px) {
       .wizard-layout { grid-template-columns: 1fr; }
       .draft-summary { position: static; }
-      .step-form { grid-template-columns: 1fr; }
+      .basics-form { grid-template-columns: 1fr; }
+      .action-bar { left: 0; }
+      .heading-row { flex-direction: column; }
+      .top-actions { justify-content: flex-end; width: 100%; }
     }
   `
 })
 export class PlatformCreateSubscriptionPlanPage implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly api = inject(PlatformSubscriptionPlanApiService);
+  private readonly apiError = inject(ApiErrorService);
+  private readonly router = inject(Router);
 
   readonly steps = [
     { key: 'basics' as WizardStep, label: 'Basics' },
@@ -362,6 +531,14 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
     { key: 'pricing' as WizardStep, label: 'Pricing' },
     { key: 'limits' as WizardStep, label: 'Limits' },
     { key: 'review' as WizardStep, label: 'Review & Publish' }
+  ];
+
+  readonly billingCycleOptions: ReadonlyArray<{ value: SubscriptionDbBillingCycle; label: string }> = [
+    { value: 'monthly', label: 'Monthly' },
+    { value: 'yearly', label: 'Yearly' },
+    { value: 'custom', label: 'Custom' },
+    { value: 'trial', label: 'Trial' },
+    { value: 'demo', label: 'Demo' }
   ];
 
   readonly availabilityOptions: ModuleAvailability[] = ['included', 'addon', 'not_available'];
@@ -374,45 +551,36 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
   readonly featureAvailability = signal<Record<string, ModuleAvailability>>({});
   readonly isSaving = signal(false);
   readonly showPublishModal = signal(false);
+  readonly successMessage = signal<string | null>(null);
+  readonly errorMessage = signal<string | null>(null);
+  readonly savedPlanId = signal<string | null>(null);
+  readonly pricingSaved = signal(false);
+  readonly limitsSaved = signal(false);
+  readonly basePriceInput = signal('');
+
+  private readonly currencyLabels: Record<string, string> = {
+    LKR: 'LKR - Sri Lankan Rupee',
+    USD: 'USD - US Dollar',
+    GBP: 'GBP - British Pound',
+    EUR: 'EUR - Euro'
+  };
 
   readonly basicsForm = this.fb.nonNullable.group({
     planName: ['', Validators.required],
     planCode: ['', Validators.required],
-    description: [''],
-    planType: ['paid' as const],
-    currencyCode: ['LKR'],
-    taxMode: ['excluded' as const],
-    visibility: ['public' as const],
-    effectiveFrom: [new Date().toISOString().slice(0, 10)]
+    description: ['', Validators.maxLength(500)],
+    billingCycle: ['' as SubscriptionDbBillingCycle | '', Validators.required],
+    baseCurrency: ['LKR', Validators.required]
   });
 
   readonly pricingForm = this.fb.nonNullable.group({
-    monthlyPrice: [null as number | null],
-    annualPrice: [null as number | null],
-    trialDays: [null as number | null],
-    billingCycle: ['both' as const],
-    setupFee: [null as number | null]
+    basePrice: [null as number | null, [Validators.required, Validators.min(0)]]
   });
 
   readonly limitsForm = this.fb.nonNullable.group({
-    outletLimit: [null as number | null],
-    tillLimit: [null as number | null],
-    userLimit: [null as number | null]
-  });
-
-  readonly annualDiscount = computed(() => {
-    const monthly = this.pricingForm.controls.monthlyPrice.value;
-    const annual = this.pricingForm.controls.annualPrice.value;
-    if (monthly == null || annual == null || monthly <= 0) {
-      return null;
-    }
-
-    const fullYear = monthly * 12;
-    if (fullYear <= 0 || annual >= fullYear) {
-      return null;
-    }
-
-    return Math.round(((fullYear - annual) / fullYear) * 100);
+    maxOutlets: [null as number | null],
+    maxTills: [null as number | null],
+    maxUsers: [null as number | null]
   });
 
   readonly featureGroups = computed(() => {
@@ -433,8 +601,93 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
     return [...groups.values()];
   });
 
-  readonly includedModulesCount = computed(() =>
-    Object.values(this.moduleAvailability()).filter((value) => value === 'included').length
+  readonly billingCycleLabel = computed(() => {
+    const value = this.basicsForm.controls.billingCycle.value;
+    return this.billingCycleOptions.find((option) => option.value === value)?.label ?? '—';
+  });
+
+  readonly currencyLabel = computed(() => {
+    const code = this.basicsForm.controls.baseCurrency.value;
+    return this.currencyLabels[code] ?? code ?? '—';
+  });
+
+  readonly basePriceSummaryLabel = computed(() => {
+    const price = this.pricingForm.controls.basePrice.value;
+    const currency = this.basicsForm.controls.baseCurrency.value || 'LKR';
+    if (price == null) {
+      return '—';
+    }
+
+    return `${currency} ${this.formatCurrencyAmount(price)}`;
+  });
+
+  readonly showBasePriceInSummary = computed(() => {
+    const stepIndex = this.stepIndex(this.currentStep());
+    return this.pricingForm.controls.basePrice.value != null || stepIndex >= this.stepIndex('pricing');
+  });
+
+  readonly selectedModulesCount = computed(() =>
+    Object.values(this.moduleAvailability()).filter((value) => value !== 'not_available').length
+  );
+
+  readonly enabledFeaturesCount = computed(() =>
+    Object.values(this.featureAvailability()).filter((value) => value === 'included').length
+  );
+
+  readonly modulesSummary = computed(() =>
+    this.selectedModulesCount() > 0 ? `${this.selectedModulesCount()} selected` : 'Not selected'
+  );
+
+  readonly featuresSummary = computed(() =>
+    this.enabledFeaturesCount() > 0 ? `${this.enabledFeaturesCount()} enabled` : 'Not selected'
+  );
+
+  readonly pricingSummary = computed(() => {
+    if (this.pricingSaved()) {
+      return 'Configured';
+    }
+
+    const price = this.pricingForm.controls.basePrice.value;
+    const control = this.pricingForm.controls.basePrice;
+
+    if (price == null && !this.basePriceInput().trim()) {
+      return 'Not configured';
+    }
+
+    if (control.valid && price != null && price >= 0) {
+      return 'In progress';
+    }
+
+    return 'In progress';
+  });
+
+  readonly limitsSummary = computed(() =>
+    this.limitsSaved() ? 'Configured' : 'Not configured'
+  );
+
+  readonly modulesSummaryClass = computed(() =>
+    this.modulesSummary() === 'Not selected' ? 'status-muted' : 'status-success'
+  );
+
+  readonly featuresSummaryClass = computed(() =>
+    this.featuresSummary() === 'Not selected' ? 'status-muted' : 'status-success'
+  );
+
+  readonly pricingSummaryClass = computed(() => {
+    const summary = this.pricingSummary();
+    if (summary === 'Configured') {
+      return 'status-info';
+    }
+
+    if (summary === 'In progress') {
+      return 'status-progress';
+    }
+
+    return 'status-muted';
+  });
+
+  readonly limitsSummaryClass = computed(() =>
+    this.limitsSummary() === 'Configured' ? 'status-info' : 'status-muted'
   );
 
   ngOnInit(): void {
@@ -446,8 +699,31 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
   }
 
   nextStep(): void {
-    if (this.currentStep() === 'basics' && this.basicsForm.invalid) {
-      this.basicsForm.markAllAsTouched();
+    if (this.currentStep() === 'basics' && !this.validateBasicsStep()) {
+      return;
+    }
+
+    if (this.currentStep() === 'pricing') {
+      if (!this.validatePricingStep()) {
+        return;
+      }
+
+      this.persistPricingAndAdvance();
+      return;
+    }
+
+    if (this.currentStep() === 'limits') {
+      if (!this.validateLimitsStep()) {
+        this.errorMessage.set('Outlet, till, and user limits are required before continuing.');
+        return;
+      }
+
+      if (!this.pricingSaved()) {
+        this.errorMessage.set('Save pricing before configuring limits.');
+        return;
+      }
+
+      this.persistLimitsAndAdvance();
       return;
     }
 
@@ -464,11 +740,40 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
     }
   }
 
+  goBack(): void {
+    if (this.currentStep() === 'basics') {
+      void this.router.navigate(['/admin/subscriptions']);
+      return;
+    }
+
+    this.prevStep();
+  }
+
   onPlanCodeInput(event: Event): void {
     const input = event.target as HTMLInputElement;
     const upper = input.value.toUpperCase();
     this.basicsForm.controls.planCode.setValue(upper, { emitEvent: false });
     input.value = upper;
+  }
+
+  onBasePriceInput(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    this.basePriceInput.set(input.value);
+    const parsed = this.parseCurrencyAmount(input.value);
+    this.pricingForm.controls.basePrice.setValue(parsed);
+    this.pricingForm.controls.basePrice.markAsTouched();
+    this.pricingForm.controls.basePrice.updateValueAndValidity();
+  }
+
+  onBasePriceBlur(): void {
+    const parsed = this.parseCurrencyAmount(this.basePriceInput());
+    if (parsed == null) {
+      this.pricingForm.controls.basePrice.setValue(null);
+      return;
+    }
+
+    this.pricingForm.controls.basePrice.setValue(parsed);
+    this.basePriceInput.set(this.formatCurrencyAmount(parsed));
   }
 
   setModuleAvailability(moduleId: string, value: ModuleAvailability): void {
@@ -495,11 +800,136 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
   }
 
   saveDraft(): void {
+    if (!this.validateBasicsStep()) {
+      this.errorMessage.set('Plan name, plan code, billing cycle, and currency are required before saving.');
+      return;
+    }
+
+    if (this.shouldValidatePricingForSave() && !this.pricingSaved() && !this.validatePricingStep()) {
+      this.errorMessage.set('Base price is required before saving.');
+      return;
+    }
+
+    if (this.shouldValidateLimitsForSave() && !this.validateLimitsStep()) {
+      this.errorMessage.set('Outlet, till, and user limits are required before saving.');
+      return;
+    }
+
     this.isSaving.set(true);
-    this.api.saveDraft(this.buildDraft()).subscribe({
-      next: () => this.isSaving.set(false),
-      error: () => this.isSaving.set(false)
+    this.successMessage.set(null);
+    this.errorMessage.set(null);
+
+    this.ensureDraftPlanId((planId) => {
+      if (this.shouldValidatePricingForSave() && !this.pricingSaved()) {
+        this.api.updateSubscriptionPlanPricing(planId, {
+          basePrice: this.pricingForm.controls.basePrice.value!
+        }).subscribe({
+          next: () => {
+            this.pricingSaved.set(true);
+            this.persistLimitsDraft(planId);
+          },
+          error: (error) => {
+            this.errorMessage.set(this.apiError.toSafeMessage(error));
+            this.isSaving.set(false);
+          }
+        });
+        return;
+      }
+
+      this.persistLimitsDraft(planId);
     });
+  }
+
+  private persistLimitsDraft(planId: string): void {
+    if (this.shouldValidateLimitsForSave()) {
+      this.api.updateSubscriptionPlanLimits(planId, this.buildLimitsRequest()).subscribe({
+        next: () => {
+          this.limitsSaved.set(true);
+          this.successMessage.set('Subscription plan saved as draft');
+          this.isSaving.set(false);
+        },
+        error: (error) => {
+          this.errorMessage.set(this.apiError.toSafeMessage(error));
+          this.isSaving.set(false);
+        }
+      });
+      return;
+    }
+
+    this.successMessage.set('Subscription plan saved as draft');
+    this.isSaving.set(false);
+  }
+
+  private persistPricingAndAdvance(): void {
+    this.isSaving.set(true);
+    this.errorMessage.set(null);
+
+    this.ensureDraftPlanId((planId) => {
+      this.api.updateSubscriptionPlanPricing(planId, {
+        basePrice: this.pricingForm.controls.basePrice.value!
+      }).subscribe({
+        next: () => {
+          this.pricingSaved.set(true);
+          this.isSaving.set(false);
+          this.currentStep.set('limits');
+        },
+        error: (error) => {
+          this.errorMessage.set(this.apiError.toSafeMessage(error));
+          this.isSaving.set(false);
+        }
+      });
+    });
+  }
+
+  private persistLimitsAndAdvance(): void {
+    this.isSaving.set(true);
+    this.errorMessage.set(null);
+
+    this.ensureDraftPlanId((planId) => {
+      this.api.updateSubscriptionPlanLimits(planId, this.buildLimitsRequest()).subscribe({
+        next: () => {
+          this.limitsSaved.set(true);
+          this.isSaving.set(false);
+          this.currentStep.set('review');
+        },
+        error: (error) => {
+          this.errorMessage.set(this.apiError.toSafeMessage(error));
+          this.isSaving.set(false);
+        }
+      });
+    });
+  }
+
+  private ensureDraftPlanId(onReady: (planId: string) => void): void {
+    const existingPlanId = this.savedPlanId();
+    if (existingPlanId) {
+      onReady(existingPlanId);
+      return;
+    }
+
+    this.api.createSubscriptionPlanDraft(this.buildDraft()).subscribe({
+      next: (response) => {
+        this.savedPlanId.set(response.id);
+        onReady(response.id);
+      },
+      error: (error) => {
+        this.errorMessage.set(this.apiError.toSafeMessage(error));
+        this.isSaving.set(false);
+      }
+    });
+  }
+
+  private shouldValidatePricingForSave(): boolean {
+    return this.currentStep() === 'pricing'
+      || this.currentStep() === 'limits'
+      || this.currentStep() === 'review'
+      || this.basePriceInput().trim().length > 0;
+  }
+
+  private shouldValidateLimitsForSave(): boolean {
+    return this.currentStep() === 'limits'
+      || this.currentStep() === 'review'
+      || this.hasLimitsInput();
   }
 
   openPublishModal(): void {
@@ -511,19 +941,118 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
   }
 
   confirmPublish(): void {
+    if (!this.validateBasicsStep()) {
+      this.errorMessage.set('Plan name, plan code, billing cycle, and currency are required before publishing.');
+      return;
+    }
+
+    if (!this.validatePricingStep()) {
+      this.errorMessage.set('Base price is required before publishing.');
+      return;
+    }
+
+    if (!this.validateLimitsStep()) {
+      this.errorMessage.set('Outlet, till, and user limits are required before publishing.');
+      return;
+    }
+
     this.isSaving.set(true);
-    this.api.saveDraft(this.buildDraft()).subscribe({
-      next: ({ id }) => {
-        this.api.publish(id).subscribe({
-          next: () => {
-            this.isSaving.set(false);
-            this.closePublishModal();
-          },
-          error: () => this.isSaving.set(false)
-        });
-      },
-      error: () => this.isSaving.set(false)
+    this.successMessage.set(null);
+    this.errorMessage.set(null);
+
+    this.ensureDraftPlanId((planId) => {
+      this.api.updateSubscriptionPlanPricing(planId, {
+        basePrice: this.pricingForm.controls.basePrice.value!
+      }).subscribe({
+        next: () => {
+          this.pricingSaved.set(true);
+          this.api.updateSubscriptionPlanLimits(planId, this.buildLimitsRequest()).subscribe({
+            next: () => {
+              this.limitsSaved.set(true);
+              this.api.publishSubscriptionPlan(planId).subscribe({
+                next: () => {
+                  this.isSaving.set(false);
+                  this.closePublishModal();
+                  void this.router.navigate(['/admin/subscriptions'], {
+                    state: { successMessage: 'Subscription plan published successfully.' }
+                  });
+                },
+                error: (error) => {
+                  this.errorMessage.set(this.apiError.toSafeMessage(error));
+                  this.isSaving.set(false);
+                }
+              });
+            },
+            error: (error) => {
+              this.errorMessage.set(this.apiError.toSafeMessage(error));
+              this.isSaving.set(false);
+            }
+          });
+        },
+        error: (error) => {
+          this.errorMessage.set(this.apiError.toSafeMessage(error));
+          this.isSaving.set(false);
+        }
+      });
     });
+  }
+
+  private validateBasicsStep(): boolean {
+    this.basicsForm.markAllAsTouched();
+    return this.basicsForm.valid;
+  }
+
+  private validatePricingStep(): boolean {
+    this.syncBasePriceFromInput();
+    this.pricingForm.markAllAsTouched();
+    return this.pricingForm.valid;
+  }
+
+  private validateLimitsStep(): boolean {
+    this.limitsForm.markAllAsTouched();
+    const { maxOutlets, maxTills, maxUsers } = this.limitsForm.getRawValue();
+    const values = [maxOutlets, maxTills, maxUsers];
+    const hasAny = values.some((value) => value != null);
+    const allValid = values.every((value) => value == null || value >= 0);
+
+    return hasAny && allValid;
+  }
+
+  private hasLimitsInput(): boolean {
+    const { maxOutlets, maxTills, maxUsers } = this.limitsForm.getRawValue();
+    return maxOutlets != null || maxTills != null || maxUsers != null;
+  }
+
+  private buildLimitsRequest() {
+    const { maxOutlets, maxTills, maxUsers } = this.limitsForm.getRawValue();
+    return {
+      maxOutlets: maxOutlets ?? undefined,
+      maxTills: maxTills ?? undefined,
+      maxUsers: maxUsers ?? undefined
+    };
+  }
+
+  private syncBasePriceFromInput(): void {
+    const parsed = this.parseCurrencyAmount(this.basePriceInput());
+    this.pricingForm.controls.basePrice.setValue(parsed);
+    this.pricingForm.controls.basePrice.updateValueAndValidity();
+  }
+
+  private parseCurrencyAmount(raw: string): number | null {
+    const cleaned = raw.replace(/,/g, '').trim();
+    if (!cleaned) {
+      return null;
+    }
+
+    const parsed = Number.parseFloat(cleaned);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  private formatCurrencyAmount(value: number): string {
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value);
   }
 
   private loadCatalogs(): void {
@@ -555,9 +1084,15 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
 
   private buildDraft(): SubscriptionPlanDraft {
     return {
-      ...this.basicsForm.getRawValue(),
-      ...this.pricingForm.getRawValue(),
-      ...this.limitsForm.getRawValue(),
+      planName: this.basicsForm.controls.planName.value,
+      planCode: this.basicsForm.controls.planCode.value,
+      description: this.basicsForm.controls.description.value,
+      billingCycle: this.basicsForm.controls.billingCycle.value,
+      baseCurrency: this.basicsForm.controls.baseCurrency.value,
+      basePrice: this.pricingForm.controls.basePrice.value,
+      maxOutlets: this.limitsForm.controls.maxOutlets.value,
+      maxTills: this.limitsForm.controls.maxTills.value,
+      maxUsers: this.limitsForm.controls.maxUsers.value,
       moduleAvailability: this.moduleAvailability(),
       featureAvailability: this.featureAvailability()
     };
