@@ -10,7 +10,8 @@ export const platformPermissions = {
   subscriptionPlansArchive: 'platform.subscription_plans.archive',
   subscriptionPlansDelete: 'platform.subscription_plans.delete',
   featureEntitle: 'platform.feature.entitle',
-  auditView: 'platform.audit.view'
+  auditView: 'platform.audit.view',
+  permissionsView: 'platform.permissions.view'
 } as const;
 
 export const tenantPermissions = {
