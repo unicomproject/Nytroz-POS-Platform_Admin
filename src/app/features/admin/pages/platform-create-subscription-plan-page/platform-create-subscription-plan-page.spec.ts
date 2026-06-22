@@ -72,6 +72,18 @@ describe('PlatformCreateSubscriptionPlanPage', () => {
     component.currentStep.set('pricing');
   }
 
+  function goToLimits(component: PlatformCreateSubscriptionPlanPage): void {
+    fillBasics(component);
+    component.savedPlanId.set('draft-1');
+    component.basicsSaved.set(true);
+    component.pricingSaved.set(true);
+    component.currentStep.set('limits');
+  }
+
+  function fillLimits(component: PlatformCreateSubscriptionPlanPage): void {
+    component.limitsForm.patchValue({ maxOutlets: 5, maxTills: 10, maxUsers: 25 });
+  }
+
   it('renders wizard steps and bottom action bar controls', () => {
     const fixture = createFixture();
     const root = fixture.nativeElement as HTMLElement;
@@ -85,7 +97,34 @@ describe('PlatformCreateSubscriptionPlanPage', () => {
     expect(root.querySelector('.action-bar .back-btn')).toBeTruthy();
     expect(root.querySelector('.action-bar .save-btn')).toBeTruthy();
     expect(root.querySelector('.action-bar .next-btn')).toBeTruthy();
-    expect(root.querySelector('.top-actions .save-btn')).toBeTruthy();
+    expect(root.querySelector('.top-actions')).toBeNull();
+  });
+
+  it('does not render duplicate top-right wizard action buttons', () => {
+    const fixture = createFixture();
+    const root = fixture.nativeElement as HTMLElement;
+    const pageHeading = root.querySelector('.page-heading') as HTMLElement;
+
+    expect(root.querySelector('.top-actions')).toBeNull();
+    expect(pageHeading.querySelector('.back-btn')).toBeNull();
+    expect(pageHeading.querySelector('.save-btn')).toBeNull();
+    expect(pageHeading.querySelector('.next-btn')).toBeNull();
+    expect(pageHeading.querySelector('.publish-btn')).toBeNull();
+  });
+
+  it('shows Publish Plan only in bottom action bar on Review step', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    component.currentStep.set('review');
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const actionBar = root.querySelector('.action-bar') as HTMLElement;
+    const stepCard = root.querySelector('.step-card') as HTMLElement;
+
+    expect(actionBar.querySelector('.publish-btn')).toBeTruthy();
+    expect(actionBar.querySelector('.next-btn')).toBeNull();
+    expect(stepCard.querySelector('.publish-btn')).toBeNull();
   });
 
   it('does not render breadcrumb or removed non-R1 fields in page content', () => {
@@ -137,8 +176,109 @@ describe('PlatformCreateSubscriptionPlanPage', () => {
     expect(rows[1]).toContain('Features');
     expect(rows[2]).toContain('Pricing');
     expect(rows[3]).toContain('Limits');
-    expect(component.pricingSummary()).toBe('In progress');
+    expect(component.pricingSummary()).toBe('Not configured');
     expect(component.limitsSummary()).toBe('Not configured');
+  });
+
+  it('renders billing cycle and currency as read-only on pricing step', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    goToPricing(component);
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const readonlyFields = root.querySelectorAll('.pricing-form .field-shell.readonly');
+    const basePriceInput = root.querySelector('.pricing-form input[aria-label="Base price"]') as HTMLInputElement | null;
+
+    expect(readonlyFields.length).toBe(2);
+    expect(basePriceInput).toBeTruthy();
+    expect(basePriceInput?.readOnly).not.toBe(true);
+  });
+
+  it('displays billing cycle label from Basics state on pricing step', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    goToPricing(component);
+    fixture.detectChanges();
+
+    expect(component.billingCycleLabel()).toBe('Monthly');
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Monthly');
+  });
+
+  it('creates draft and stores planId when Next is clicked on Basics', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    fillBasics(component);
+    fixture.detectChanges();
+
+    component.nextStep();
+    fixture.detectChanges();
+
+    expect(api.createSubscriptionPlanDraft).toHaveBeenCalledTimes(1);
+    expect(component.savedPlanId()).toBe('draft-1');
+    expect(component.basicsSaved()).toBe(true);
+    expect(component.currentStep()).toBe('modules');
+  });
+
+  it('creates draft then patches pricing when Next is clicked on Pricing without planId', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    goToPricing(component);
+    component.basePriceInput.set('12900.00');
+    component.onBasePriceBlur();
+    fixture.detectChanges();
+
+    component.nextStep();
+    fixture.detectChanges();
+
+    expect(api.createSubscriptionPlanDraft).toHaveBeenCalledTimes(1);
+    expect(api.updateSubscriptionPlanPricing).toHaveBeenCalledWith('draft-1', { basePrice: 12900 });
+    expect(component.savedPlanId()).toBe('draft-1');
+    expect(component.basicsSaved()).toBe(true);
+    expect(component.currentStep()).toBe('limits');
+    expect(component.pricingSaved()).toBe(true);
+  });
+
+  it('does not patch pricing when Basics is incomplete on Pricing Next', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    component.basicsForm.patchValue({
+      planName: 'Partial Plan',
+      planCode: 'PARTIAL',
+      billingCycle: '',
+      baseCurrency: 'LKR'
+    });
+    component.currentStep.set('pricing');
+    component.basePriceInput.set('12900.00');
+    component.onBasePriceBlur();
+    fixture.detectChanges();
+
+    component.nextStep();
+    fixture.detectChanges();
+
+    expect(api.createSubscriptionPlanDraft).not.toHaveBeenCalled();
+    expect(api.updateSubscriptionPlanPricing).not.toHaveBeenCalled();
+    expect(component.currentStep()).toBe('basics');
+    expect(component.errorMessage()).toBe('Please complete and save the Basics step before configuring pricing.');
+    expect(component.pricingSaved()).toBe(false);
+  });
+
+  it('uses existing planId on Pricing Next without creating another draft', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    goToPricing(component);
+    component.savedPlanId.set('draft-1');
+    component.basicsSaved.set(true);
+    component.basePriceInput.set('12900.00');
+    component.onBasePriceBlur();
+    fixture.detectChanges();
+
+    component.nextStep();
+    fixture.detectChanges();
+
+    expect(api.createSubscriptionPlanDraft).not.toHaveBeenCalled();
+    expect(api.updateSubscriptionPlanPricing).toHaveBeenCalledWith('draft-1', { basePrice: 12900 });
+    expect(component.currentStep()).toBe('limits');
   });
 
   it('marks pricing configured only after backend save', () => {
@@ -148,6 +288,7 @@ describe('PlatformCreateSubscriptionPlanPage', () => {
     component.basePriceInput.set('12900.00');
     component.onBasePriceBlur();
     component.savedPlanId.set('draft-1');
+    component.basicsSaved.set(true);
     component.saveDraft();
     fixture.detectChanges();
 
@@ -161,6 +302,7 @@ describe('PlatformCreateSubscriptionPlanPage', () => {
     const component = fixture.componentInstance;
     goToPricing(component);
     component.savedPlanId.set('draft-1');
+    component.basicsSaved.set(true);
     component.basePriceInput.set('12900.00');
     component.onBasePriceBlur();
     fixture.detectChanges();
@@ -168,19 +310,34 @@ describe('PlatformCreateSubscriptionPlanPage', () => {
     component.saveDraft();
     fixture.detectChanges();
 
+    expect(api.createSubscriptionPlanDraft).not.toHaveBeenCalled();
     expect(api.updateSubscriptionPlanPricing).toHaveBeenCalledWith('draft-1', { basePrice: 12900 });
     expect(component.successMessage()).toBe('Subscription plan saved as draft');
+    expect(component.currentStep()).toBe('pricing');
+  });
+
+  it('creates draft then patches pricing on Save Draft when planId is missing', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    goToPricing(component);
+    component.basePriceInput.set('12900.00');
+    component.onBasePriceBlur();
+    fixture.detectChanges();
+
+    component.saveDraft();
+    fixture.detectChanges();
+
+    expect(api.createSubscriptionPlanDraft).toHaveBeenCalledTimes(1);
+    expect(api.updateSubscriptionPlanPricing).toHaveBeenCalledWith('draft-1', { basePrice: 12900 });
+    expect(component.currentStep()).toBe('pricing');
+    expect(component.pricingSaved()).toBe(true);
   });
 
   it('calls limits API on saveDraft from limits step', () => {
     const fixture = createFixture();
     const component = fixture.componentInstance;
-    fillBasics(component);
-    goToPricing(component);
-    component.savedPlanId.set('draft-1');
-    component.pricingSaved.set(true);
-    component.currentStep.set('limits');
-    component.limitsForm.patchValue({ maxOutlets: 5, maxTills: 10, maxUsers: 25 });
+    goToLimits(component);
+    fillLimits(component);
     fixture.detectChanges();
 
     component.saveDraft();
@@ -192,6 +349,152 @@ describe('PlatformCreateSubscriptionPlanPage', () => {
       maxUsers: 25
     });
     expect(component.limitsSaved()).toBe(true);
+    expect(component.currentStep()).toBe('limits');
+    expect(component.successMessage()).toBe('Subscription plan saved as draft');
+  });
+
+  it('renders limits step with R1 fields only and step 5 active styling', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    goToLimits(component);
+    fillLimits(component);
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const text = root.textContent ?? '';
+    const steps = [...root.querySelectorAll('.stepper li')];
+
+    expect(text).toContain('Plan Limits');
+    expect(text).toContain('Outlet Limit');
+    expect(text).toContain('Till Limit');
+    expect(text).toContain('User Limit');
+    expect(text).toContain('Maximum outlets allowed for this plan.');
+    expect(text).toContain('These limits define the default usage allowance for tenants on this plan.');
+    expect(text).not.toContain('Product Limit');
+    expect(text).not.toContain('Storage Limit');
+    expect(text).not.toContain('API Access Limit');
+    expect(text).not.toContain('Transaction Limit');
+    expect(steps[4]?.classList.contains('active')).toBe(true);
+  });
+
+  it('renders editable numeric limit inputs on limits step', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    goToLimits(component);
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const outletInput = root.querySelector('input[aria-label="Outlet limit"]') as HTMLInputElement | null;
+    const tillInput = root.querySelector('input[aria-label="Till limit"]') as HTMLInputElement | null;
+    const userInput = root.querySelector('input[aria-label="User limit"]') as HTMLInputElement | null;
+
+    expect(outletInput?.type).toBe('number');
+    expect(tillInput?.type).toBe('number');
+    expect(userInput?.type).toBe('number');
+    expect(outletInput?.readOnly).not.toBe(true);
+  });
+
+  it('persists limits and moves to Review on Next', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    goToLimits(component);
+    fillLimits(component);
+    fixture.detectChanges();
+
+    component.nextStep();
+    fixture.detectChanges();
+
+    expect(api.updateSubscriptionPlanLimits).toHaveBeenCalledWith('draft-1', {
+      maxOutlets: 5,
+      maxTills: 10,
+      maxUsers: 25
+    });
+    expect(component.currentStep()).toBe('review');
+    expect(component.limitsSaved()).toBe(true);
+    expect(component.limitsSummary()).toBe('Configured');
+  });
+
+  it('marks limits configured only after backend save', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    goToLimits(component);
+    fillLimits(component);
+    fixture.detectChanges();
+
+    expect(component.limitsSummary()).toBe('Not configured');
+
+    component.saveDraft();
+    fixture.detectChanges();
+
+    expect(component.limitsSaved()).toBe(true);
+    expect(component.limitsSummary()).toBe('Configured');
+  });
+
+  it('does not mark limits configured when limits API fails', () => {
+    api.updateSubscriptionPlanLimits.mockReturnValueOnce(throwError(() => ({ error: { success: false } })));
+
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    goToLimits(component);
+    fillLimits(component);
+    fixture.detectChanges();
+
+    component.saveDraft();
+    fixture.detectChanges();
+
+    expect(component.successMessage()).toBeNull();
+    expect(component.errorMessage()).toBe('Save failed safely');
+    expect(component.limitsSaved()).toBe(false);
+    expect(component.limitsSummary()).toBe('Not configured');
+    expect(component.currentStep()).toBe('limits');
+  });
+
+  it('does not patch limits when planId is missing', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    fillBasics(component);
+    component.pricingSaved.set(true);
+    component.currentStep.set('limits');
+    fillLimits(component);
+    fixture.detectChanges();
+
+    component.saveDraft();
+    fixture.detectChanges();
+
+    expect(api.updateSubscriptionPlanLimits).not.toHaveBeenCalled();
+    expect(component.currentStep()).toBe('basics');
+    expect(component.errorMessage()).toBe('Please save the Basics step before configuring limits.');
+  });
+
+  it('blocks limits save when pricing is not saved', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    fillBasics(component);
+    component.savedPlanId.set('draft-1');
+    component.basicsSaved.set(true);
+    component.pricingSaved.set(false);
+    component.currentStep.set('limits');
+    fillLimits(component);
+    fixture.detectChanges();
+
+    component.saveDraft();
+    fixture.detectChanges();
+
+    expect(api.updateSubscriptionPlanLimits).not.toHaveBeenCalled();
+    expect(component.currentStep()).toBe('pricing');
+    expect(component.errorMessage()).toBe('Please save the Pricing step before configuring limits.');
+  });
+
+  it('disables Next while limits save is in progress', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    goToLimits(component);
+    fillLimits(component);
+    component.isSaving.set(true);
+    fixture.detectChanges();
+
+    const nextButtons = [...fixture.nativeElement.querySelectorAll('.next-btn')] as HTMLButtonElement[];
+    expect(nextButtons.every((button) => button.disabled)).toBe(true);
   });
 
   it('persists pricing and moves to Limits on Next', () => {
@@ -199,6 +502,7 @@ describe('PlatformCreateSubscriptionPlanPage', () => {
     const component = fixture.componentInstance;
     goToPricing(component);
     component.savedPlanId.set('draft-1');
+    component.basicsSaved.set(true);
     component.basePriceInput.set('12900.00');
     component.onBasePriceBlur();
     fixture.detectChanges();
@@ -218,6 +522,7 @@ describe('PlatformCreateSubscriptionPlanPage', () => {
     const component = fixture.componentInstance;
     goToPricing(component);
     component.savedPlanId.set('draft-1');
+    component.basicsSaved.set(true);
     component.basePriceInput.set('12900.00');
     component.onBasePriceBlur();
     fixture.detectChanges();
@@ -227,6 +532,8 @@ describe('PlatformCreateSubscriptionPlanPage', () => {
 
     expect(component.successMessage()).toBeNull();
     expect(component.errorMessage()).toBe('Save failed safely');
+    expect(component.pricingSaved()).toBe(false);
+    expect(component.pricingSummary()).toBe('Not configured');
   });
 
   it('navigates back to subscriptions from step 1', () => {
@@ -262,6 +569,22 @@ describe('PlatformCreateSubscriptionPlanPage', () => {
     expect(router.navigate).toHaveBeenCalledWith(['/admin/subscriptions'], {
       state: { successMessage: 'Subscription plan published successfully.' }
     });
+  });
+
+  it('disables Next while pricing save is in progress', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    goToPricing(component);
+    component.savedPlanId.set('draft-1');
+    component.basicsSaved.set(true);
+    component.basePriceInput.set('12900.00');
+    component.onBasePriceBlur();
+    component.isSaving.set(true);
+    fixture.detectChanges();
+
+    const nextButtons = [...fixture.nativeElement.querySelectorAll('.next-btn')] as HTMLButtonElement[];
+    expect(nextButtons.length).toBeGreaterThan(0);
+    expect(nextButtons.every((button) => button.disabled)).toBe(true);
   });
 
   it('shows modules and features as Not selected when catalog is empty', () => {
