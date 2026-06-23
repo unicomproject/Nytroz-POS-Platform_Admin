@@ -59,8 +59,11 @@ export const adminRoutes: Routes = [
   },
   {
     path: 'roles-permissions',
-    loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
-    data: { title: 'Roles and Permissions' }
+    loadComponent: () =>
+      import('../pages/platform-permission-catalog-page/platform-permission-catalog-page').then(
+        (m) => m.PlatformPermissionCatalogPage
+      ),
+    data: { title: 'Roles and Permissions', requiredPermission: platformPermissions.permissionsView }
   },
   {
     path: 'platform-users',
