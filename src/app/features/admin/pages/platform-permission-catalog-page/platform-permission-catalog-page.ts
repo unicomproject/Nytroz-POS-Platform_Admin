@@ -18,6 +18,7 @@ import { PlatformRoleManagementApiService } from '../../services/platform-role-m
 
 type ModuleFilter = '';
 type GrantFilter = '' | 'granted' | 'not-granted';
+type ActionFilter = '';
 type PermissionMode = 'custom' | 'readOnly' | 'fullAccess';
 
 interface FilteredPermissionCatalogModule extends PermissionCatalogModule {
@@ -187,6 +188,33 @@ interface RoleSnapshot {
               </div>
             }
 
+            <section class="summary-strip" aria-label="Role permission summary">
+              <article>
+                <span>Available Permissions</span>
+                <strong>{{ allPermissions().length }}</strong>
+              </article>
+              <article>
+                <span>Granted</span>
+                <strong>{{ selectedPermissionCodes().size }}</strong>
+              </article>
+              <article>
+                <span>Not Granted</span>
+                <strong>{{ notGrantedCount() }}</strong>
+              </article>
+              <article>
+                <span>Sensitive</span>
+                <strong>{{ selectedSensitivePermissions().length }}</strong>
+              </article>
+              <article>
+                <span>Assigned Users</span>
+                <strong>{{ assignedUserCount() }}</strong>
+              </article>
+              <article class="dirty-summary" [class.active]="isDirty()">
+                <span>Unsaved Changes</span>
+                <strong>{{ changedPermissionCount() }}</strong>
+              </article>
+            </section>
+
             <section class="permission-mode" aria-label="Permission mode">
               <span>Permission Mode</span>
               <button
@@ -247,11 +275,12 @@ interface RoleSnapshot {
               </label>
 
               <label class="field">
-                <span>View</span>
-                <select [ngModel]="grantFilter()" (ngModelChange)="onGrantFilterChange($event)">
-                  <option value="">All ({{ allPermissions().length }})</option>
-                  <option value="granted">Granted</option>
-                  <option value="not-granted">Not Granted</option>
+                <span>Action</span>
+                <select [ngModel]="actionFilter()" (ngModelChange)="onActionFilterChange($event)">
+                  <option value="">All Actions</option>
+                  @for (action of actionOptions(); track action) {
+                    <option [value]="action">{{ action }}</option>
+                  }
                 </select>
               </label>
 
@@ -260,6 +289,13 @@ interface RoleSnapshot {
                 <button type="button" (click)="collapseAll()">Collapse All</button>
               </div>
             </section>
+
+            @if (isDirty()) {
+              <section class="dirty-banner" role="status">
+                <span>You have changes that haven't been saved.</span>
+                <button type="button" (click)="showPreview.set(true)">Review Summary</button>
+              </section>
+            }
 
             @if (!filteredModules().length) {
               <div class="state-card empty">
@@ -270,8 +306,11 @@ interface RoleSnapshot {
               <section class="catalog-tree" aria-label="Backend permission catalog tree">
                 <div class="tree-header" aria-hidden="true">
                   <span>Permission</span>
+                  <span>Code</span>
+                  <span>Description</span>
                   <span>Scope</span>
                   <span>Action</span>
+                  <span>Access</span>
                 </div>
 
                 @for (module of filteredModules(); track module.id) {
@@ -313,20 +352,11 @@ interface RoleSnapshot {
                             <ul class="permission-list">
                               @for (permission of feature.permissions; track permission.id) {
                                 <li class="permission-row">
-                                  <input
-                                    type="checkbox"
-                                    [disabled]="permissionsDisabled() || !permission.isActive"
-                                    [checked]="hasPermission(permission.code)"
-                                    (change)="togglePermission(permission.code, $any($event.target).checked)"
-                                    [attr.aria-label]="'Toggle ' + permission.name"
-                                  />
                                   <span class="permission-copy">
                                     <strong>{{ permission.name }}</strong>
-                                    <code>{{ permission.code }}</code>
-                                    @if (permission.description) {
-                                      <small>{{ permission.description }}</small>
-                                    }
                                   </span>
+                                  <code>{{ permission.code }}</code>
+                                  <span class="permission-description">{{ permission.description || '-' }}</span>
                                   <span class="scope-badge" [class]="permission.scope">{{ permission.scope || 'platform' }}</span>
                                   <span class="action-badge">{{ actionLabel(permission) }}</span>
                                   @if (isSensitive(permission)) {
@@ -335,6 +365,13 @@ interface RoleSnapshot {
                                   @if (!permission.isActive) {
                                     <span class="inactive-badge">Inactive</span>
                                   }
+                                  <input
+                                    type="checkbox"
+                                    [disabled]="permissionsDisabled() || !permission.isActive"
+                                    [checked]="hasPermission(permission.code)"
+                                    (change)="togglePermission(permission.code, $any($event.target).checked)"
+                                    [attr.aria-label]="'Toggle ' + permission.name"
+                                  />
                                 </li>
                               }
                             </ul>
@@ -353,82 +390,91 @@ interface RoleSnapshot {
               </button>
               <span class="save-error" role="alert">{{ saveError() }}</span>
               <button type="button" class="secondary-button" [disabled]="isSaving()" (click)="cancelChanges()">Cancel</button>
+              <button type="button" class="secondary-button preview-button" (click)="showPreview.set(true)">Preview Impact</button>
               <button type="button" class="primary-button" [disabled]="!canSave()" (click)="saveRole()">
                 {{ isSaving() ? 'Saving...' : 'Save Changes' }}
               </button>
             </footer>
           </main>
 
-          <aside class="panel summary-panel" aria-label="Role summary">
-            <h2>Role Summary</h2>
-            <div class="summary-grid">
-              <article class="summary-card purple">
-                <span>Available Modules</span>
-                <strong>{{ modules().length }}</strong>
-              </article>
-              <article class="summary-card blue">
-                <span>Available Permissions</span>
-                <strong>{{ allPermissions().length }}</strong>
-              </article>
-              <article class="summary-card green">
-                <span>Granted Permissions</span>
-                <strong>{{ selectedPermissionCodes().size }}</strong>
-              </article>
-              <article class="summary-card red">
-                <span>Not Granted</span>
-                <strong>{{ notGrantedCount() }}</strong>
-              </article>
-              <article class="summary-card users">
-                <span>Assigned Users</span>
-                <strong>{{ assignedUserCount() }}</strong>
-              </article>
-            </div>
-
-            <section class="sensitive-card">
-              <h3>Sensitive Permissions</h3>
-              @if (selectedSensitivePermissions().length) {
-                <p>{{ selectedSensitivePermissions().length }} sensitive permission{{ selectedSensitivePermissions().length === 1 ? '' : 's' }} granted</p>
-                <ul>
-                  @for (permission of selectedSensitivePermissions().slice(0, 6); track permission.id) {
-                    <li><code>{{ permission.code }}</code></li>
-                  }
-                </ul>
-              } @else {
-                <p>No sensitive permissions are currently granted.</p>
-              }
-            </section>
-
-            <section class="preview-card">
-              <h3>Preview Access</h3>
-              <p>See what this role can and cannot access from selected backend permissions.</p>
-              <button type="button" (click)="showPreview.set(true)">Preview Access</button>
-            </section>
-
-            @if (lastUpdated()) {
-              <section class="updated-card">
-                <h3>Last updated</h3>
-                <p>{{ lastUpdated() }}</p>
-              </section>
-            }
-          </aside>
         </section>
       }
 
       @if (showPreview()) {
         <div class="modal-backdrop" role="presentation" (click)="showPreview.set(false)">
-          <section class="preview-modal" role="dialog" aria-modal="true" aria-label="Preview access" (click)="$event.stopPropagation()">
+          <section class="preview-modal" role="dialog" aria-modal="true" aria-label="Preview impact" (click)="$event.stopPropagation()">
             <header>
-              <h2>Preview Access</h2>
+              <div>
+                <h2>Preview Impact</h2>
+                <p>Review how your changes will affect access before saving.</p>
+              </div>
               <button type="button" aria-label="Close preview" (click)="showPreview.set(false)">x</button>
             </header>
-            <div class="preview-list">
-              @for (module of modules(); track module.id) {
-                <article>
-                  <strong>{{ module.name }}</strong>
-                  <span>{{ selectedCountForModule(module) }} / {{ permissionCountForModule(module) }} granted</span>
-                </article>
+
+            <section class="modal-section">
+              <h3>1. Role Summary</h3>
+              <div class="modal-card-grid">
+                <article><span>Available Permissions</span><strong>{{ allPermissions().length }}</strong></article>
+                <article><span>Granted</span><strong>{{ selectedPermissionCodes().size }}</strong></article>
+                <article><span>Not Granted</span><strong>{{ notGrantedCount() }}</strong></article>
+                <article><span>Assigned Users</span><strong>{{ assignedUserCount() }}</strong></article>
+                <article><span>Sensitive Permissions</span><strong>{{ selectedSensitivePermissions().length }}</strong></article>
+              </div>
+            </section>
+
+            <section class="modal-section">
+              <h3>2. Change Impact</h3>
+              <div class="modal-card-grid impact">
+                <article><span>Added Permissions</span><strong>+{{ addedPermissionCodes().length }}</strong></article>
+                <article><span>Removed Permissions</span><strong>-{{ removedPermissionCodes().length }}</strong></article>
+                <article><span>Affected Users</span><strong>{{ assignedUserCount() }}</strong></article>
+                <article><span>Sensitive Permissions</span><strong>{{ selectedSensitivePermissions().length }}</strong></article>
+              </div>
+            </section>
+
+            <section class="modal-section sensitive-modal-card">
+              <h3>3. Sensitive Permissions</h3>
+              @if (selectedSensitivePermissions().length) {
+                <ul>
+                  @for (permission of selectedSensitivePermissions(); track permission.id) {
+                    <li><code>{{ permission.code }}</code></li>
+                  }
+                </ul>
+              } @else {
+                <p>No sensitive permissions selected.</p>
               }
-            </div>
+            </section>
+
+            <section class="modal-section">
+              <h3>4. Access Preview</h3>
+              <div class="access-preview">
+                <article class="can-access">
+                  <strong>Can Access</strong>
+                  @if (grantedPreviewPermissions().length) {
+                    @for (permission of grantedPreviewPermissions().slice(0, 8); track permission.id) {
+                      <span>{{ permission.name }} <code>{{ permission.code }}</code></span>
+                    }
+                  } @else {
+                    <span>No granted permissions selected.</span>
+                  }
+                </article>
+                <article class="cannot-access">
+                  <strong>Cannot Access</strong>
+                  @if (deniedPreviewPermissions().length) {
+                    @for (permission of deniedPreviewPermissions().slice(0, 8); track permission.id) {
+                      <span>{{ permission.name }} <code>{{ permission.code }}</code></span>
+                    }
+                  } @else {
+                    <span>All catalog permissions are selected.</span>
+                  }
+                </article>
+              </div>
+            </section>
+
+            <footer class="modal-actions">
+              <button type="button" class="secondary-button" (click)="showPreview.set(false)">Close</button>
+              <button type="button" class="primary-button" (click)="showPreview.set(false)">Apply Changes</button>
+            </footer>
           </section>
         </div>
       }
@@ -486,7 +532,7 @@ interface RoleSnapshot {
       align-items: start;
       display: grid;
       gap: 1rem;
-      grid-template-columns: minmax(250px, 320px) minmax(520px, 1fr) minmax(270px, 340px);
+      grid-template-columns: minmax(250px, 320px) minmax(640px, 1fr);
     }
 
     .panel,
@@ -679,6 +725,45 @@ interface RoleSnapshot {
       padding: 0.75rem;
     }
 
+    .summary-strip {
+      border: 1px solid #dfe8f2;
+      border-radius: 10px;
+      display: grid;
+      gap: 0;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      margin-bottom: 1rem;
+      overflow: hidden;
+    }
+
+    .summary-strip article {
+      background: #fbfdff;
+      border-right: 1px solid #dfe8f2;
+      display: grid;
+      gap: 0.25rem;
+      min-height: 66px;
+      padding: 0.75rem;
+    }
+
+    .summary-strip article:last-child {
+      border-right: 0;
+    }
+
+    .summary-strip span {
+      color: #55708c;
+      font-size: 0.68rem;
+      font-weight: 800;
+    }
+
+    .summary-strip strong {
+      color: #10243b;
+      font-size: 1.2rem;
+      line-height: 1;
+    }
+
+    .summary-strip .dirty-summary.active {
+      background: #fff8ed;
+    }
+
     .inline-error,
     .save-error {
       color: #b42318;
@@ -736,6 +821,29 @@ interface RoleSnapshot {
       margin-bottom: 1rem;
     }
 
+    .dirty-banner {
+      align-items: center;
+      background: #fff8ed;
+      border: 1px solid #fed7aa;
+      border-radius: 8px;
+      color: #7c2d12;
+      display: flex;
+      font-size: 0.82rem;
+      gap: 0.75rem;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+      padding: 0.65rem 0.8rem;
+    }
+
+    .dirty-banner button {
+      background: transparent;
+      border: 0;
+      color: #155eef;
+      cursor: pointer;
+      font: inherit;
+      font-weight: 900;
+    }
+
     .toolbar-actions {
       display: flex;
       gap: 0.45rem;
@@ -756,7 +864,7 @@ interface RoleSnapshot {
       display: grid;
       font-size: 0.7rem;
       font-weight: 900;
-      grid-template-columns: 1fr 110px 110px;
+      grid-template-columns: minmax(180px, 1.2fr) minmax(180px, 1fr) minmax(220px, 1.1fr) 90px 90px 80px;
       letter-spacing: 0.03em;
       padding: 0.65rem 0.9rem;
       position: sticky;
@@ -887,7 +995,7 @@ interface RoleSnapshot {
       align-items: start;
       display: grid;
       gap: 0.65rem;
-      grid-template-columns: auto minmax(220px, 1fr) auto auto auto auto;
+      grid-template-columns: minmax(160px, 1.1fr) minmax(180px, 1fr) minmax(220px, 1.1fr) auto auto auto auto;
       padding: 0.68rem 0.9rem 0.68rem 3.2rem;
     }
 
@@ -897,7 +1005,7 @@ interface RoleSnapshot {
       width: 1rem;
     }
 
-    .permission-copy code,
+    .permission-row > code,
     .sensitive-card code {
       background: #f0f5fa;
       border-radius: 6px;
@@ -905,6 +1013,12 @@ interface RoleSnapshot {
       font-size: 0.74rem;
       padding: 0.15rem 0.4rem;
       width: fit-content;
+    }
+
+    .permission-description {
+      color: #6b8198;
+      font-size: 0.74rem;
+      line-height: 1.35;
     }
 
     .scope-badge.platform {
@@ -942,9 +1056,14 @@ interface RoleSnapshot {
       border-top: 1px solid #edf2f7;
       display: grid;
       gap: 0.65rem;
-      grid-template-columns: auto 1fr auto auto;
+      grid-template-columns: auto 1fr auto auto auto;
       margin-top: 1rem;
       padding-top: 1rem;
+    }
+
+    .preview-button {
+      border-color: #155eef;
+      color: #155eef;
     }
 
     .summary-grid {
@@ -1077,7 +1196,7 @@ interface RoleSnapshot {
       border-radius: 12px;
       box-shadow: 0 20px 60px rgba(8, 21, 38, 0.24);
       max-height: min(720px, 86vh);
-      max-width: 620px;
+      max-width: 760px;
       overflow: auto;
       padding: 1rem;
       width: 100%;
@@ -1088,6 +1207,12 @@ interface RoleSnapshot {
       display: flex;
       justify-content: space-between;
       margin-bottom: 1rem;
+    }
+
+    .preview-modal header p {
+      color: #5f738a;
+      font-size: 0.82rem;
+      margin-top: 0.25rem;
     }
 
     .preview-modal header button {
@@ -1104,6 +1229,112 @@ interface RoleSnapshot {
     .preview-list {
       display: grid;
       gap: 0.55rem;
+    }
+
+    .modal-section {
+      display: grid;
+      gap: 0.6rem;
+      margin-top: 1rem;
+    }
+
+    .modal-card-grid {
+      display: grid;
+      gap: 0.55rem;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+
+    .modal-card-grid.impact {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .modal-card-grid article {
+      border: 1px solid #dfe8f2;
+      border-radius: 8px;
+      display: grid;
+      gap: 0.25rem;
+      min-height: 64px;
+      padding: 0.65rem;
+    }
+
+    .modal-card-grid span {
+      color: #55708c;
+      font-size: 0.68rem;
+      font-weight: 800;
+    }
+
+    .modal-card-grid strong {
+      color: #10243b;
+      font-size: 1.15rem;
+    }
+
+    .sensitive-modal-card {
+      background: #fff8ed;
+      border: 1px solid #fed7aa;
+      border-radius: 10px;
+      padding: 0.75rem;
+    }
+
+    .sensitive-modal-card ul {
+      display: grid;
+      gap: 0.3rem;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      margin: 0;
+      padding-left: 1rem;
+    }
+
+    .sensitive-modal-card code,
+    .access-preview code {
+      background: #f0f5fa;
+      border-radius: 6px;
+      color: #355272;
+      font-size: 0.72rem;
+      padding: 0.1rem 0.35rem;
+    }
+
+    .access-preview {
+      display: grid;
+      gap: 0.75rem;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .access-preview article {
+      border-radius: 10px;
+      display: grid;
+      gap: 0.45rem;
+      padding: 0.75rem;
+    }
+
+    .access-preview span {
+      border-radius: 7px;
+      display: grid;
+      gap: 0.15rem;
+      padding: 0.45rem;
+    }
+
+    .can-access {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+    }
+
+    .can-access span {
+      background: #dcfce7;
+    }
+
+    .cannot-access {
+      background: #fff7f7;
+      border: 1px solid #fecaca;
+    }
+
+    .cannot-access span {
+      background: #fee2e2;
+    }
+
+    .modal-actions {
+      align-items: center;
+      display: flex;
+      gap: 0.6rem;
+      justify-content: space-between;
+      margin-top: 1rem;
     }
 
     .preview-list article {
@@ -1130,17 +1361,16 @@ interface RoleSnapshot {
       .roles-layout {
         grid-template-columns: 300px minmax(0, 1fr);
       }
-
-      .summary-panel {
-        grid-column: 1 / -1;
-      }
     }
 
     @media (max-width: 900px) {
       .roles-layout,
       .toolbar,
       .role-form,
-      .summary-grid,
+      .summary-strip,
+      .modal-card-grid,
+      .modal-card-grid.impact,
+      .access-preview,
       .action-bar {
         grid-template-columns: 1fr;
       }
@@ -1184,6 +1414,7 @@ export class PlatformPermissionCatalogPage {
   readonly moduleFilter = signal<ModuleFilter | string>('');
   readonly scopeFilter = signal<PermissionCatalogScopeFilter>('');
   readonly grantFilter = signal<GrantFilter>('');
+  readonly actionFilter = signal<ActionFilter | string>('');
   readonly permissionMode = signal<PermissionMode>('custom');
   readonly form = signal<RoleFormState>({ code: '', name: '', description: '', status: 'Active' });
   private readonly snapshot = signal<RoleSnapshot | null>(null);
@@ -1191,6 +1422,9 @@ export class PlatformPermissionCatalogPage {
 
   readonly modules = computed(() => this.catalog()?.modules ?? []);
   readonly allPermissions = computed(() => permissionsFromModules(this.modules()));
+  readonly actionOptions = computed(() =>
+    [...new Set(this.allPermissions().map((permission) => this.actionLabel(permission)).filter(Boolean))].sort()
+  );
   readonly filteredRoles = computed(() => {
     const term = this.roleSearch().trim().toLowerCase();
     if (!term) {
@@ -1208,6 +1442,7 @@ export class PlatformPermissionCatalogPage {
       this.moduleFilter(),
       this.scopeFilter(),
       this.grantFilter(),
+      this.actionFilter(),
       this.selectedPermissionCodes()
     )
   );
@@ -1215,6 +1450,21 @@ export class PlatformPermissionCatalogPage {
     this.allPermissions().filter((permission) => this.hasPermission(permission.code) && isSensitivePermission(permission))
   );
   readonly notGrantedCount = computed(() => Math.max(this.allPermissions().length - this.selectedPermissionCodes().size, 0));
+  readonly addedPermissionCodes = computed(() => {
+    const loaded = new Set(this.snapshot()?.permissionCodes ?? []);
+    return [...this.selectedPermissionCodes()].filter((code) => !loaded.has(code)).sort();
+  });
+  readonly removedPermissionCodes = computed(() => {
+    const selected = this.selectedPermissionCodes();
+    return [...(this.snapshot()?.permissionCodes ?? [])].filter((code) => !selected.has(code)).sort();
+  });
+  readonly changedPermissionCount = computed(() => this.addedPermissionCodes().length + this.removedPermissionCodes().length);
+  readonly grantedPreviewPermissions = computed(() =>
+    this.allPermissions().filter((permission) => this.selectedPermissionCodes().has(permission.code))
+  );
+  readonly deniedPreviewPermissions = computed(() =>
+    this.allPermissions().filter((permission) => !this.selectedPermissionCodes().has(permission.code))
+  );
   readonly assignedUserCount = computed(() =>
     this.selectedRole()?.assignedUserCount ?? this.roles().find((role) => role.id === this.selectedRoleId())?.assignedUserCount ?? 0
   );
@@ -1374,6 +1624,11 @@ export class PlatformPermissionCatalogPage {
     this.expandAll();
   }
 
+  onActionFilterChange(value: string): void {
+    this.actionFilter.set(value);
+    this.expandAll();
+  }
+
   isExpanded(kind: 'module' | 'feature', id: string): boolean {
     return this.expandedKeys().has(`${kind}:${id}`);
   }
@@ -1517,13 +1772,7 @@ export class PlatformPermissionCatalogPage {
   }
 
   actionLabel(permission: PermissionCatalogPermission): string {
-    const explicitAction = permission.action?.trim();
-    if (explicitAction) {
-      return explicitAction;
-    }
-
-    const parts = permission.code.split('.');
-    return parts.at(-1) || 'access';
+    return getActionLabel(permission);
   }
 
   isSensitive(permission: PermissionCatalogPermission): boolean {
@@ -1596,6 +1845,7 @@ function filterCatalog(
   moduleFilter: string,
   scopeFilter: PermissionCatalogScopeFilter,
   grantFilter: GrantFilter,
+  actionFilter: string,
   selectedCodes: Set<string>
 ): FilteredPermissionCatalogModule[] {
   const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -1609,6 +1859,7 @@ function filterCatalog(
             (permission) =>
               matchesScope(permission.scope, scopeFilter) &&
               matchesGrant(permission.code, grantFilter, selectedCodes) &&
+              matchesAction(permission, actionFilter) &&
               matchesSearch(permission, normalizedSearch, module, feature)
           );
 
@@ -1642,6 +1893,14 @@ function matchesGrant(code: string, grantFilter: GrantFilter, selectedCodes: Set
   return grantFilter === 'granted' ? isGranted : !isGranted;
 }
 
+function matchesAction(permission: PermissionCatalogPermission, actionFilter: string): boolean {
+  if (!actionFilter) {
+    return true;
+  }
+
+  return getActionLabel(permission) === actionFilter;
+}
+
 function matchesSearch(
   permission: PermissionCatalogPermission,
   searchTerm: string,
@@ -1669,6 +1928,16 @@ function permissionsFromModules(modules: PermissionCatalogModule[]): PermissionC
 
 function isReadOnlyPermission(permission: PermissionCatalogPermission): boolean {
   return permission.code.toLowerCase().endsWith('.view') || (permission.action ?? '').toLowerCase() === 'view';
+}
+
+function getActionLabel(permission: PermissionCatalogPermission): string {
+  const explicitAction = permission.action?.trim();
+  if (explicitAction) {
+    return explicitAction;
+  }
+
+  const parts = permission.code.split('.');
+  return parts.at(-1) || 'access';
 }
 
 function isSensitivePermission(permission: PermissionCatalogPermission): boolean {

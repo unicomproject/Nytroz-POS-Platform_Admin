@@ -144,7 +144,7 @@ describe('PlatformPermissionCatalogPage', () => {
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('Loading roles and permissions');
   });
 
-  it('renders the three-panel role management UI from real API responses', async () => {
+  it('renders the two-panel role management UI from real API responses', async () => {
     const fixture = await createComponent();
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
 
@@ -155,7 +155,11 @@ describe('PlatformPermissionCatalogPage', () => {
     expect(text).toContain('Roles & Permissions');
     expect(text).toContain('Support Admin');
     expect(text).toContain('Edit Role');
-    expect(text).toContain('Role Summary');
+    expect(text).toContain('Available Permissions');
+    expect(text).toContain('Preview Impact');
+    expect(fixture.nativeElement.querySelector('.roles-panel')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.editor-panel')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.summary-panel')).toBeFalsy();
   });
 
   it('fills the selected role form and checks assigned permissions', async () => {
@@ -166,11 +170,11 @@ describe('PlatformPermissionCatalogPage', () => {
 
     expect(description.value).toBe('Support team role');
     expect(checkboxes[0].checked).toBe(true);
-    expect(text).toContain('Granted Permissions');
+    expect(text).toContain('Granted');
     expect(text).toContain('1');
   });
 
-  it('filters permissions by search, module, scope, and granted state', async () => {
+  it('filters permissions by search, module, scope, action, and granted state', async () => {
     const fixture = await createComponent();
 
     fixture.componentInstance.permissionSearchTerm.set('tenant roles');
@@ -191,10 +195,40 @@ describe('PlatformPermissionCatalogPage', () => {
     expect(treeText(fixture)).not.toContain('platform.roles.view');
 
     fixture.componentInstance.onScopeChange('');
+    fixture.componentInstance.onActionFilterChange('update');
+    fixture.detectChanges();
+    expect(treeText(fixture)).toContain('platform.roles.update');
+    expect(treeText(fixture)).not.toContain('platform.roles.view');
+
+    fixture.componentInstance.onActionFilterChange('');
     fixture.componentInstance.onGrantFilterChange('granted');
     fixture.detectChanges();
     expect(treeText(fixture)).toContain('platform.roles.view');
     expect(treeText(fixture)).not.toContain('platform.roles.update');
+  });
+
+  it('shows dirty banner and preview impact modal with computed impact', async () => {
+    const fixture = await createComponent();
+
+    fixture.componentInstance.togglePermission('platform.roles.update', true);
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain("You have changes that haven't been saved.");
+
+    const previewButton = fixture.nativeElement.querySelector('.preview-button') as HTMLButtonElement;
+    previewButton.click();
+    fixture.detectChanges();
+
+    const modalText = fixture.nativeElement.querySelector('.preview-modal')?.textContent ?? '';
+    expect(modalText).toContain('Preview Impact');
+    expect(modalText).toContain('1. Role Summary');
+    expect(modalText).toContain('2. Change Impact');
+    expect(modalText).toContain('Added Permissions');
+    expect(modalText).toContain('+1');
+    expect(modalText).toContain('3. Sensitive Permissions');
+    expect(modalText).toContain('4. Access Preview');
+    expect(modalText).toContain('Can Access');
+    expect(modalText).toContain('Cannot Access');
   });
 
   it('applies read only and full access permission modes', async () => {
