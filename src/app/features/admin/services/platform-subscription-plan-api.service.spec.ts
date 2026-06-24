@@ -144,4 +144,28 @@ describe('PlatformSubscriptionPlanApiService', () => {
 
     expect(basePrice).toBe(12900);
   });
+
+  it('fails explicitly while the subscription module catalog endpoint is pending', () => {
+    let message = '';
+
+    service.getModules().subscribe({
+      error: (error: Error) => {
+        message = error.message;
+      }
+    });
+
+    expect(message).toContain('Subscription module catalog API is not available.');
+  });
+
+  it('fails explicitly while the subscription feature catalog endpoint is pending', () => {
+    let message = '';
+
+    service.getFeatures().subscribe({
+      error: (error: Error) => {
+        message = error.message;
+      }
+    });
+
+    expect(message).toContain('Subscription feature catalog API is not available.');
+  });
 });

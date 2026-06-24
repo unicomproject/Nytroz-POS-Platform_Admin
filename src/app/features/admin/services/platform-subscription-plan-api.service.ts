@@ -1,6 +1,6 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { map, Observable, of } from 'rxjs';
+import { map, Observable, throwError } from 'rxjs';
 
 import { apiEndpoints } from '../../../core/config/api-endpoints';
 import { appSettings } from '../../../core/config/app-settings';
@@ -46,14 +46,14 @@ export class PlatformSubscriptionPlanApiService {
       );
   }
 
-  /** TODO: Wire when GET /api/v1/platform/subscription-plans/modules is available. */
+  /** Pending backend API: GET /api/v1/platform/subscription-plans/modules. */
   getModules(): Observable<PlatformModuleOption[]> {
-    return of([]);
+    return throwError(() => new Error('Subscription module catalog API is not available.'));
   }
 
-  /** TODO: Wire when GET /api/v1/platform/subscription-plans/features is available. */
+  /** Pending backend API: GET /api/v1/platform/subscription-plans/features. */
   getFeatures(): Observable<PlatformFeatureOption[]> {
-    return of([]);
+    return throwError(() => new Error('Subscription feature catalog API is not available.'));
   }
 
   saveDraft(draft: SubscriptionPlanDraft): Observable<SubscriptionPlanMutationResponse> {

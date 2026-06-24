@@ -1288,7 +1288,11 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
         this.moduleAvailability.set(availability);
         this.modulesLoading.set(false);
       },
-      error: () => this.modulesLoading.set(false)
+      error: () => {
+        this.modules.set([]);
+        this.moduleAvailability.set({});
+        this.modulesLoading.set(false);
+      }
     });
 
     this.api.getFeatures().subscribe({
@@ -1299,6 +1303,10 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
           availability[feature.id] = 'not_available';
         }
         this.featureAvailability.set(availability);
+      },
+      error: () => {
+        this.features.set([]);
+        this.featureAvailability.set({});
       }
     });
   }

@@ -31,9 +31,30 @@ export class AuthApiService {
     return this.http
       .post<ApiResponse<PlatformLoginResponse>>(
         `${appSettings.apiBaseUrl}${apiEndpoints.auth.login}`,
-        request
+        request,
+        { withCredentials: true }
       )
       .pipe(map((response) => this.toAuthSession(response.data)));
+  }
+
+  refresh(): Observable<AuthSession> {
+    return this.http
+      .post<ApiResponse<PlatformLoginResponse>>(
+        `${appSettings.apiBaseUrl}${apiEndpoints.auth.refresh}`,
+        {},
+        { withCredentials: true }
+      )
+      .pipe(map((response) => this.toAuthSession(response.data)));
+  }
+
+  logout(): Observable<boolean> {
+    return this.http
+      .post<ApiResponse<boolean>>(
+        `${appSettings.apiBaseUrl}${apiEndpoints.auth.logout}`,
+        {},
+        { withCredentials: true }
+      )
+      .pipe(map((response) => response.data === true));
   }
 
   private toAuthSession(response: PlatformLoginResponse): AuthSession {
