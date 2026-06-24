@@ -1,8 +1,9 @@
 import { Component, computed } from '@angular/core';
-import { RouterLink, RouterLinkActive } from '@angular/router';
+import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 
 import { platformMenuConfig } from '../../core/config/menu.config';
 import { AuthSessionService } from '../../core/services/auth-session.service';
+import { AuthApiService } from '../../features/auth/services/auth-api.service';
 import { SidebarMenuIcon } from './sidebar-menu-icon';
 
 @Component({
@@ -56,6 +57,8 @@ import { SidebarMenuIcon } from './sidebar-menu-icon';
           </div>
           <span class="user-chevron" aria-hidden="true">›</span>
         </div>
+
+        <button class="logout-button" type="button" (click)="logout()">Sign out</button>
 
         <div class="version-card">
           <div class="version-copy">
@@ -246,6 +249,29 @@ import { SidebarMenuIcon } from './sidebar-menu-icon';
       font-size: 0.68rem;
     }
 
+    .logout-button {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      color: #e8eef5;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.8rem;
+      font-weight: 700;
+      min-height: 2.35rem;
+      padding: 0.58rem 0.8rem;
+      text-align: left;
+      transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+    }
+
+    .logout-button:hover,
+    .logout-button:focus-visible {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.18);
+      color: #fff;
+      outline: none;
+    }
+
     .version-card {
       align-items: center;
       background: rgba(255, 255, 255, 0.04);
@@ -302,7 +328,23 @@ export class Sidebar {
       .toUpperCase()
   );
 
-  constructor(readonly authSession: AuthSessionService) {}
+  constructor(
+    readonly authSession: AuthSessionService,
+    private readonly authApi: AuthApiService,
+    private readonly router: Router
+  ) {}
+
+  logout(): void {
+    this.authApi.logout().subscribe({
+      next: () => this.completeLogout(),
+      error: () => this.completeLogout()
+    });
+  }
+
+  private completeLogout(): void {
+    this.authSession.clearSession();
+    void this.router.navigate(['/login']);
+  }
 
   linkActiveOptions(path: string): { exact: boolean } {
     if (path === '/admin/dashboard') {

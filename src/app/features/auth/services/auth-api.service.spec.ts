@@ -85,4 +85,52 @@ describe('AuthApiService', () => {
       'platform.subscription_plans.create'
     ]);
   });
+
+  it('calls the platform refresh endpoint and maps the replacement session', () => {
+    let accessToken = '';
+
+    service.refresh().subscribe((response) => {
+      accessToken = response.accessToken;
+    });
+
+    const request = httpTesting.expectOne('/api/v1/auth/platform-refresh');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.withCredentials).toBe(true);
+
+    request.flush({
+      success: true,
+      message: 'ok',
+      data: {
+        accessToken: 'refreshed-token',
+        tokenType: 'Bearer',
+        accessTokenExpiresAt: new Date(Date.now() + 60_000).toISOString(),
+        sessionExpiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+        user: {
+          id: 'platform-user-1',
+          email: 'admin@nytroz.local',
+          fullName: 'Platform Admin',
+          status: 'active',
+          platformPermissions: []
+        }
+      }
+    });
+
+    expect(accessToken).toBe('refreshed-token');
+  });
+
+  it('calls the platform logout endpoint with refresh cookie credentials', () => {
+    let loggedOut = false;
+
+    service.logout().subscribe((response) => {
+      loggedOut = response;
+    });
+
+    const request = httpTesting.expectOne('/api/v1/auth/platform-logout');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.withCredentials).toBe(true);
+
+    request.flush({ success: true, message: 'ok', data: true });
+
+    expect(loggedOut).toBe(true);
+  });
 });
