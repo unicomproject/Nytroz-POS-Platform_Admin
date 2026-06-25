@@ -181,19 +181,26 @@ type WizardStep = 'basics' | 'modules' | 'features' | 'pricing' | 'limits' | 're
                 </form>
               }
               @case ('modules') {
-                <header class="step-header"><h2>Modules</h2><p>Select which modules are included or available as add-ons.</p></header>
+                <header class="step-header"><h2>Modules</h2><p>Select commercial subscription modules for this plan.</p></header>
                 @if (modulesLoading()) {
-                  <p class="muted">Loading modules from platform catalog...</p>
+                  <p class="muted">Loading subscription modules...</p>
+                } @else if (catalogError()) {
+                  <div class="empty-step"><strong>Module catalog could not be loaded</strong><span>{{ catalogError() }}</span></div>
                 } @else if (!modules().length) {
-                  <div class="empty-step"><strong>Module catalog unavailable</strong><span>Modules will load from the platform API when the catalog endpoint is available.</span></div>
+                  <div class="empty-step"><strong>No subscription modules found</strong><span>The backend subscription catalog did not return Release 1 modules.</span></div>
                 } @else {
                   <div class="module-grid">
                     @for (module of modules(); track module.id) {
-                      <article class="module-card" [class.selected]="moduleAvailability()[module.id] !== 'not_available'">
-                        <div class="module-head"><strong>{{ module.name }}</strong><p>{{ module.description || 'No description provided.' }}</p></div>
-                        <select [ngModel]="moduleAvailability()[module.id]" (ngModelChange)="setModuleAvailability(module.id, $event)">
+                      <article class="module-card" [class.selected]="moduleAvailability()[module.id] === 'included'" [class.locked]="module.isLocked">
+                        <div class="module-head">
+                          <strong>{{ module.name }}</strong>
+                          <p>{{ module.description || 'No description provided.' }}</p>
+                          @if (module.isLocked) {
+                            <small>Included by default</small>
+                          }
+                        </div>
+                        <select [ngModel]="moduleAvailability()[module.id]" [disabled]="module.isLocked" (ngModelChange)="setModuleAvailability(module.id, $event)">
                           <option value="included">Included</option>
-                          <option value="addon">Add-on</option>
                           <option value="not_available">Not Available</option>
                         </select>
                       </article>
@@ -203,18 +210,30 @@ type WizardStep = 'basics' | 'modules' | 'features' | 'pricing' | 'limits' | 're
               }
               @case ('features') {
                 <header class="step-header"><h2>Features</h2><p>Configure feature entitlements grouped by module.</p></header>
-                @if (!features().length) {
-                  <div class="empty-step"><strong>Feature catalog unavailable</strong><span>Features will load from the platform API when the catalog endpoint is available.</span></div>
+                @if (featuresLoading()) {
+                  <p class="muted">Loading subscription features...</p>
+                } @else if (catalogError()) {
+                  <div class="empty-step"><strong>Feature catalog could not be loaded</strong><span>{{ catalogError() }}</span></div>
+                } @else if (!selectedModulesCount()) {
+                  <div class="empty-step"><strong>Select modules first</strong><span>Features are shown after at least one module is included.</span></div>
+                } @else if (!featureGroups().length) {
+                  <div class="empty-step"><strong>No features found</strong><span>The selected modules do not expose subscription feature entitlements.</span></div>
                 } @else {
                   @for (group of featureGroups(); track group.moduleId) {
                     <section class="feature-group">
                       <h3>{{ group.moduleName }}</h3>
                       <table>
-                        <thead><tr><th>Feature</th><th>Included</th><th>Add-on</th><th>Not Available</th></tr></thead>
+                        <thead><tr><th>Feature</th><th>Included</th><th>Not Available</th></tr></thead>
                         <tbody>
                           @for (feature of group.features; track feature.id) {
                             <tr [class.disabled]="isFeatureDisabled(feature)">
-                              <td><strong>{{ feature.name }}</strong></td>
+                              <td>
+                                <strong>{{ feature.name }}</strong>
+                                <span>{{ feature.description || feature.entitlementKey || feature.featureKey }}</span>
+                                @if (feature.isLocked) {
+                                  <small>Included by default</small>
+                                }
+                              </td>
                               @for (option of availabilityOptions; track option) {
                                 <td class="radio-cell">
                                   <input type="radio" [name]="feature.id" [value]="option" [checked]="featureAvailability()[feature.id] === option" [disabled]="isFeatureDisabled(feature)" (change)="setFeatureAvailability(feature.id, option)" />
@@ -392,6 +411,29 @@ type WizardStep = 'basics' | 'modules' | 'features' | 'pricing' | 'limits' | 're
             <div><span>Pricing</span><strong [class]="pricingSummaryClass()">{{ pricingSummary() }}</strong></div>
             <div><span>Limits</span><strong [class]="limitsSummaryClass()">{{ limitsSummary() }}</strong></div>
           </div>
+          @if (selectedModuleNames().length) {
+            <section class="selection-summary" aria-label="Selected modules">
+              <h3>Selected Modules</h3>
+              <ul>
+                @for (moduleName of selectedModuleNames(); track moduleName) {
+                  <li>{{ moduleName }}</li>
+                }
+              </ul>
+            </section>
+          }
+          @if (selectedFeatureGroups().length) {
+            <section class="selection-summary" aria-label="Selected features">
+              <h3>Selected Features</h3>
+              @for (group of selectedFeatureGroups(); track group.moduleName) {
+                <strong>{{ group.moduleName }}</strong>
+                <ul>
+                  @for (featureName of group.featureNames; track featureName) {
+                    <li>{{ featureName }}</li>
+                  }
+                </ul>
+              }
+            </section>
+          }
           <p class="summary-note">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M12 10v6M12 7h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
             Complete all steps to see full summary.
@@ -523,11 +565,12 @@ type WizardStep = 'basics' | 'modules' | 'features' | 'pricing' | 'limits' | 're
     .module-grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); }
     .module-card { border: 1px solid #eaecf0; border-radius: 12px; display: grid; gap: 0.65rem; padding: 0.85rem; }
     .module-card.selected { border-color: #84adff; box-shadow: 0 0 0 3px rgba(11, 92, 255, 0.12); }
-    .module-head p, .muted, .empty-step span { color: #667085; font-size: 0.78rem; }
+    .module-head p, .module-head small, .muted, .empty-step span { color: #667085; font-size: 0.78rem; }
     .empty-step { background: #f9fafb; border: 1px dashed #d0d5dd; border-radius: 12px; display: grid; gap: 0.35rem; padding: 1.25rem; }
     table { border-collapse: collapse; width: 100%; }
     th, td { border-bottom: 1px solid #f2f4f7; padding: 0.55rem 0.35rem; text-align: left; }
     th { color: #667085; font-size: 0.72rem; text-transform: uppercase; }
+    td span { color: #667085; display: block; font-size: 0.75rem; margin-top: 0.2rem; }
     tr.disabled { opacity: 0.5; }
     .radio-cell { text-align: center; width: 5rem; }
     .review-list { display: grid; gap: 0.65rem; margin-bottom: 1rem; }
@@ -553,6 +596,11 @@ type WizardStep = 'basics' | 'modules' | 'features' | 'pricing' | 'limits' | 're
     .summary-progress strong.status-muted { color: #98a2b3; font-weight: 500; }
     .summary-note { align-items: center; background: #eef4ff; border-radius: 10px; color: #175cd3; display: flex; font-size: 0.75rem; gap: 0.45rem; line-height: 1.35; margin: 1rem 0 0; padding: 0.65rem 0.75rem; }
     .summary-note svg { flex-shrink: 0; height: 1rem; stroke: currentColor; stroke-width: 1.5; fill: none; width: 1rem; }
+    .selection-summary { border-top: 1px solid #f2f4f7; display: grid; gap: 0.45rem; margin-top: 1rem; padding-top: 1rem; }
+    .selection-summary h3 { color: #101828; font-size: 0.82rem; margin: 0; }
+    .selection-summary strong { color: #344054; font-size: 0.76rem; }
+    .selection-summary ul { display: grid; gap: 0.25rem; list-style: none; margin: 0; padding: 0; }
+    .selection-summary li { color: #667085; font-size: 0.75rem; line-height: 1.35; }
     .action-bar { align-items: center; background: #fff; border-top: 1px solid #eaecf0; bottom: 0; box-shadow: 0 -4px 18px rgba(16, 24, 40, 0.06); display: flex; gap: 0.75rem; justify-content: space-between; left: 16.5rem; padding: 0.95rem 1.6rem; position: fixed; right: 0; z-index: 10; }
     .action-group { align-items: center; display: flex; flex-wrap: wrap; gap: 0.65rem; justify-content: flex-end; }
     .btn { align-items: center; border-radius: 10px; cursor: pointer; display: inline-flex; font-size: 0.86rem; font-weight: 600; gap: 0.45rem; justify-content: center; min-height: 2.65rem; padding: 0.55rem 1.05rem; }
@@ -597,12 +645,14 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
     { value: 'demo', label: 'Demo' }
   ];
 
-  readonly availabilityOptions: ModuleAvailability[] = ['included', 'addon', 'not_available'];
+  readonly availabilityOptions: ModuleAvailability[] = ['included', 'not_available'];
 
   readonly currentStep = signal<WizardStep>('basics');
   readonly modules = signal<PlatformModuleOption[]>([]);
   readonly features = signal<PlatformFeatureOption[]>([]);
   readonly modulesLoading = signal(false);
+  readonly featuresLoading = signal(false);
+  readonly catalogError = signal<string | null>(null);
   readonly moduleAvailability = signal<Record<string, ModuleAvailability>>({});
   readonly featureAvailability = signal<Record<string, ModuleAvailability>>({});
   readonly isSaving = signal(false);
@@ -611,6 +661,7 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
   readonly errorMessage = signal<string | null>(null);
   readonly savedPlanId = signal<string | null>(null);
   readonly basicsSaved = signal(false);
+  readonly featuresSaved = signal(false);
   readonly pricingSaved = signal(false);
   readonly limitsSaved = signal(false);
   readonly basePriceInput = signal('');
@@ -642,7 +693,8 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
 
   readonly featureGroups = computed(() => {
     const groups = new Map<string, { moduleId: string; moduleName: string; features: PlatformFeatureOption[] }>();
-    for (const feature of this.features()) {
+    const selectedModuleIds = new Set(this.selectedModuleIds());
+    for (const feature of this.features().filter((item) => selectedModuleIds.has(item.moduleId))) {
       const existing = groups.get(feature.moduleId);
       if (existing) {
         existing.features.push(feature);
@@ -657,6 +709,30 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
 
     return [...groups.values()];
   });
+
+  readonly selectedModuleIds = computed(() =>
+    Object.entries(this.moduleAvailability())
+      .filter(([, value]) => value === 'included')
+      .map(([moduleId]) => moduleId)
+  );
+
+  readonly selectedModuleNames = computed(() => {
+    const selected = new Set(this.selectedModuleIds());
+    return this.modules()
+      .filter((module) => selected.has(module.id))
+      .map((module) => module.name);
+  });
+
+  readonly selectedFeatureGroups = computed(() =>
+    this.featureGroups()
+      .map((group) => ({
+        moduleName: group.moduleName,
+        featureNames: group.features
+          .filter((feature) => this.featureAvailability()[feature.id] === 'included')
+          .map((feature) => feature.name)
+      }))
+      .filter((group) => group.featureNames.length > 0)
+  );
 
   billingCycleLabel(): string {
     const value = this.basicsForm.controls.billingCycle.value;
@@ -688,7 +764,7 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
   }
 
   readonly selectedModulesCount = computed(() =>
-    Object.values(this.moduleAvailability()).filter((value) => value !== 'not_available').length
+    Object.values(this.moduleAvailability()).filter((value) => value === 'included').length
   );
 
   readonly enabledFeaturesCount = computed(() =>
@@ -742,8 +818,12 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
       return this.basicsSaved();
     }
 
-    if (step === 'modules' || step === 'features') {
+    if (step === 'modules') {
       return this.basicsSaved() && currentIndex > index;
+    }
+
+    if (step === 'features') {
+      return this.featuresSaved();
     }
 
     if (step === 'pricing') {
@@ -786,6 +866,11 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
 
     if (this.currentStep() === 'pricing') {
       this.persistPricing({ advanceToLimits: true });
+      return;
+    }
+
+    if (this.currentStep() === 'features') {
+      this.persistFeatures({ advanceToPricing: true });
       return;
     }
 
@@ -844,7 +929,14 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
   }
 
   setModuleAvailability(moduleId: string, value: ModuleAvailability): void {
+    const module = this.modules().find((item) => item.id === moduleId);
+    if (module?.isLocked) {
+      this.moduleAvailability.update((current) => ({ ...current, [moduleId]: 'included' }));
+      return;
+    }
+
     this.moduleAvailability.update((current) => ({ ...current, [moduleId]: value }));
+    this.featuresSaved.set(false);
 
     if (value === 'not_available') {
       const moduleFeatures = this.features().filter((feature) => feature.moduleId === moduleId);
@@ -855,15 +947,32 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
         }
         return next;
       });
+      return;
     }
+
+    const moduleFeatures = this.features().filter((feature) => feature.moduleId === moduleId);
+    this.featureAvailability.update((current) => {
+      const next = { ...current };
+      for (const feature of moduleFeatures) {
+        next[feature.id] = next[feature.id] ?? 'not_available';
+      }
+      return next;
+    });
   }
 
   setFeatureAvailability(featureId: string, value: ModuleAvailability): void {
+    const feature = this.features().find((item) => item.id === featureId);
+    if (feature?.isLocked) {
+      this.featureAvailability.update((current) => ({ ...current, [featureId]: 'included' }));
+      return;
+    }
+
     this.featureAvailability.update((current) => ({ ...current, [featureId]: value }));
+    this.featuresSaved.set(false);
   }
 
   isFeatureDisabled(feature: PlatformFeatureOption): boolean {
-    return this.moduleAvailability()[feature.moduleId] === 'not_available';
+    return feature.isLocked || this.moduleAvailability()[feature.moduleId] !== 'included';
   }
 
   saveDraft(): void {
@@ -879,6 +988,11 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
 
     if (this.currentStep() === 'limits') {
       this.persistLimits({ advanceToReview: false });
+      return;
+    }
+
+    if (this.currentStep() === 'features') {
+      this.persistFeatures({ advanceToPricing: false });
       return;
     }
 
@@ -919,6 +1033,37 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
       }
 
       this.persistLimitsDraft(planId);
+    });
+  }
+
+  private persistFeatures(options: { advanceToPricing: boolean }): void {
+    if (!this.validateFeaturesStep()) {
+      return;
+    }
+
+    this.isSaving.set(true);
+    this.successMessage.set(null);
+    this.errorMessage.set(null);
+
+    this.ensureDraftPlanId((planId) => {
+      this.api.updateSubscriptionPlanFeatures(planId, {
+        featureAvailability: this.buildFeatureAvailabilityRequest()
+      }).subscribe({
+        next: (response) => {
+          this.applyFeaturesResponse(response.includedFeatureIds);
+          this.featuresSaved.set(true);
+          this.isSaving.set(false);
+          if (options.advanceToPricing) {
+            this.currentStep.set('pricing');
+          } else {
+            this.successMessage.set('Subscription plan saved as draft');
+          }
+        },
+        error: (error) => {
+          this.errorMessage.set(this.apiError.toSafeMessage(error));
+          this.isSaving.set(false);
+        }
+      });
     });
   }
 
@@ -1234,6 +1379,20 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
     return this.pricingForm.valid;
   }
 
+  private validateFeaturesStep(): boolean {
+    if (!this.modules().length || !this.features().length) {
+      this.errorMessage.set('Module and feature catalog must be loaded before saving features.');
+      return false;
+    }
+
+    if (!this.selectedModulesCount()) {
+      this.errorMessage.set('Select at least one module before saving features.');
+      return false;
+    }
+
+    return true;
+  }
+
   private validateLimitsStep(): boolean {
     this.limitsForm.markAllAsTouched();
     return this.limitsForm.valid;
@@ -1251,6 +1410,31 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
       maxTills: maxTills!,
       maxUsers: maxUsers!
     };
+  }
+
+  private buildFeatureAvailabilityRequest(): Record<string, ModuleAvailability> {
+    const availability: Record<string, ModuleAvailability> = {};
+    const selectedModules = new Set(this.selectedModuleIds());
+
+    for (const feature of this.features()) {
+      availability[feature.id] = feature.isLocked
+        || (selectedModules.has(feature.moduleId) && this.featureAvailability()[feature.id] === 'included')
+        ? 'included'
+        : 'not_available';
+    }
+
+    return availability;
+  }
+
+  private applyFeaturesResponse(includedFeatureIds: string[]): void {
+    const included = new Set(includedFeatureIds);
+    this.featureAvailability.update((current) => {
+      const next = { ...current };
+      for (const feature of this.features()) {
+        next[feature.id] = feature.isLocked || included.has(feature.id) ? 'included' : 'not_available';
+      }
+      return next;
+    });
   }
 
   private syncBasePriceFromInput(): void {
@@ -1278,35 +1462,62 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
 
   private loadCatalogs(): void {
     this.modulesLoading.set(true);
-    this.api.getModules().subscribe({
-      next: (modules) => {
+    this.featuresLoading.set(true);
+    this.catalogError.set(null);
+
+    this.api.getSubscriptionCatalog().subscribe({
+      next: (catalog) => {
+        const modules = catalog.modules.map((module) => ({
+          id: module.id,
+          moduleKey: module.code,
+          name: module.name,
+          description: module.description ?? null,
+          sortOrder: module.sortOrder,
+          isCore: module.isCore,
+          isLocked: module.isLocked,
+          defaultAvailability: module.defaultAvailability
+        }));
+        const features = catalog.modules.flatMap((module) =>
+          module.features.map((feature) => ({
+            id: feature.id,
+            moduleId: module.id,
+            moduleName: module.name,
+            featureKey: feature.code,
+            name: feature.name,
+            description: feature.description ?? null,
+            entitlementKey: feature.entitlementKey ?? null,
+            sortOrder: feature.sortOrder,
+            isCore: feature.isCore,
+            isLocked: feature.isLocked,
+            defaultAvailability: feature.defaultAvailability
+          }))
+        );
+
         this.modules.set(modules);
+        this.features.set(features);
+
         const availability: Record<string, ModuleAvailability> = {};
         for (const module of modules) {
-          availability[module.id] = 'not_available';
+          availability[module.id] = module.defaultAvailability;
         }
         this.moduleAvailability.set(availability);
-        this.modulesLoading.set(false);
-      },
-      error: () => {
-        this.modules.set([]);
-        this.moduleAvailability.set({});
-        this.modulesLoading.set(false);
-      }
-    });
 
-    this.api.getFeatures().subscribe({
-      next: (features) => {
-        this.features.set(features);
-        const availability: Record<string, ModuleAvailability> = {};
+        const featureAvailability: Record<string, ModuleAvailability> = {};
         for (const feature of features) {
-          availability[feature.id] = 'not_available';
+          featureAvailability[feature.id] = feature.defaultAvailability;
         }
-        this.featureAvailability.set(availability);
+        this.featureAvailability.set(featureAvailability);
+        this.modulesLoading.set(false);
+        this.featuresLoading.set(false);
       },
-      error: () => {
+      error: (error) => {
+        this.modules.set([]);
         this.features.set([]);
+        this.moduleAvailability.set({});
         this.featureAvailability.set({});
+        this.catalogError.set(this.apiError.toSafeMessage(error));
+        this.modulesLoading.set(false);
+        this.featuresLoading.set(false);
       }
     });
   }

@@ -145,27 +145,117 @@ describe('PlatformSubscriptionPlanApiService', () => {
     expect(basePrice).toBe(12900);
   });
 
-  it('fails explicitly while the subscription module catalog endpoint is pending', () => {
-    let message = '';
+  it('maps commercial modules from subscription catalog', () => {
+    let modules: { name: string; isLocked: boolean }[] = [];
 
-    service.getModules().subscribe({
-      error: (error: Error) => {
-        message = error.message;
-      }
+    service.getModules().subscribe((items) => {
+      modules = items.map((module) => ({ name: module.name, isLocked: module.isLocked }));
     });
 
-    expect(message).toContain('Subscription module catalog API is not available.');
+    const request = httpTesting.expectOne('/api/v1/platform/subscription-plans/catalog');
+    expect(request.request.method).toBe('GET');
+
+    request.flush({ success: true, message: 'ok', data: subscriptionCatalogFixture() });
+
+    expect(modules).toEqual([
+      { name: 'Core POS', isLocked: true },
+      { name: 'Inventory', isLocked: false }
+    ]);
   });
 
-  it('fails explicitly while the subscription feature catalog endpoint is pending', () => {
-    let message = '';
+  it('maps features from commercial subscription modules', () => {
+    let featureKeys: string[] = [];
 
-    service.getFeatures().subscribe({
-      error: (error: Error) => {
-        message = error.message;
+    service.getFeatures().subscribe((features) => {
+      featureKeys = features.map((feature) => feature.featureKey);
+    });
+
+    const request = httpTesting.expectOne('/api/v1/platform/subscription-plans/catalog');
+    request.flush({ success: true, message: 'ok', data: subscriptionCatalogFixture() });
+
+    expect(featureKeys).toEqual(['pos.sales', 'inventory_management']);
+  });
+
+  it('calls PATCH /api/v1/platform/subscription-plans/{id}/features for feature update', () => {
+    let includedFeatureIds: string[] = [];
+
+    service.updateSubscriptionPlanFeatures('plan-1', {
+      featureAvailability: {
+        'feature-1': 'included',
+        'feature-2': 'not_available'
+      }
+    }).subscribe((response) => {
+      includedFeatureIds = response.includedFeatureIds;
+    });
+
+    const request = httpTesting.expectOne('/api/v1/platform/subscription-plans/plan-1/features');
+    expect(request.request.method).toBe('PATCH');
+    expect(request.request.body).toEqual({
+      featureAvailability: {
+        'feature-1': 'included',
+        'feature-2': 'not_available'
       }
     });
 
-    expect(message).toContain('Subscription feature catalog API is not available.');
+    request.flush({
+      success: true,
+      message: 'ok',
+      data: { id: 'plan-1', includedFeatureIds: ['feature-1'], status: 'draft' }
+    });
+
+    expect(includedFeatureIds).toEqual(['feature-1']);
   });
 });
+
+function subscriptionCatalogFixture() {
+  return {
+    modules: [
+      {
+        id: 'core_pos',
+        code: 'core_pos',
+        name: 'Core POS',
+        description: null,
+        sortOrder: 10,
+        isCore: true,
+        isLocked: true,
+        defaultAvailability: 'included',
+        features: [
+          {
+            id: 'feature-core',
+            code: 'pos.sales',
+            name: 'POS Sales',
+            description: 'Start sale',
+            entitlementKey: 'pos.sales',
+            sortOrder: 1,
+            isCore: true,
+            isLocked: true,
+            defaultAvailability: 'included'
+          }
+        ]
+      },
+      {
+        id: 'inventory',
+        code: 'inventory',
+        name: 'Inventory',
+        description: null,
+        sortOrder: 30,
+        isCore: false,
+        isLocked: false,
+        defaultAvailability: 'not_available',
+        features: [
+          {
+            id: 'feature-inventory',
+            code: 'inventory_management',
+            name: 'Inventory Management',
+            description: 'Manage inventory',
+            entitlementKey: 'inventory_management',
+            sortOrder: 1,
+            isCore: false,
+            isLocked: false,
+            defaultAvailability: 'not_available'
+          }
+        ]
+      }
+    ]
+  };
+}

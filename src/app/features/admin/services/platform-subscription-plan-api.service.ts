@@ -1,6 +1,6 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { map, Observable, throwError } from 'rxjs';
+import { map, Observable } from 'rxjs';
 
 import { apiEndpoints } from '../../../core/config/api-endpoints';
 import { appSettings } from '../../../core/config/app-settings';
@@ -8,7 +8,11 @@ import { ApiResponse } from '../../../core/models/api-response.model';
 import {
   PlatformFeatureOption,
   PlatformModuleOption,
+  SubscriptionPlanCatalogModule,
+  SubscriptionPlanCatalogResponse,
   SubscriptionPlanDraft,
+  SubscriptionPlanFeaturesMutationResponse,
+  SubscriptionPlanFeaturesUpdateRequest,
   SubscriptionPlanLimitsMutationResponse,
   SubscriptionPlanLimitsUpdateRequest,
   SubscriptionPlanListQuery,
@@ -46,14 +50,29 @@ export class PlatformSubscriptionPlanApiService {
       );
   }
 
-  /** Pending backend API: GET /api/v1/platform/subscription-plans/modules. */
   getModules(): Observable<PlatformModuleOption[]> {
-    return throwError(() => new Error('Subscription module catalog API is not available.'));
+    return this.getSubscriptionCatalog().pipe(
+      map((catalog) => catalog.modules.map(toPlatformModuleOption))
+    );
   }
 
-  /** Pending backend API: GET /api/v1/platform/subscription-plans/features. */
   getFeatures(): Observable<PlatformFeatureOption[]> {
-    return throwError(() => new Error('Subscription feature catalog API is not available.'));
+    return this.getSubscriptionCatalog().pipe(
+      map((catalog) =>
+        catalog.modules
+          .flatMap((module) => module.features.map((feature) => toPlatformFeatureOption(module, feature)))
+      )
+    );
+  }
+
+  getSubscriptionCatalog(): Observable<SubscriptionPlanCatalogResponse> {
+    return this.http
+      .get<ApiResponse<SubscriptionPlanCatalogResponse>>(
+        `${appSettings.apiBaseUrl}${apiEndpoints.platform.subscriptionPlans}/catalog`
+      )
+      .pipe(
+        map((response) => response.data ?? { modules: [] })
+      );
   }
 
   saveDraft(draft: SubscriptionPlanDraft): Observable<SubscriptionPlanMutationResponse> {
@@ -142,6 +161,26 @@ export class PlatformSubscriptionPlanApiService {
       );
   }
 
+  updateSubscriptionPlanFeatures(
+    planId: string,
+    request: SubscriptionPlanFeaturesUpdateRequest
+  ): Observable<SubscriptionPlanFeaturesMutationResponse> {
+    return this.http
+      .patch<ApiResponse<SubscriptionPlanFeaturesMutationResponse>>(
+        `${appSettings.apiBaseUrl}${apiEndpoints.platform.subscriptionPlans}/${planId}/features`,
+        { featureAvailability: request.featureAvailability }
+      )
+      .pipe(
+        map((response) => {
+          if (!response.success || !response.data?.id) {
+            throw new Error(response.message || 'Subscription plan features could not be saved.');
+          }
+
+          return response.data;
+        })
+      );
+  }
+
   private toCreateRequest(draft: SubscriptionPlanDraft) {
     const request: Record<string, unknown> = {
       planName: draft.planName,
@@ -165,10 +204,6 @@ export class PlatformSubscriptionPlanApiService {
 
     if (draft.maxUsers != null) {
       request['userLimit'] = draft.maxUsers;
-    }
-
-    if (Object.keys(draft.featureAvailability).length > 0) {
-      request['featureAvailability'] = draft.featureAvailability;
     }
 
     return request;
@@ -215,4 +250,36 @@ export class PlatformSubscriptionPlanApiService {
 
     return params;
   }
+}
+
+function toPlatformModuleOption(module: SubscriptionPlanCatalogModule): PlatformModuleOption {
+  return {
+    id: module.id,
+    moduleKey: module.code,
+    name: module.name,
+    description: module.description ?? null,
+    sortOrder: module.sortOrder,
+    isCore: module.isCore,
+    isLocked: module.isLocked,
+    defaultAvailability: module.defaultAvailability
+  };
+}
+
+function toPlatformFeatureOption(
+  module: SubscriptionPlanCatalogModule,
+  feature: SubscriptionPlanCatalogModule['features'][number]
+): PlatformFeatureOption {
+  return {
+    id: feature.id,
+    moduleId: module.id,
+    moduleName: module.name,
+    featureKey: feature.code,
+    name: feature.name,
+    description: feature.description ?? null,
+    entitlementKey: feature.entitlementKey ?? null,
+    sortOrder: feature.sortOrder,
+    isCore: feature.isCore,
+    isLocked: feature.isLocked,
+    defaultAvailability: feature.defaultAvailability
+  };
 }

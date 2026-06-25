@@ -3,7 +3,7 @@ export type SubscriptionPlanStatus = 'draft' | 'active' | 'retired';
 export type SubscriptionDbBillingCycle = 'monthly' | 'yearly' | 'custom' | 'trial' | 'demo';
 export type SubscriptionPlanType = 'free' | 'trial' | 'paid' | 'custom';
 export type SubscriptionBillingCycle = 'monthly' | 'annual' | 'both';
-export type ModuleAvailability = 'included' | 'addon' | 'not_available';
+export type ModuleAvailability = 'included' | 'not_available';
 
 export interface SubscriptionPlanListItem {
   id: string;
@@ -64,7 +64,10 @@ export interface PlatformModuleOption {
   moduleKey: string;
   name: string;
   description: string | null;
-  iconKey: string | null;
+  sortOrder: number;
+  isCore: boolean;
+  isLocked: boolean;
+  defaultAvailability: ModuleAvailability;
 }
 
 export interface PlatformFeatureOption {
@@ -74,6 +77,11 @@ export interface PlatformFeatureOption {
   featureKey: string;
   name: string;
   description: string | null;
+  entitlementKey: string | null;
+  sortOrder: number;
+  isCore: boolean;
+  isLocked: boolean;
+  defaultAvailability: ModuleAvailability;
 }
 
 export interface SubscriptionPlanDraft {
@@ -119,4 +127,42 @@ export interface SubscriptionPlanLimitsMutationResponse {
   maxTills: number | null;
   maxUsers: number | null;
   status: SubscriptionPlanStatus | string;
+}
+
+export interface SubscriptionPlanFeaturesUpdateRequest {
+  featureAvailability: Record<string, ModuleAvailability>;
+}
+
+export interface SubscriptionPlanFeaturesMutationResponse {
+  id: string;
+  includedFeatureIds: string[];
+  status: SubscriptionPlanStatus | string;
+}
+
+export interface SubscriptionPlanCatalogResponse {
+  modules: SubscriptionPlanCatalogModule[];
+}
+
+export interface SubscriptionPlanCatalogModule {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  sortOrder: number;
+  isCore: boolean;
+  isLocked: boolean;
+  defaultAvailability: ModuleAvailability;
+  features: SubscriptionPlanCatalogFeature[];
+}
+
+export interface SubscriptionPlanCatalogFeature {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  entitlementKey: string | null;
+  sortOrder: number;
+  isCore: boolean;
+  isLocked: boolean;
+  defaultAvailability: ModuleAvailability;
 }
