@@ -5,7 +5,8 @@ import { TestBed } from '@angular/core/testing';
 import {
   createTenantFilterOptionsApiDto,
   createTenantListResponseApiDto,
-  createTenantSummaryApiDto
+  createTenantSummaryApiDto,
+  createTenantDetailApiDto
 } from '../../../testing/test-fixtures';
 import { PlatformTenantApiService } from './platform-tenant-api.service';
 
@@ -80,5 +81,55 @@ describe('PlatformTenantApiService', () => {
 
     request.flush({ success: true, message: 'ok', data: createTenantFilterOptionsApiDto() });
     expect(planCount).toBe(3);
+  });
+
+  it('calls GET /api/v1/platform-admin/tenants/{tenantId} and maps response data', () => {
+    let tenantCode = '';
+
+    service.getTenantById('tenant-1').subscribe((tenant) => {
+      tenantCode = tenant.code;
+    });
+
+    const request = httpTesting.expectOne('/api/v1/platform-admin/tenants/tenant-1');
+    expect(request.request.method).toBe('GET');
+
+    request.flush({ success: true, message: 'ok', data: createTenantDetailApiDto() });
+    expect(tenantCode).toBe('demo-alpha');
+  });
+
+  it('calls POST /api/v1/platform-admin/tenants/{tenantId}/activate and maps response data', () => {
+    let status = '';
+
+    service.activateTenant('tenant-1').subscribe((tenant) => {
+      status = tenant.status;
+    });
+
+    const request = httpTesting.expectOne('/api/v1/platform-admin/tenants/tenant-1/activate');
+    expect(request.request.method).toBe('POST');
+
+    request.flush({
+      success: true,
+      message: 'ok',
+      data: createTenantDetailApiDto({ status: 'active', canActivate: false, canSuspend: true })
+    });
+    expect(status).toBe('active');
+  });
+
+  it('calls POST /api/v1/platform-admin/tenants/{tenantId}/suspend and maps response data', () => {
+    let status = '';
+
+    service.suspendTenant('tenant-1').subscribe((tenant) => {
+      status = tenant.status;
+    });
+
+    const request = httpTesting.expectOne('/api/v1/platform-admin/tenants/tenant-1/suspend');
+    expect(request.request.method).toBe('POST');
+
+    request.flush({
+      success: true,
+      message: 'ok',
+      data: createTenantDetailApiDto({ status: 'suspended', canActivate: true, canSuspend: false })
+    });
+    expect(status).toBe('suspended');
   });
 });

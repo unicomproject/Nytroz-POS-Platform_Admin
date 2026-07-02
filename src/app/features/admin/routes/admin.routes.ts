@@ -16,6 +16,12 @@ export const adminRoutes: Routes = [
     data: { title: 'Tenants', requiredPermission: platformPermissions.tenantsView }
   },
   {
+    path: 'tenants/:tenantId',
+    loadComponent: () =>
+      import('../pages/platform-tenant-detail-page/platform-tenant-detail-page').then((m) => m.PlatformTenantDetailPage),
+    data: { title: 'Tenant Detail', requiredPermission: platformPermissions.tenantsView }
+  },
+  {
     path: 'outlets',
     loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
     data: { title: 'Outlets', requiredPermission: platformPermissions.tenantsView }

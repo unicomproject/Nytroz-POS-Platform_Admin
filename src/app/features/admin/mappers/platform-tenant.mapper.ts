@@ -171,6 +171,9 @@ export function mapPlatformTenantDetail(dto: PlatformTenantDetailApiDto): Platfo
     defaultLocale: dto.defaultLocale,
     businessType: dto.businessType ?? null,
     tillCount: dto.tillCount,
+    onlineStoreEnabled: dto.onlineStoreEnabled,
+    clickCollectEnabled: dto.clickCollectEnabled,
+    offlineEnabled: dto.offlineEnabled,
     subscription: dto.subscription
       ? {
           planId: String(dto.subscription.planId),

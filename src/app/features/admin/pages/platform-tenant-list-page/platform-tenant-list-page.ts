@@ -2,6 +2,7 @@ import { DatePipe } from '@angular/common';
 import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
 
 import { ApiErrorService } from '../../../../core/services/api-error.service';
@@ -17,7 +18,7 @@ import { PlatformTenantSearchService } from '../../services/platform-tenant-sear
 @Component({
   selector: 'app-platform-tenant-list-page',
   standalone: true,
-  imports: [DatePipe, FormsModule],
+  imports: [DatePipe, FormsModule, RouterLink],
   template: `
     <section class="tenant-list-page">
       <header class="page-heading">
@@ -163,7 +164,7 @@ import { PlatformTenantSearchService } from '../../services/platform-tenant-sear
                 </thead>
                 <tbody>
                   @for (tenant of list.items; track tenant.id) {
-                    <tr>
+                    <tr class="tenant-row" [routerLink]="['/admin/tenants', tenant.id]" tabindex="0">
                       <td>
                         <div class="tenant-cell">
                           <span class="avatar" [style.background]="avatarColor(tenant.name)">{{ initials(tenant.name) }}</span>
@@ -191,13 +192,9 @@ import { PlatformTenantSearchService } from '../../services/platform-tenant-sear
                         }
                       </td>
                       <td>
-                        <button type="button" class="actions-btn" aria-label="Tenant actions">
-                          <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <circle cx="12" cy="5" r="1" fill="currentColor" stroke="none" />
-                            <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
-                            <circle cx="12" cy="19" r="1" fill="currentColor" stroke="none" />
-                          </svg>
-                        </button>
+                        <a class="actions-link" [routerLink]="['/admin/tenants', tenant.id]" (click)="$event.stopPropagation()">
+                          View
+                        </a>
                       </td>
                     </tr>
                   }
@@ -495,6 +492,13 @@ import { PlatformTenantSearchService } from '../../services/platform-tenant-sear
 
     tbody tr:hover { background: #fafbfd; }
 
+    .tenant-row { cursor: pointer; }
+
+    .tenant-row:focus-visible {
+      outline: 2px solid #0b5cff;
+      outline-offset: -2px;
+    }
+
     .tenant-cell {
       align-items: center;
       display: flex;
@@ -570,25 +574,14 @@ import { PlatformTenantSearchService } from '../../services/platform-tenant-sear
 
     .activity i.recent { background: #16a34a; }
 
-    .actions-btn {
-      align-items: center;
-      background: transparent;
-      border: 0;
-      border-radius: 8px;
-      color: #667085;
-      cursor: pointer;
-      display: flex;
-      height: 2rem;
-      justify-content: center;
-      width: 2rem;
+    .actions-link {
+      color: #0b5cff;
+      font-size: 0.82rem;
+      font-weight: 700;
+      text-decoration: none;
     }
 
-    .actions-btn:hover { background: #f1f5f9; }
-
-    .actions-btn svg {
-      height: 1.1rem;
-      width: 1.1rem;
-    }
+    .actions-link:hover { text-decoration: underline; }
 
     .pagination {
       align-items: center;
