@@ -192,19 +192,36 @@ interface RoleSnapshot {
               </div>
             }
 
+            @if (externalAssignedPermissionCodes().length) {
+              <div class="notice auth-bootstrap">
+                <strong>Auth bootstrap permissions</strong>
+                <span>
+                  {{ externalAssignedPermissionCodes().length }} permission{{ externalAssignedPermissionCodes().length === 1 ? '' : 's' }}
+                  (for example {{ externalAssignedPermissionCodes()[0] }}) {{ externalAssignedPermissionCodes().length === 1 ? 'is' : 'are' }}
+                  managed outside the business catalog and {{ externalAssignedPermissionCodes().length === 1 ? 'is' : 'are' }} preserved when you save.
+                </span>
+              </div>
+            }
+
             <section class="summary-strip" aria-label="Role permission summary">
               <article>
-                <span>Available Permissions</span>
+                <span>Business Permissions</span>
                 <strong>{{ allPermissions().length }}</strong>
               </article>
               <article>
-                <span>Granted</span>
-                <strong>{{ selectedPermissionCodes().size }}</strong>
+                <span>Granted (Catalog)</span>
+                <strong>{{ grantedCatalogPermissionCount() }}</strong>
               </article>
               <article>
                 <span>Not Granted</span>
                 <strong>{{ notGrantedCount() }}</strong>
               </article>
+              @if (externalAssignedPermissionCodes().length) {
+                <article>
+                  <span>Auth Bootstrap</span>
+                  <strong>{{ externalAssignedPermissionCodes().length }}</strong>
+                </article>
+              }
               <article>
                 <span>Sensitive</span>
                 <strong>{{ selectedSensitivePermissions().length }}</strong>
@@ -727,6 +744,11 @@ interface RoleSnapshot {
       gap: 0.25rem;
       margin-bottom: 1rem;
       padding: 0.75rem;
+    }
+
+    .notice.auth-bootstrap {
+      background: #eff6ff;
+      border-color: #bfdbfe;
     }
 
     .summary-strip {
@@ -1427,6 +1449,15 @@ export class PlatformPermissionCatalogPage {
 
   readonly modules = computed(() => this.catalog()?.modules ?? []);
   readonly allPermissions = computed(() => permissionsFromModules(this.modules()));
+  readonly catalogPermissionCodeSet = computed(() => new Set(this.allPermissions().map((permission) => permission.code)));
+  readonly externalAssignedPermissionCodes = computed(() =>
+    [...this.selectedPermissionCodes()]
+      .filter((code) => !this.catalogPermissionCodeSet().has(code))
+      .sort()
+  );
+  readonly grantedCatalogPermissionCount = computed(() =>
+    [...this.selectedPermissionCodes()].filter((code) => this.catalogPermissionCodeSet().has(code)).length
+  );
   readonly actionOptions = computed(() =>
     [...new Set(this.allPermissions().map((permission) => this.actionLabel(permission)).filter(Boolean))].sort()
   );
@@ -1454,7 +1485,9 @@ export class PlatformPermissionCatalogPage {
   readonly selectedSensitivePermissions = computed(() =>
     this.allPermissions().filter((permission) => this.hasPermission(permission.code) && isSensitivePermission(permission))
   );
-  readonly notGrantedCount = computed(() => Math.max(this.allPermissions().length - this.selectedPermissionCodes().size, 0));
+  readonly notGrantedCount = computed(() =>
+    Math.max(this.allPermissions().length - this.grantedCatalogPermissionCount(), 0)
+  );
   readonly addedPermissionCodes = computed(() => {
     const loaded = new Set(this.snapshot()?.permissionCodes ?? []);
     return [...this.selectedPermissionCodes()].filter((code) => !loaded.has(code)).sort();
@@ -1697,11 +1730,12 @@ export class PlatformPermissionCatalogPage {
       return;
     }
 
-    const next = mode === 'fullAccess'
-      ? this.allPermissions().map((permission) => permission.code)
-      : this.allPermissions().filter((permission) => isReadOnlyPermission(permission)).map((permission) => permission.code);
+    const catalogCodes =
+      mode === 'fullAccess'
+        ? this.allPermissions().map((permission) => permission.code)
+        : this.allPermissions().filter((permission) => isReadOnlyPermission(permission)).map((permission) => permission.code);
 
-    this.selectedPermissionCodes.set(new Set(next));
+    this.selectedPermissionCodes.set(new Set([...catalogCodes, ...this.externalAssignedPermissionCodes()]));
   }
 
   togglePermission(code: string, checked: boolean): void {

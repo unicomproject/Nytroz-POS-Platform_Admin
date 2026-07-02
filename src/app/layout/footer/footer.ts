@@ -3,7 +3,7 @@ import { Component } from '@angular/core';
 @Component({
   selector: 'app-footer',
   standalone: true,
-  template: `<footer>Release 1 Platform Admin</footer>`,
+  template: `<footer>TM-EPOS MVP Platform Admin</footer>`,
   styles: `
     footer {
       color: #607080;

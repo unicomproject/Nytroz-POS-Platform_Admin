@@ -30,19 +30,19 @@ import { PlatformDashboardApiService } from '../../services/platform-dashboard-a
         <section class="kpi-grid">
           <article class="kpi-card blue">
             <i>TT</i><div><span>Total Tenants</span><strong>{{ data.kpis.totalTenants }}</strong></div>
-            <small [class.negative]="data.kpis.totalTenantsChangePercent < 0">{{ change(data.kpis.totalTenantsChangePercent) }} vs last month</small>
+            <small [class.negative]="data.kpis.totalTenantsChangePercent < 0" [class.neutral]="data.kpis.totalTenantsChangePercent === 0">{{ change(data.kpis.totalTenantsChangePercent) }} vs last month</small>
           </article>
           <article class="kpi-card violet">
             <i>AS</i><div><span>Active Subscriptions</span><strong>{{ data.kpis.activeSubscriptions }}</strong></div>
-            <small [class.negative]="data.kpis.activeSubscriptionsChangePercent < 0">{{ change(data.kpis.activeSubscriptionsChangePercent) }} vs last month</small>
+            <small [class.negative]="data.kpis.activeSubscriptionsChangePercent < 0" [class.neutral]="data.kpis.activeSubscriptionsChangePercent === 0">{{ change(data.kpis.activeSubscriptionsChangePercent) }} vs last month</small>
           </article>
           <article class="kpi-card green">
-            <i>Rs</i><div><span>Monthly Recurring Revenue</span><strong>{{ money(data.kpis.monthlyRecurringRevenue) }}</strong></div>
-            <small>{{ change(data.kpis.monthlyRecurringRevenueChangePercent) }} vs last month</small>
+            <i>Rs</i><div><span>Monthly Recurring Revenue</span><strong>{{ mrrLabel(data.kpis.monthlyRecurringRevenue) }}</strong></div>
+            <small [class.negative]="data.kpis.monthlyRecurringRevenueChangePercent < 0" [class.neutral]="data.kpis.monthlyRecurringRevenueChangePercent === 0">{{ change(data.kpis.monthlyRecurringRevenueChangePercent) }}</small>
           </article>
           <article class="kpi-card orange">
             <i>!</i><div><span>Items Requiring Attention</span><strong>{{ data.kpis.itemsRequiringAttention }}</strong></div>
-            <small [class.negative]="data.kpis.itemsRequiringAttentionChangePercent > 0">{{ change(data.kpis.itemsRequiringAttentionChangePercent) }} vs last week</small>
+            <small [class.negative]="data.kpis.itemsRequiringAttentionChangePercent > 0" [class.neutral]="data.kpis.itemsRequiringAttentionChangePercent === 0">{{ change(data.kpis.itemsRequiringAttentionChangePercent) }}</small>
           </article>
           <article class="kpi-card health">
             <i>+</i><div><span>System Health</span><strong>{{ data.kpis.systemHealth }}</strong></div>
@@ -54,9 +54,9 @@ import { PlatformDashboardApiService } from '../../services/platform-dashboard-a
           <article class="panel overview-panel">
             <div class="panel-title"><div><h2>Platform Status Overview</h2><p>Tenant growth, subscription health, and revenue trend</p></div><span>This Month</span></div>
             <div class="summary-row">
-              <div><span>Tenant Growth</span><strong>{{ data.statusOverview.tenantGrowth }}</strong><small>{{ change(data.statusOverview.tenantGrowthChangePercent) }}</small></div>
+              <div><span>Tenant Growth</span><strong>{{ data.statusOverview.tenantGrowth }}</strong><small [class.neutral]="data.statusOverview.tenantGrowthChangePercent === 0">{{ change(data.statusOverview.tenantGrowthChangePercent) }}</small></div>
               <div class="health-summary"><span>Subscription Health</span><section><b>{{ data.statusOverview.subscriptionHealthPercent }}%</b><p><strong>Healthy</strong><small>{{ data.statusOverview.activeSubscriptionCount }} Active <em>{{ data.statusOverview.atRiskSubscriptionCount }} At Risk</em></small></p></section></div>
-              <div><span>Revenue Trend (MRR)</span><strong>{{ money(data.statusOverview.revenueTrendTotal) }}</strong><small>{{ change(data.statusOverview.revenueTrendChangePercent) }}</small></div>
+              <div><span>Revenue Trend (MRR)</span><strong>{{ mrrLabel(data.statusOverview.revenueTrendTotal) }}</strong><small [class.neutral]="data.statusOverview.revenueTrendChangePercent === 0">{{ change(data.statusOverview.revenueTrendChangePercent) }}</small></div>
             </div>
             @if (data.statusOverview.trend.length) {
               <div class="chart-wrap">
@@ -124,6 +124,7 @@ import { PlatformDashboardApiService } from '../../services/platform-dashboard-a
     .kpi-card strong { color: #101a38; font-size: clamp(1.15rem, 1.7vw, 1.48rem); overflow-wrap: anywhere; }
     .kpi-card small { color: #13a653; font-size: 0.72rem; font-weight: 800; grid-column: 1 / -1; }
     .kpi-card small.negative { color: #ef4444; }
+    .kpi-card small.neutral { color: #667085; }
     .kpi-card.violet > i { background: #f0eaff; color: #7047eb; }
     .kpi-card.green > i, .kpi-card.health > i { background: #e8f8ed; color: #18a44b; }
     .kpi-card.orange > i { background: #fff1e6; color: #ff7a18; }
@@ -141,6 +142,7 @@ import { PlatformDashboardApiService } from '../../services/platform-dashboard-a
     .summary-row span { color: #344054; font-size: 0.72rem; }
     .summary-row strong { font-size: 1.32rem; }
     .summary-row small { color: #16a34a; font-size: 0.75rem; font-weight: 800; }
+    .summary-row small.neutral { color: #667085; }
     .health-summary section { align-items: center; display: flex; gap: 0.7rem; justify-content: center; }
     .health-summary section > b { align-items: center; border: 5px solid #1bb55c; border-radius: 50%; display: flex; height: 3.5rem; justify-content: center; width: 3.5rem; }
     .health-summary p { display: grid; gap: 0.2rem; margin: 0; text-align: left; }
@@ -211,7 +213,17 @@ export class PlatformDashboardPage {
     return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR', maximumFractionDigits: 0 }).format(value);
   }
 
-  change(value: number): string { return `${value >= 0 ? '+' : '-'} ${Math.abs(value)}%`; }
+  mrrLabel(value: number): string {
+    return value === 0 ? 'Not tracked in TM-EPOS MVP' : this.money(value);
+  }
+
+  change(value: number): string {
+    if (value === 0) {
+      return 'No change yet';
+    }
+
+    return `${value >= 0 ? '+' : '-'} ${Math.abs(value)}%`;
+  }
 
   attentionIcon(type: string): string {
     return ({ payment_failures: 'PF', expiring_subscriptions: 'EX', suspended_tenants: 'ST', setup_pending: 'SP', support_tickets: 'TK' } as Record<string, string>)[type] ?? '!';

@@ -1,5 +1,6 @@
 export interface PlatformTenantListItem {
   id: string;
+  code: string;
   name: string;
   email: string | null;
   ownerName: string | null;

@@ -162,7 +162,7 @@ describe('PlatformSubscriptionPlanApiService', () => {
     request.flush({ success: true, message: 'ok', data: subscriptionCatalogFixture() });
 
     expect(modules).toEqual([
-      { name: 'Core POS', isLocked: true },
+      { name: 'Core POS', isLocked: false },
       { name: 'Inventory', isLocked: false }
     ]);
   });

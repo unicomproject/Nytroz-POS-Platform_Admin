@@ -155,28 +155,23 @@ export function mapSubscriptionPlanCatalog(
 }
 
 function mapSubscriptionPlanCatalogModule(dto: SubscriptionPlanCatalogModuleApiDto): SubscriptionPlanCatalogModule {
-  const isCore = isCoreModuleCode(dto.moduleCode);
-
   return {
     id: String(dto.id),
     code: dto.moduleCode,
     name: dto.name,
     description: dto.description ?? null,
     sortOrder: dto.sortOrder,
-    isCore,
-    isLocked: isCore,
-    defaultAvailability: isCore ? 'included' : 'not_available',
-    features: (dto.features ?? []).map((feature) => mapSubscriptionPlanCatalogFeature(dto, feature, isCore))
+    isCore: false,
+    isLocked: false,
+    defaultAvailability: 'not_available',
+    features: (dto.features ?? []).map((feature) => mapSubscriptionPlanCatalogFeature(dto, feature))
   };
 }
 
 function mapSubscriptionPlanCatalogFeature(
   module: SubscriptionPlanCatalogModuleApiDto,
-  dto: SubscriptionPlanCatalogFeatureApiDto,
-  moduleIsCore: boolean
+  dto: SubscriptionPlanCatalogFeatureApiDto
 ): SubscriptionPlanCatalogFeature {
-  const isCore = moduleIsCore;
-
   return {
     id: String(dto.id),
     code: dto.featureCode,
@@ -184,9 +179,9 @@ function mapSubscriptionPlanCatalogFeature(
     description: dto.description ?? null,
     entitlementKey: dto.featureCode,
     sortOrder: dto.sortOrder,
-    isCore,
-    isLocked: isCore,
-    defaultAvailability: isCore ? 'included' : 'not_available'
+    isCore: false,
+    isLocked: false,
+    defaultAvailability: 'not_available'
   };
 }
 
@@ -350,7 +345,3 @@ function derivePlanType(basePrice: number): string {
   return basePrice > 0 ? 'paid' : 'free';
 }
 
-function isCoreModuleCode(moduleCode: string): boolean {
-  const normalized = moduleCode.trim().toLowerCase();
-  return normalized.includes('core');
-}

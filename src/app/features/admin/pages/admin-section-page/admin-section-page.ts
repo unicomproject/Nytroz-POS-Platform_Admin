@@ -13,7 +13,7 @@ import { PageHeader } from '../../../../shared/components/page-header/page-heade
     <app-page-header [title]="data().title ?? 'Platform Admin'" [description]="data().description" />
     <app-empty-state
       title="Real API integration point"
-      message="This Release 1 page is ready for its feature service, typed API service, pagination, filters, loading, empty, error, permission, and entitlement states."
+      message="This TM-EPOS MVP page is ready for its feature service, typed API service, pagination, filters, loading, empty, error, permission, and entitlement states."
     />
   `
 })
