@@ -1,3 +1,5 @@
+import { platformPermissions } from './permission-keys';
+
 export interface MenuItemConfig {
   label: string;
   path: string;
@@ -32,36 +34,102 @@ export const platformMenuConfig: MenuSectionConfig[] = [
   {
     label: 'Platform',
     items: [
-      { label: 'Dashboard', path: '/admin/dashboard', requiresTenant: false, icon: 'dashboard' },
-      { label: 'Tenants', path: '/admin/tenants', requiresTenant: false, icon: 'tenants', hasSubmenu: true },
+      {
+        label: 'Dashboard',
+        path: '/admin/dashboard',
+        requiresTenant: false,
+        icon: 'dashboard',
+        requiredPermission: platformPermissions.dashboardView
+      },
+      {
+        label: 'Tenants',
+        path: '/admin/tenants',
+        requiresTenant: false,
+        icon: 'tenants',
+        hasSubmenu: true,
+        requiredPermission: platformPermissions.tenantsView
+      },
       {
         label: 'Subscriptions',
         path: '/admin/subscriptions',
         requiresTenant: false,
         icon: 'subscriptions',
-        hasSubmenu: true
+        hasSubmenu: true,
+        requiredPermission: platformPermissions.subscriptionPlansView
       },
-      { label: 'Outlets', path: '/admin/outlets', requiresTenant: false, icon: 'outlets' },
-      { label: 'Tills & Devices', path: '/admin/tills-devices', requiresTenant: false, icon: 'tills' },
-      { label: 'Users', path: '/admin/platform-users', requiresTenant: false, icon: 'users', hasSubmenu: true },
+      {
+        label: 'Outlets',
+        path: '/admin/outlets',
+        requiresTenant: false,
+        icon: 'outlets',
+        requiredPermission: platformPermissions.tenantsView
+      },
+      {
+        label: 'Tills & Devices',
+        path: '/admin/tills-devices',
+        requiresTenant: false,
+        icon: 'tills',
+        requiredPermission: platformPermissions.tenantsView
+      },
+      {
+        label: 'Users',
+        path: '/admin/platform-users',
+        requiresTenant: false,
+        icon: 'users',
+        hasSubmenu: true,
+        requiredPermission: platformPermissions.usersView
+      },
       {
         label: 'Roles & Permissions',
         path: '/admin/roles-permissions',
         requiresTenant: false,
         icon: 'roles',
-        requiredPermission: 'platform.permissions.view'
+        requiredPermission: platformPermissions.permissionsView
       },
-      { label: 'Products', path: '/admin/products', requiresTenant: false, icon: 'products' },
-      { label: 'Billing', path: '/admin/billing', requiresTenant: false, icon: 'billing', hasSubmenu: true },
-      { label: 'Reports', path: '/admin/reports', requiresTenant: false, icon: 'reports', hasSubmenu: true },
-      { label: 'Audit Logs', path: '/admin/audit-logs', requiresTenant: false, icon: 'audit' },
-      { label: 'Alerts Center', path: '/admin/alerts', requiresTenant: false, icon: 'alerts' },
+      {
+        label: 'Products',
+        path: '/admin/products',
+        requiresTenant: false,
+        icon: 'products',
+        requiredPermission: platformPermissions.tenantsView
+      },
+      {
+        label: 'Billing',
+        path: '/admin/billing',
+        requiresTenant: false,
+        icon: 'billing',
+        hasSubmenu: true,
+        requiredPermission: platformPermissions.billingView
+      },
+      {
+        label: 'Reports',
+        path: '/admin/reports',
+        requiresTenant: false,
+        icon: 'reports',
+        hasSubmenu: true,
+        requiredPermission: platformPermissions.dashboardView
+      },
+      {
+        label: 'Audit Logs',
+        path: '/admin/audit-logs',
+        requiresTenant: false,
+        icon: 'audit',
+        requiredPermission: platformPermissions.auditView
+      },
+      {
+        label: 'Alerts Center',
+        path: '/admin/alerts',
+        requiresTenant: false,
+        icon: 'alerts',
+        requiredPermission: platformPermissions.dashboardView
+      },
       {
         label: 'System Settings',
         path: '/admin/settings/system',
         requiresTenant: false,
         icon: 'settings',
-        hasSubmenu: true
+        hasSubmenu: true,
+        requiredPermission: platformPermissions.settingsView
       }
     ]
   }

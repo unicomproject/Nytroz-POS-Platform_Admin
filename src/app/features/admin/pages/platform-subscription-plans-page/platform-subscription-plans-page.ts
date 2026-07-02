@@ -729,8 +729,7 @@ export class PlatformSubscriptionPlansPage implements OnInit {
   }
 
   canCreate(): boolean {
-    return this.accessControl.hasPermission(platformPermissions.subscriptionPlansCreate)
-      || this.accessControl.hasPermission(platformPermissions.subscriptionManage);
+    return this.accessControl.hasPermission(platformPermissions.subscriptionPlansCreate);
   }
 
   tabCount(tab: StatusTab): number {

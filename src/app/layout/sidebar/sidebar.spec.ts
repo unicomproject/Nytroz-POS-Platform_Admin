@@ -103,12 +103,45 @@ describe('Sidebar', () => {
     const fixture = TestBed.createComponent(Sidebar);
     fixture.detectChanges();
 
-    const alertsLink = [...(fixture.nativeElement as HTMLElement).querySelectorAll('a.menu-item')]
-      .find((link) => link.textContent?.includes('Alerts Center'));
+    const menuItems = (fixture.nativeElement as HTMLElement).querySelectorAll('a.menu-item');
+    expect(menuItems.length).toBe(13);
 
+    const alertsLink = [...menuItems].find((link) => link.textContent?.includes('Alerts Center'));
     expect(alertsLink).toBeTruthy();
     expect(fixture.nativeElement.querySelector('.alert-badge')).toBeNull();
     expect(alertsLink?.textContent).not.toMatch(/\b12\b/);
+  });
+
+  it('hides menu items when the user lacks required permissions', async () => {
+    await TestBed.configureTestingModule({
+      imports: [Sidebar],
+      providers: [
+        provideRouter([]),
+        {
+          provide: AuthSessionService,
+          useValue: {
+            currentUser: () =>
+              createAuthSession({
+                user: {
+                  ...createAuthSession().user,
+                  platformPermissions: ['platform.dashboard.view']
+                }
+              }).user
+          }
+        }
+      ]
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(Sidebar);
+    fixture.detectChanges();
+
+    const labels = [...(fixture.nativeElement as HTMLElement).querySelectorAll('.menu-label')].map(
+      (node) => node.textContent?.trim()
+    );
+
+    expect(labels).toContain('Dashboard');
+    expect(labels).not.toContain('Tenants');
+    expect(labels).not.toContain('Audit Logs');
   });
 
   it('does not render a sidebar collapse button', async () => {

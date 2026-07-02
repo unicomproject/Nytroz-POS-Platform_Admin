@@ -54,6 +54,35 @@ describe('AuthApiService', () => {
     expect(result).toBe('mapped-token');
   });
 
+  it('derives fullName from email when backend fullName is empty', () => {
+    let fullName = '';
+
+    service.login({ email: 'posunique001@gmail.com', password: 'Admin@12345' }).subscribe((response) => {
+      fullName = response.user.fullName;
+    });
+
+    const request = httpTesting.expectOne('/api/v1/auth/platform-login');
+    request.flush({
+      success: true,
+      message: 'ok',
+      data: {
+        accessToken: 'token',
+        tokenType: 'Bearer',
+        accessTokenExpiresAt: new Date(Date.now() + 60_000).toISOString(),
+        sessionExpiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+        user: {
+          id: 'platform-user-1',
+          email: 'posunique001@gmail.com',
+          fullName: '',
+          status: 'active',
+          platformPermissions: ['platform.admin.access']
+        }
+      }
+    });
+
+    expect(fullName).toBe('Posunique001');
+  });
+
   it('maps platformPermissions from the login response user payload', () => {
     let permissions: string[] = [];
 

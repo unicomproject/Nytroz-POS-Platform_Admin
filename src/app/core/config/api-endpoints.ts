@@ -15,7 +15,7 @@ export const apiEndpoints = {
     subscriptionPlans: '/platform/subscription-plans',
     features: '/features',
     auditLogs: '/platform/audit-logs',
-    users: '/platform/users',
+    users: '/platform-admin/users',
     settings: '/platform/settings'
   },
   tenant: {

@@ -6,6 +6,10 @@ import { apiEndpoints } from '../../../core/config/api-endpoints';
 import { appSettings } from '../../../core/config/app-settings';
 import { ApiResponse } from '../../../core/models/api-response.model';
 import { PlatformDashboard } from '../models/platform-dashboard.model';
+import {
+  mapPlatformDashboard,
+  PlatformDashboardApiDto
+} from '../mappers/platform-dashboard.mapper';
 
 @Injectable({ providedIn: 'root' })
 export class PlatformDashboardApiService {
@@ -13,7 +17,7 @@ export class PlatformDashboardApiService {
 
   getDashboard(): Observable<PlatformDashboard> {
     return this.http
-      .get<ApiResponse<PlatformDashboard>>(`${appSettings.apiBaseUrl}${apiEndpoints.platform.dashboard}`)
-      .pipe(map((response) => response.data));
+      .get<ApiResponse<PlatformDashboardApiDto>>(`${appSettings.apiBaseUrl}${apiEndpoints.platform.dashboard}`)
+      .pipe(map((response) => mapPlatformDashboard(response.data)));
   }
 }

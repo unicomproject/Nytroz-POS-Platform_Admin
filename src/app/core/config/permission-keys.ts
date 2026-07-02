@@ -1,16 +1,29 @@
 export const platformPermissions = {
-  tenantCreate: 'platform.tenant.create',
-  tenantUpdate: 'platform.tenant.update',
-  tenantActivate: 'platform.tenant.activate',
-  subscriptionManage: 'platform.subscription.manage',
+  dashboardView: 'platform.dashboard.view',
+  tenantsView: 'platform.tenants.view',
+  tenantsCreate: 'platform.tenants.create',
+  tenantsUpdate: 'platform.tenants.update',
+  tenantsActivate: 'platform.tenants.activate',
+  tenantsSuspend: 'platform.tenants.suspend',
+  tenantsEntitlementsUpdate: 'platform.tenants.entitlements.update',
   subscriptionPlansView: 'platform.subscription_plans.view',
   subscriptionPlansCreate: 'platform.subscription_plans.create',
   subscriptionPlansEdit: 'platform.subscription_plans.edit',
   subscriptionPlansDuplicate: 'platform.subscription_plans.duplicate',
   subscriptionPlansArchive: 'platform.subscription_plans.archive',
   subscriptionPlansDelete: 'platform.subscription_plans.delete',
-  featureEntitle: 'platform.feature.entitle',
+  modulesView: 'platform.modules.view',
+  featuresView: 'platform.features.view',
+  usersView: 'platform.users.view',
+  usersCreate: 'platform.users.create',
+  usersUpdate: 'platform.users.update',
+  usersRolesAssign: 'platform.users.roles.assign',
   auditView: 'platform.audit.view',
+  settingsView: 'platform.settings.view',
+  settingsUpdate: 'platform.settings.update',
+  billingView: 'platform.billing.view',
+  billingManage: 'platform.billing.manage',
+  integrationsManage: 'platform.integrations.manage',
   permissionsView: 'platform.permissions.view',
   rolesView: 'platform.roles.view',
   rolesCreate: 'platform.roles.create',
@@ -39,3 +52,6 @@ export const reportPermissions = {
   reportView: 'reports.view',
   reportExport: 'reports.export'
 } as const;
+
+/** All platform permission codes used by Platform Admin (for tests and super-admin fixtures). */
+export const allPlatformPermissionCodes = Object.values(platformPermissions);

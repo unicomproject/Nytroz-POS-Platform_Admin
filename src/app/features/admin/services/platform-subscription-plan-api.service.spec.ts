@@ -2,7 +2,10 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 
-import { createSubscriptionPlanListResponse } from '../../../testing/test-fixtures';
+import {
+  createSubscriptionPlanListItemApiDto,
+  createSubscriptionPlanListResponseApiDto
+} from '../../../testing/test-fixtures';
 import { PlatformSubscriptionPlanApiService } from './platform-subscription-plan-api.service';
 
 describe('PlatformSubscriptionPlanApiService', () => {
@@ -44,7 +47,7 @@ describe('PlatformSubscriptionPlanApiService', () => {
     expect(request.request.params.get('search')).toBe('pro');
     expect(request.request.params.get('status')).toBe('active');
 
-    request.flush({ success: true, message: 'ok', data: createSubscriptionPlanListResponse() });
+    request.flush({ success: true, message: 'ok', data: createSubscriptionPlanListResponseApiDto() });
     expect(planName).toBe('Test Subscription Plan');
   });
 
@@ -71,12 +74,13 @@ describe('PlatformSubscriptionPlanApiService', () => {
     expect(request.request.method).toBe('POST');
     expect(request.request.body.planCode).toBe('STARTER');
     expect(request.request.body.billingCycle).toBe('monthly');
-    expect(request.request.body.currencyCode).toBe('LKR');
+    expect(request.request.body.baseCurrency).toBe('LKR');
+    expect(request.request.body.name).toBe('Starter');
 
     request.flush({
       success: true,
       message: 'ok',
-      data: { id: 'plan-1', planName: 'Starter', planCode: 'STARTER', status: 'draft' }
+      data: { id: 'plan-1', name: 'Starter', planCode: 'STARTER', status: 'draft' }
     });
 
     expect(savedId).toBe('plan-1');
@@ -95,7 +99,7 @@ describe('PlatformSubscriptionPlanApiService', () => {
     request.flush({
       success: true,
       message: 'ok',
-      data: { id: 'plan-1', planName: 'Starter', planCode: 'STARTER', status: 'active' }
+      data: { id: 'plan-1', name: 'Starter', planCode: 'STARTER', status: 'active' }
     });
 
     expect(publishedStatus).toBe('active');
@@ -145,27 +149,100 @@ describe('PlatformSubscriptionPlanApiService', () => {
     expect(basePrice).toBe(12900);
   });
 
-  it('fails explicitly while the subscription module catalog endpoint is pending', () => {
-    let message = '';
+  it('maps commercial modules from subscription catalog', () => {
+    let modules: { name: string; isLocked: boolean }[] = [];
 
-    service.getModules().subscribe({
-      error: (error: Error) => {
-        message = error.message;
-      }
+    service.getModules().subscribe((items) => {
+      modules = items.map((module) => ({ name: module.name, isLocked: module.isLocked }));
     });
 
-    expect(message).toContain('Subscription module catalog API is not available.');
+    const request = httpTesting.expectOne('/api/v1/platform/subscription-plans/catalog');
+    expect(request.request.method).toBe('GET');
+
+    request.flush({ success: true, message: 'ok', data: subscriptionCatalogFixture() });
+
+    expect(modules).toEqual([
+      { name: 'Core POS', isLocked: true },
+      { name: 'Inventory', isLocked: false }
+    ]);
   });
 
-  it('fails explicitly while the subscription feature catalog endpoint is pending', () => {
-    let message = '';
+  it('maps features from commercial subscription modules', () => {
+    let featureKeys: string[] = [];
 
-    service.getFeatures().subscribe({
-      error: (error: Error) => {
-        message = error.message;
-      }
+    service.getFeatures().subscribe((features) => {
+      featureKeys = features.map((feature) => feature.featureKey);
     });
 
-    expect(message).toContain('Subscription feature catalog API is not available.');
+    const request = httpTesting.expectOne('/api/v1/platform/subscription-plans/catalog');
+    request.flush({ success: true, message: 'ok', data: subscriptionCatalogFixture() });
+
+    expect(featureKeys).toEqual(['pos.sales', 'inventory_management']);
+  });
+
+  it('calls PATCH /api/v1/platform/subscription-plans/{id}/features for feature update', () => {
+    let includedFeatureIds: string[] = [];
+
+    service.updateSubscriptionPlanFeatures('plan-1', {
+      featureAvailability: {
+        'feature-1': 'included',
+        'feature-2': 'not_available'
+      }
+    }).subscribe((response) => {
+      includedFeatureIds = response.includedFeatureIds;
+    });
+
+    const request = httpTesting.expectOne('/api/v1/platform/subscription-plans/plan-1/features');
+    expect(request.request.method).toBe('PATCH');
+    expect(request.request.body).toEqual({
+      featureIds: ['feature-1']
+    });
+
+    request.flush({
+      success: true,
+      message: 'ok',
+      data: createSubscriptionPlanListItemApiDto({ id: 'plan-1', status: 'draft' })
+    });
+
+    expect(includedFeatureIds).toEqual(['feature-1']);
   });
 });
+
+function subscriptionCatalogFixture() {
+  return {
+    modules: [
+      {
+        id: '11111111-1111-1111-1111-111111111111',
+        moduleCode: 'core_pos',
+        name: 'Core POS',
+        description: null,
+        sortOrder: 10,
+        features: [
+          {
+            id: '22222222-2222-2222-2222-222222222222',
+            featureCode: 'pos.sales',
+            name: 'POS Sales',
+            description: 'Start sale',
+            sortOrder: 1
+          }
+        ]
+      },
+      {
+        id: '33333333-3333-3333-3333-333333333333',
+        moduleCode: 'inventory',
+        name: 'Inventory',
+        description: null,
+        sortOrder: 30,
+        features: [
+          {
+            id: '44444444-4444-4444-4444-444444444444',
+            featureCode: 'inventory_management',
+            name: 'Inventory Management',
+            description: 'Manage inventory',
+            sortOrder: 1
+          }
+        ]
+      }
+    ]
+  };
+}

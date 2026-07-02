@@ -8,9 +8,9 @@ import { PlatformCreateSubscriptionPlanPage } from './platform-create-subscripti
 
 describe('PlatformCreateSubscriptionPlanPage', () => {
   let api: {
-    getModules: ReturnType<typeof vi.fn>;
-    getFeatures: ReturnType<typeof vi.fn>;
+    getSubscriptionCatalog: ReturnType<typeof vi.fn>;
     createSubscriptionPlanDraft: ReturnType<typeof vi.fn>;
+    updateSubscriptionPlanFeatures: ReturnType<typeof vi.fn>;
     updateSubscriptionPlanPricing: ReturnType<typeof vi.fn>;
     updateSubscriptionPlanLimits: ReturnType<typeof vi.fn>;
     publishSubscriptionPlan: ReturnType<typeof vi.fn>;
@@ -19,9 +19,9 @@ describe('PlatformCreateSubscriptionPlanPage', () => {
 
   beforeEach(async () => {
     api = {
-      getModules: vi.fn().mockReturnValue(of([])),
-      getFeatures: vi.fn().mockReturnValue(of([])),
+      getSubscriptionCatalog: vi.fn().mockReturnValue(of({ modules: [] })),
       createSubscriptionPlanDraft: vi.fn().mockReturnValue(of({ id: 'draft-1', planName: 'Plan', planCode: 'PLAN', status: 'draft' })),
+      updateSubscriptionPlanFeatures: vi.fn().mockReturnValue(of({ id: 'draft-1', includedFeatureIds: ['feature-pos-sale', 'feature-inventory'], status: 'draft' })),
       updateSubscriptionPlanPricing: vi.fn().mockReturnValue(of({ id: 'draft-1', basePrice: 12900, status: 'draft' })),
       updateSubscriptionPlanLimits: vi.fn().mockReturnValue(of({ id: 'draft-1', maxOutlets: 5, maxTills: 10, maxUsers: 25, status: 'draft' })),
       publishSubscriptionPlan: vi.fn().mockReturnValue(of({ id: 'draft-1', planName: 'Plan', planCode: 'PLAN', status: 'active' }))
@@ -34,10 +34,10 @@ describe('PlatformCreateSubscriptionPlanPage', () => {
         {
           provide: PlatformSubscriptionPlanApiService,
           useValue: {
-            getModules: api.getModules,
-            getFeatures: api.getFeatures,
+            getSubscriptionCatalog: api.getSubscriptionCatalog,
             saveDraft: api.createSubscriptionPlanDraft,
             createSubscriptionPlanDraft: api.createSubscriptionPlanDraft,
+            updateSubscriptionPlanFeatures: api.updateSubscriptionPlanFeatures,
             updateSubscriptionPlanPricing: api.updateSubscriptionPlanPricing,
             updateSubscriptionPlanLimits: api.updateSubscriptionPlanLimits,
             publish: api.publishSubscriptionPlan,
@@ -82,6 +82,59 @@ describe('PlatformCreateSubscriptionPlanPage', () => {
 
   function fillLimits(component: PlatformCreateSubscriptionPlanPage): void {
     component.limitsForm.patchValue({ maxOutlets: 5, maxTills: 10, maxUsers: 25 });
+  }
+
+  function mockCatalogSuccess(): void {
+    api.getSubscriptionCatalog.mockReturnValue(of({
+      modules: [
+        {
+          id: 'core_pos',
+          code: 'core_pos',
+          name: 'Core POS',
+          description: 'Core selling and checkout capabilities',
+          sortOrder: 10,
+          isCore: true,
+          isLocked: true,
+          defaultAvailability: 'included',
+          features: [
+            {
+              id: 'feature-pos-sale',
+              code: 'pos.sales',
+              name: 'POS Sales',
+              description: 'Start POS sale',
+              entitlementKey: 'pos.sales',
+              sortOrder: 10,
+              isCore: true,
+              isLocked: true,
+              defaultAvailability: 'included'
+            }
+          ]
+        },
+        {
+          id: 'inventory',
+          code: 'inventory',
+          name: 'Inventory',
+          description: 'Inventory management',
+          sortOrder: 30,
+          isCore: false,
+          isLocked: false,
+          defaultAvailability: 'not_available',
+          features: [
+            {
+              id: 'feature-inventory',
+              code: 'inventory_management',
+              name: 'Inventory Management',
+              description: 'Manage inventory',
+              entitlementKey: 'inventory_management',
+              sortOrder: 10,
+              isCore: false,
+              isLocked: false,
+              defaultAvailability: 'not_available'
+            }
+          ]
+        }
+      ]
+    }));
   }
 
   it('renders wizard steps and bottom action bar controls', () => {
@@ -593,5 +646,116 @@ describe('PlatformCreateSubscriptionPlanPage', () => {
 
     expect(component.modulesSummary()).toBe('Not selected');
     expect(component.featuresSummary()).toBe('Not selected');
+  });
+
+  it('loads modules and features from catalog API service', () => {
+    mockCatalogSuccess();
+
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+
+    expect(api.getSubscriptionCatalog).toHaveBeenCalledOnce();
+    expect(component.modules().map((module) => module.name)).toEqual(['Core POS', 'Inventory']);
+    expect(component.features().map((feature) => feature.name)).toEqual(['POS Sales', 'Inventory Management']);
+    expect(component.moduleAvailability()['core_pos']).toBe('included');
+    expect(component.featureAvailability()['feature-pos-sale']).toBe('included');
+    expect(component.catalogError()).toBeNull();
+  });
+
+  it('shows catalog load error state when catalog API fails', () => {
+    api.getSubscriptionCatalog.mockReturnValue(throwError(() => new Error('network')));
+
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    component.currentStep.set('modules');
+    fixture.detectChanges();
+
+    expect(component.catalogError()).toBe('Save failed safely');
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Module catalog could not be loaded');
+  });
+
+  it('module selection controls which features are available', () => {
+    mockCatalogSuccess();
+
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+
+    component.setModuleAvailability('inventory', 'included');
+    fixture.detectChanges();
+
+    expect(component.selectedModulesCount()).toBe(2);
+    expect(component.featureGroups().map((group) => group.moduleName)).toEqual(['Core POS', 'Inventory']);
+    expect(component.isFeatureDisabled(component.features().find((feature) => feature.id === 'feature-pos-sale')!)).toBe(true);
+    expect(component.isFeatureDisabled(component.features().find((feature) => feature.id === 'feature-inventory')!)).toBe(false);
+  });
+
+  it('saves selected features with included and not_available payload only', () => {
+    mockCatalogSuccess();
+
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    fillBasics(component);
+    component.savedPlanId.set('draft-1');
+    component.basicsSaved.set(true);
+    component.currentStep.set('features');
+    component.setModuleAvailability('inventory', 'included');
+    component.setFeatureAvailability('feature-inventory', 'included');
+    fixture.detectChanges();
+
+    component.nextStep();
+    fixture.detectChanges();
+
+    expect(api.updateSubscriptionPlanFeatures).toHaveBeenCalledWith('draft-1', {
+      featureAvailability: {
+        'feature-pos-sale': 'included',
+        'feature-inventory': 'included'
+      }
+    });
+    expect(JSON.stringify(api.updateSubscriptionPlanFeatures.mock.calls[0][1])).not.toContain('addon');
+    expect(component.featuresSaved()).toBe(true);
+    expect(component.currentStep()).toBe('pricing');
+  });
+
+  it('keeps feature summary unsaved when feature PATCH fails', () => {
+    mockCatalogSuccess();
+    api.updateSubscriptionPlanFeatures.mockReturnValueOnce(throwError(() => ({ error: { success: false } })));
+
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    fillBasics(component);
+    component.savedPlanId.set('draft-1');
+    component.basicsSaved.set(true);
+    component.currentStep.set('features');
+    component.setModuleAvailability('inventory', 'included');
+    component.setFeatureAvailability('feature-inventory', 'included');
+    fixture.detectChanges();
+
+    component.saveDraft();
+    fixture.detectChanges();
+
+    expect(component.errorMessage()).toBe('Save failed safely');
+    expect(component.featuresSaved()).toBe(false);
+    expect(component.currentStep()).toBe('features');
+  });
+
+  it('review summary displays selected modules and features grouped by module', () => {
+    mockCatalogSuccess();
+
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    component.setModuleAvailability('inventory', 'included');
+    component.setFeatureAvailability('feature-inventory', 'included');
+    component.currentStep.set('review');
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Selected Modules');
+    expect(text).toContain('Core POS');
+    expect(text).toContain('Inventory');
+    expect(text).toContain('Selected Features');
+    expect(text).toContain('POS Sales');
+    expect(text).toContain('Inventory Management');
+    expect(component.modulesSummary()).toBe('2 selected');
+    expect(component.featuresSummary()).toBe('2 enabled');
   });
 });

@@ -1,7 +1,8 @@
 import { Component, computed } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 
-import { platformMenuConfig } from '../../core/config/menu.config';
+import { MenuSectionConfig, platformMenuConfig } from '../../core/config/menu.config';
+import { AccessControlService } from '../../core/services/access-control.service';
 import { AuthSessionService } from '../../core/services/auth-session.service';
 import { AuthApiService } from '../../features/auth/services/auth-api.service';
 import { SidebarMenuIcon } from './sidebar-menu-icon';
@@ -30,7 +31,7 @@ import { SidebarMenuIcon } from './sidebar-menu-icon';
       </a>
 
       <nav class="menu sidebar-scroll" aria-label="Platform administration">
-        @for (section of platformMenu; track section.label) {
+        @for (section of visibleMenu(); track section.label) {
           @for (item of section.items; track item.path) {
             <a
               class="menu-item"
@@ -53,7 +54,7 @@ import { SidebarMenuIcon } from './sidebar-menu-icon';
           <div class="user-avatar">{{ userInitials() }}</div>
           <div class="user-copy">
             <strong>{{ authSession.currentUser()?.fullName ?? 'Admin User' }}</strong>
-            <span>Super Administrator</span>
+            <span>Platform account</span>
           </div>
           <span class="user-chevron" aria-hidden="true">›</span>
         </div>
@@ -317,7 +318,18 @@ import { SidebarMenuIcon } from './sidebar-menu-icon';
   `
 })
 export class Sidebar {
-  readonly platformMenu = platformMenuConfig;
+  readonly visibleMenu = computed(() =>
+    platformMenuConfig
+      .map(
+        (section): MenuSectionConfig => ({
+          ...section,
+          items: section.items.filter((item) =>
+            this.accessControl.canAccess(item.requiredPermission, item.requiredFeature)
+          )
+        })
+      )
+      .filter((section) => section.items.length > 0)
+  );
 
   readonly userInitials = computed(() =>
     (this.authSession.currentUser()?.fullName ?? 'Admin User')
@@ -330,6 +342,7 @@ export class Sidebar {
 
   constructor(
     readonly authSession: AuthSessionService,
+    private readonly accessControl: AccessControlService,
     private readonly authApi: AuthApiService,
     private readonly router: Router
   ) {}

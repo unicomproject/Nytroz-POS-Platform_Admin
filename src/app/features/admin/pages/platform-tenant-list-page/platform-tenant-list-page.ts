@@ -121,8 +121,8 @@ type CreatedOnFilter = 'all' | '7d' | '30d' | '90d';
           <span class="field-label">Plan</span>
           <select [ngModel]="planFilter()" (ngModelChange)="onPlanChange($event)">
             <option value="">All Plans</option>
-            @for (plan of filterOptions().plans; track plan) {
-              <option [value]="plan">{{ plan }}</option>
+            @for (plan of filterOptions().plans; track plan.id) {
+              <option [value]="plan.id">{{ plan.name }}</option>
             }
           </select>
         </label>
@@ -877,20 +877,10 @@ export class PlatformTenantListPage {
       pageSize: this.pageSize(),
       search: this.tenantSearch.searchTerm(),
       status: this.statusFilter(),
-      plan: this.planFilter(),
-      region: this.regionFilter(),
+      planId: this.planFilter(),
       sortBy: 'createdOn',
       sortDirection: 'desc'
     };
-
-    const createdRange = this.createdOnRange(this.createdOnFilter());
-    if (createdRange.from) {
-      query.createdFrom = createdRange.from;
-    }
-
-    if (createdRange.to) {
-      query.createdTo = createdRange.to;
-    }
 
     return query;
   }

@@ -36,18 +36,32 @@ describe('PlatformPermissionCatalogApiService', () => {
       data: {
         modules: [
           {
-            id: 'mod-1',
-            code: 'tenant_admin',
-            name: 'Tenant Admin',
-            scope: 'tenant',
-            sortOrder: 1,
-            isActive: true,
-            features: []
+            key: 'tenants',
+            name: 'Tenants',
+            description: 'Tenant administration permissions',
+            features: [
+              {
+                key: 'general',
+                name: 'General',
+                description: null,
+                permissions: [
+                  {
+                    id: '11111111-1111-1111-1111-111111111111',
+                    code: 'platform.tenants.view',
+                    name: 'View Tenants',
+                    description: null,
+                    status: 'active',
+                    isSystem: true,
+                    isBootstrap: false
+                  }
+                ]
+              }
+            ]
           }
         ]
       }
     });
 
-    expect(moduleCode).toBe('tenant_admin');
+    expect(moduleCode).toBe('tenants');
   });
 });

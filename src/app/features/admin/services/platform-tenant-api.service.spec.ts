@@ -3,9 +3,9 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 
 import {
-  createTenantFilterOptions,
-  createTenantListResponse,
-  createTenantSummary
+  createTenantFilterOptionsApiDto,
+  createTenantListResponseApiDto,
+  createTenantSummaryApiDto
 } from '../../../testing/test-fixtures';
 import { PlatformTenantApiService } from './platform-tenant-api.service';
 
@@ -32,10 +32,8 @@ describe('PlatformTenantApiService', () => {
       pageNumber: 2,
       pageSize: 6,
       search: 'demo',
-      status: 'Active',
-      plan: 'Professional',
-      region: 'Sri Lanka / Western',
-      createdFrom: '2026-06-01T00:00:00Z',
+      status: 'active',
+      planId: 'plan-2',
       sortBy: 'createdOn',
       sortDirection: 'desc'
     }).subscribe((response) => {
@@ -47,14 +45,12 @@ describe('PlatformTenantApiService', () => {
     expect(request.request.params.get('pageNumber')).toBe('2');
     expect(request.request.params.get('pageSize')).toBe('6');
     expect(request.request.params.get('search')).toBe('demo');
-    expect(request.request.params.get('status')).toBe('Active');
-    expect(request.request.params.get('plan')).toBe('Professional');
-    expect(request.request.params.get('region')).toBe('Sri Lanka / Western');
-    expect(request.request.params.get('createdFrom')).toBe('2026-06-01T00:00:00Z');
-    expect(request.request.params.get('sortBy')).toBe('createdOn');
+    expect(request.request.params.get('status')).toBe('active');
+    expect(request.request.params.get('planId')).toBe('plan-2');
+    expect(request.request.params.get('sortBy')).toBe('createdAt');
     expect(request.request.params.get('sortDirection')).toBe('desc');
 
-    request.flush({ success: true, message: 'ok', data: createTenantListResponse() });
+    request.flush({ success: true, message: 'ok', data: createTenantListResponseApiDto() });
     expect(tenantName).toBe('Demo Tenant Alpha');
   });
 
@@ -68,7 +64,7 @@ describe('PlatformTenantApiService', () => {
     const request = httpTesting.expectOne('/api/v1/platform-admin/tenants/summary');
     expect(request.request.method).toBe('GET');
 
-    request.flush({ success: true, message: 'ok', data: createTenantSummary() });
+    request.flush({ success: true, message: 'ok', data: createTenantSummaryApiDto() });
     expect(totalTenants).toBe(3);
   });
 
@@ -82,7 +78,7 @@ describe('PlatformTenantApiService', () => {
     const request = httpTesting.expectOne('/api/v1/platform-admin/tenants/filter-options');
     expect(request.request.method).toBe('GET');
 
-    request.flush({ success: true, message: 'ok', data: createTenantFilterOptions() });
+    request.flush({ success: true, message: 'ok', data: createTenantFilterOptionsApiDto() });
     expect(planCount).toBe(3);
   });
 });

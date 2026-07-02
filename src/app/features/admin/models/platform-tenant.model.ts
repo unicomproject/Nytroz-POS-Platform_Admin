@@ -28,10 +28,18 @@ export interface PlatformTenantSummary {
   trialTenants: number;
 }
 
+export interface PlatformTenantPlanFilterOption {
+  id: string;
+  name: string;
+  planCode: string;
+}
+
 export interface PlatformTenantFilterOptions {
-  plans: string[];
+  plans: PlatformTenantPlanFilterOption[];
   regions: string[];
   statuses: string[];
+  billingStatuses?: string[];
+  operatingModes?: string[];
 }
 
 export interface PlatformTenantListQuery {
@@ -39,10 +47,31 @@ export interface PlatformTenantListQuery {
   pageSize?: number;
   search?: string;
   status?: string;
-  plan?: string;
-  region?: string;
-  createdFrom?: string;
-  createdTo?: string;
+  billingStatus?: string;
+  planId?: string;
   sortBy?: string;
   sortDirection?: 'asc' | 'desc';
+}
+
+export interface PlatformTenantSubscriptionDetail {
+  planId: string;
+  planName: string;
+  planCode: string;
+  subscriptionStatus: string;
+}
+
+export interface PlatformTenantDetail extends PlatformTenantListItem {
+  code: string;
+  billingStatus: string;
+  operatingMode: string;
+  baseCurrency: string;
+  defaultTimezone: string;
+  defaultLocale: string;
+  businessType: string | null;
+  tillCount: number;
+  subscription: PlatformTenantSubscriptionDetail | null;
+  canUpdate: boolean;
+  canActivate: boolean;
+  canSuspend: boolean;
+  canManageEntitlements: boolean;
 }

@@ -1,14 +1,32 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { map, Observable, throwError } from 'rxjs';
+import { map, Observable } from 'rxjs';
 
 import { apiEndpoints } from '../../../core/config/api-endpoints';
 import { appSettings } from '../../../core/config/app-settings';
 import { ApiResponse } from '../../../core/models/api-response.model';
 import {
+  mapCreateSubscriptionPlanRequest,
+  mapSubscriptionPlanCatalog,
+  mapSubscriptionPlanFeaturesMutationResponse,
+  mapSubscriptionPlanFeaturesRequest,
+  mapSubscriptionPlanLimitsMutationResponse,
+  mapSubscriptionPlanListQueryParams,
+  mapSubscriptionPlanListResponse,
+  mapSubscriptionPlanMutationResponse,
+  mapSubscriptionPlanPricingMutationResponse,
+  SubscriptionPlanCatalogResponseApiDto,
+  SubscriptionPlanListResponseApiDto,
+  SubscriptionPlanMutationResponseApiDto
+} from '../mappers/platform-subscription-plan.mapper';
+import {
   PlatformFeatureOption,
   PlatformModuleOption,
+  SubscriptionPlanCatalogModule,
+  SubscriptionPlanCatalogResponse,
   SubscriptionPlanDraft,
+  SubscriptionPlanFeaturesMutationResponse,
+  SubscriptionPlanFeaturesUpdateRequest,
   SubscriptionPlanLimitsMutationResponse,
   SubscriptionPlanLimitsUpdateRequest,
   SubscriptionPlanListQuery,
@@ -28,32 +46,35 @@ export class PlatformSubscriptionPlanApiService {
 
   getPlans(query: SubscriptionPlanListQuery): Observable<SubscriptionPlanListResponse> {
     return this.http
-      .get<ApiResponse<SubscriptionPlanListResponse>>(
+      .get<ApiResponse<SubscriptionPlanListResponseApiDto>>(
         `${appSettings.apiBaseUrl}${apiEndpoints.platform.subscriptionPlans}`,
         { params: this.toParams(query) }
       )
-      .pipe(
-        map((response) => response.data ?? {
-          items: [],
-          pageNumber: query.pageNumber ?? 1,
-          pageSize: query.pageSize ?? 10,
-          totalItems: 0,
-          totalPages: 0,
-          hasPreviousPage: false,
-          hasNextPage: false,
-          statusCounts: { all: 0, draft: 0, published: 0, archived: 0 }
-        })
-      );
+      .pipe(map((response) => mapSubscriptionPlanListResponse(response.data, query)));
   }
 
-  /** Pending backend API: GET /api/v1/platform/subscription-plans/modules. */
   getModules(): Observable<PlatformModuleOption[]> {
-    return throwError(() => new Error('Subscription module catalog API is not available.'));
+    return this.getSubscriptionCatalog().pipe(
+      map((catalog) => catalog.modules.map(toPlatformModuleOption))
+    );
   }
 
-  /** Pending backend API: GET /api/v1/platform/subscription-plans/features. */
   getFeatures(): Observable<PlatformFeatureOption[]> {
-    return throwError(() => new Error('Subscription feature catalog API is not available.'));
+    return this.getSubscriptionCatalog().pipe(
+      map((catalog) =>
+        catalog.modules.flatMap((module) =>
+          module.features.map((feature) => toPlatformFeatureOption(module, feature))
+        )
+      )
+    );
+  }
+
+  getSubscriptionCatalog(): Observable<SubscriptionPlanCatalogResponse> {
+    return this.http
+      .get<ApiResponse<SubscriptionPlanCatalogResponseApiDto>>(
+        `${appSettings.apiBaseUrl}${apiEndpoints.platform.subscriptionPlans}/catalog`
+      )
+      .pipe(map((response) => mapSubscriptionPlanCatalog(response.data)));
   }
 
   saveDraft(draft: SubscriptionPlanDraft): Observable<SubscriptionPlanMutationResponse> {
@@ -62,9 +83,9 @@ export class PlatformSubscriptionPlanApiService {
 
   createSubscriptionPlanDraft(draft: SubscriptionPlanDraft): Observable<SubscriptionPlanMutationResponse> {
     return this.http
-      .post<ApiResponse<SubscriptionPlanMutationResponse>>(
+      .post<ApiResponse<SubscriptionPlanMutationResponseApiDto>>(
         `${appSettings.apiBaseUrl}${apiEndpoints.platform.subscriptionPlans}`,
-        this.toCreateRequest(draft)
+        mapCreateSubscriptionPlanRequest(draft)
       )
       .pipe(
         map((response) => {
@@ -72,7 +93,7 @@ export class PlatformSubscriptionPlanApiService {
             throw new Error(response.message || 'Subscription plan could not be saved.');
           }
 
-          return response.data;
+          return mapSubscriptionPlanMutationResponse(response.data);
         })
       );
   }
@@ -83,7 +104,7 @@ export class PlatformSubscriptionPlanApiService {
 
   publishSubscriptionPlan(planId: string): Observable<SubscriptionPlanMutationResponse> {
     return this.http
-      .post<ApiResponse<SubscriptionPlanMutationResponse>>(
+      .post<ApiResponse<SubscriptionPlanMutationResponseApiDto>>(
         `${appSettings.apiBaseUrl}${apiEndpoints.platform.subscriptionPlans}/${planId}/publish`,
         {}
       )
@@ -93,7 +114,7 @@ export class PlatformSubscriptionPlanApiService {
             throw new Error(response.message || 'Subscription plan could not be published.');
           }
 
-          return response.data;
+          return mapSubscriptionPlanMutationResponse(response.data);
         })
       );
   }
@@ -103,7 +124,7 @@ export class PlatformSubscriptionPlanApiService {
     request: SubscriptionPlanPricingUpdateRequest
   ): Observable<SubscriptionPlanPricingMutationResponse> {
     return this.http
-      .patch<ApiResponse<SubscriptionPlanPricingMutationResponse>>(
+      .patch<ApiResponse<SubscriptionPlanMutationResponseApiDto>>(
         `${appSettings.apiBaseUrl}${apiEndpoints.platform.subscriptionPlans}/${planId}/pricing`,
         { basePrice: request.basePrice }
       )
@@ -113,7 +134,7 @@ export class PlatformSubscriptionPlanApiService {
             throw new Error(response.message || 'Subscription plan pricing could not be saved.');
           }
 
-          return response.data;
+          return mapSubscriptionPlanPricingMutationResponse(response.data);
         })
       );
   }
@@ -123,7 +144,7 @@ export class PlatformSubscriptionPlanApiService {
     request: SubscriptionPlanLimitsUpdateRequest
   ): Observable<SubscriptionPlanLimitsMutationResponse> {
     return this.http
-      .patch<ApiResponse<SubscriptionPlanLimitsMutationResponse>>(
+      .patch<ApiResponse<SubscriptionPlanMutationResponseApiDto>>(
         `${appSettings.apiBaseUrl}${apiEndpoints.platform.subscriptionPlans}/${planId}/limits`,
         {
           maxOutlets: request.maxOutlets,
@@ -137,82 +158,73 @@ export class PlatformSubscriptionPlanApiService {
             throw new Error(response.message || 'Subscription plan limits could not be saved.');
           }
 
-          return response.data;
+          return mapSubscriptionPlanLimitsMutationResponse(response.data);
         })
       );
   }
 
-  private toCreateRequest(draft: SubscriptionPlanDraft) {
-    const request: Record<string, unknown> = {
-      planName: draft.planName,
-      planCode: draft.planCode,
-      description: draft.description,
-      billingCycle: draft.billingCycle,
-      currencyCode: draft.baseCurrency
-    };
+  updateSubscriptionPlanFeatures(
+    planId: string,
+    request: SubscriptionPlanFeaturesUpdateRequest
+  ): Observable<SubscriptionPlanFeaturesMutationResponse> {
+    const payload = mapSubscriptionPlanFeaturesRequest(request);
+    const requestedFeatureIds = (payload['featureIds'] as string[]) ?? [];
 
-    if (draft.basePrice != null && draft.basePrice >= 0) {
-      request['basePrice'] = draft.basePrice;
-    }
+    return this.http
+      .patch<ApiResponse<SubscriptionPlanMutationResponseApiDto>>(
+        `${appSettings.apiBaseUrl}${apiEndpoints.platform.subscriptionPlans}/${planId}/features`,
+        payload
+      )
+      .pipe(
+        map((response) => {
+          if (!response.success || !response.data?.id) {
+            throw new Error(response.message || 'Subscription plan features could not be saved.');
+          }
 
-    if (draft.maxOutlets != null) {
-      request['outletLimit'] = draft.maxOutlets;
-    }
-
-    if (draft.maxTills != null) {
-      request['tillLimit'] = draft.maxTills;
-    }
-
-    if (draft.maxUsers != null) {
-      request['userLimit'] = draft.maxUsers;
-    }
-
-    if (Object.keys(draft.featureAvailability).length > 0) {
-      request['featureAvailability'] = draft.featureAvailability;
-    }
-
-    return request;
+          return mapSubscriptionPlanFeaturesMutationResponse(response.data, requestedFeatureIds);
+        })
+      );
   }
 
   private toParams(query: SubscriptionPlanListQuery): HttpParams {
     let params = new HttpParams();
 
-    if (query.pageNumber) {
-      params = params.set('pageNumber', String(query.pageNumber));
-    }
-
-    if (query.pageSize) {
-      params = params.set('pageSize', String(query.pageSize));
-    }
-
-    if (query.search?.trim()) {
-      params = params.set('search', query.search.trim());
-    }
-
-    if (query.planType?.trim()) {
-      params = params.set('planType', query.planType.trim());
-    }
-
-    if (query.status?.trim()) {
-      params = params.set('status', query.status.trim());
-    }
-
-    if (query.billingCycle?.trim()) {
-      params = params.set('billingCycle', query.billingCycle.trim());
-    }
-
-    if (query.currencyCode?.trim()) {
-      params = params.set('currencyCode', query.currencyCode.trim());
-    }
-
-    if (query.sortBy?.trim()) {
-      params = params.set('sortBy', query.sortBy.trim());
-    }
-
-    if (query.sortDirection) {
-      params = params.set('sortDirection', query.sortDirection);
+    for (const [key, value] of Object.entries(mapSubscriptionPlanListQueryParams(query))) {
+      params = params.set(key, value);
     }
 
     return params;
   }
+}
+
+function toPlatformModuleOption(module: SubscriptionPlanCatalogModule): PlatformModuleOption {
+  return {
+    id: module.id,
+    moduleKey: module.code,
+    name: module.name,
+    description: module.description ?? null,
+    sortOrder: module.sortOrder,
+    isCore: module.isCore,
+    isLocked: module.isLocked,
+    defaultAvailability: module.defaultAvailability
+  };
+}
+
+function toPlatformFeatureOption(
+  module: SubscriptionPlanCatalogModule,
+  feature: SubscriptionPlanCatalogModule['features'][number]
+): PlatformFeatureOption {
+  return {
+    id: feature.id,
+    moduleId: module.id,
+    moduleName: module.name,
+    featureKey: feature.code,
+    name: feature.name,
+    description: feature.description ?? null,
+    entitlementKey: feature.entitlementKey ?? null,
+    sortOrder: feature.sortOrder,
+    isCore: feature.isCore,
+    isLocked: feature.isLocked,
+    defaultAvailability: feature.defaultAvailability
+  };
 }
