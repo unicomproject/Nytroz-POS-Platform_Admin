@@ -4,7 +4,8 @@ import { PlatformDashboard } from '../features/admin/models/platform-dashboard.m
 import {
   PlatformTenantFilterOptions,
   PlatformTenantListResponse,
-  PlatformTenantSummary
+  PlatformTenantSummary,
+  PlatformTenantDetail
 } from '../features/admin/models/platform-tenant.model';
 import { SubscriptionPlanListResponse } from '../features/admin/models/platform-subscription-plan.model';
 import {
@@ -16,14 +17,15 @@ import {
   PlatformTenantFilterOptionsApiDto,
   PlatformTenantListItemApiDto,
   PlatformTenantListResponseApiDto,
-  PlatformTenantSummaryApiDto
+  PlatformTenantSummaryApiDto,
+  PlatformTenantDetailApiDto
 } from '../features/admin/mappers/platform-tenant.mapper';
 import {
   SubscriptionPlanListItemApiDto,
   SubscriptionPlanListResponseApiDto
 } from '../features/admin/mappers/platform-subscription-plan.mapper';
 import { mapPlatformDashboard } from '../features/admin/mappers/platform-dashboard.mapper';
-import { mapPlatformTenantFilterOptions, mapPlatformTenantListResponse, mapPlatformTenantSummary } from '../features/admin/mappers/platform-tenant.mapper';
+import { mapPlatformTenantFilterOptions, mapPlatformTenantListResponse, mapPlatformTenantSummary, mapPlatformTenantDetail } from '../features/admin/mappers/platform-tenant.mapper';
 import { mapSubscriptionPlanListResponse } from '../features/admin/mappers/platform-subscription-plan.mapper';
 
 export function createAuthSession(overrides: Partial<AuthSession> = {}): AuthSession {
@@ -168,6 +170,29 @@ export function createTenantFilterOptions(
 ): PlatformTenantFilterOptions {
   return {
     ...mapPlatformTenantFilterOptions(createTenantFilterOptionsApiDto()),
+    ...overrides
+  };
+}
+
+export function createTenantDetailApiDto(
+  overrides: Partial<PlatformTenantDetailApiDto> = {}
+): PlatformTenantDetailApiDto {
+  return {
+    ...createTenantListItemApiDto(),
+    lastActivityAt: '2026-06-12T00:00:00Z',
+    canUpdate: true,
+    canActivate: false,
+    canSuspend: true,
+    canManageEntitlements: true,
+    ...overrides
+  };
+}
+
+export function createTenantDetail(
+  overrides: Partial<PlatformTenantDetail> = {}
+): PlatformTenantDetail {
+  return {
+    ...mapPlatformTenantDetail(createTenantDetailApiDto()),
     ...overrides
   };
 }

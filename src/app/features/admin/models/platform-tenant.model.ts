@@ -70,6 +70,9 @@ export interface PlatformTenantDetail extends PlatformTenantListItem {
   defaultLocale: string;
   businessType: string | null;
   tillCount: number;
+  onlineStoreEnabled: boolean;
+  clickCollectEnabled: boolean;
+  offlineEnabled: boolean;
   subscription: PlatformTenantSubscriptionDetail | null;
   canUpdate: boolean;
   canActivate: boolean;

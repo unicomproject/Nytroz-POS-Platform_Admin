@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 
 import { ApiErrorService } from '../../../../core/services/api-error.service';
@@ -21,6 +22,7 @@ describe('PlatformTenantListPage', () => {
     await TestBed.configureTestingModule({
       imports: [PlatformTenantListPage],
       providers: [
+        provideRouter([]),
         { provide: PlatformTenantApiService, useValue: api },
         { provide: ApiErrorService, useValue: { toSafeMessage: () => 'Tenant list failed safely' } }
       ]
@@ -79,6 +81,7 @@ describe('PlatformTenantListPage', () => {
     expect(text).toContain('Demo Tenant Alpha');
     expect(text).toContain('demo-alpha');
     expect(text).toContain('Professional');
+    expect(text).toContain('View');
     expect(text).not.toContain('No email on record');
     expect(text).not.toContain('Sydney Football Stadium');
   });

@@ -61,6 +61,24 @@ export class PlatformTenantApiService {
       .pipe(map((response) => mapPlatformTenantDetail(response.data)));
   }
 
+  activateTenant(tenantId: string): Observable<PlatformTenantDetail> {
+    return this.http
+      .post<ApiResponse<PlatformTenantDetailApiDto>>(
+        `${appSettings.apiBaseUrl}${apiEndpoints.platform.tenants}/${tenantId}/activate`,
+        {}
+      )
+      .pipe(map((response) => mapPlatformTenantDetail(response.data)));
+  }
+
+  suspendTenant(tenantId: string): Observable<PlatformTenantDetail> {
+    return this.http
+      .post<ApiResponse<PlatformTenantDetailApiDto>>(
+        `${appSettings.apiBaseUrl}${apiEndpoints.platform.tenants}/${tenantId}/suspend`,
+        {}
+      )
+      .pipe(map((response) => mapPlatformTenantDetail(response.data)));
+  }
+
   private toParams(query: PlatformTenantListQuery): HttpParams {
     let params = new HttpParams();
 
