@@ -5,6 +5,10 @@ import { map, Observable } from 'rxjs';
 import { apiEndpoints } from '../../../core/config/api-endpoints';
 import { appSettings } from '../../../core/config/app-settings';
 import { ApiResponse } from '../../../core/models/api-response.model';
+import {
+  mapPermissionCatalogTree,
+  PlatformPermissionCatalogApiDto
+} from '../mappers/platform-permission-catalog.mapper';
 import { PermissionCatalogTreeResponse } from '../models/platform-permission-catalog.model';
 
 @Injectable({ providedIn: 'root' })
@@ -13,11 +17,9 @@ export class PlatformPermissionCatalogApiService {
 
   getPermissionCatalog(): Observable<PermissionCatalogTreeResponse> {
     return this.http
-      .get<ApiResponse<PermissionCatalogTreeResponse>>(
+      .get<ApiResponse<PlatformPermissionCatalogApiDto>>(
         `${appSettings.apiBaseUrl}${apiEndpoints.platform.permissionCatalog}`
       )
-      .pipe(
-        map((response) => response.data ?? { modules: [] })
-      );
+      .pipe(map((response) => mapPermissionCatalogTree(response.data)));
   }
 }

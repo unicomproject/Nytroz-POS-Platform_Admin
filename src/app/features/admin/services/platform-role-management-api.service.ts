@@ -6,6 +6,16 @@ import { apiEndpoints } from '../../../core/config/api-endpoints';
 import { appSettings } from '../../../core/config/app-settings';
 import { ApiResponse } from '../../../core/models/api-response.model';
 import {
+  mapCreatePlatformRoleRequest,
+  mapPlatformRoleDetail,
+  mapPlatformRoleListResponse,
+  mapPlatformRolePermissionsResponse,
+  mapUpdatePlatformRoleRequest,
+  PlatformRoleListItemApiDto,
+  PlatformRoleListResponseApiDto,
+  PlatformRolePermissionsResponseApiDto
+} from '../mappers/platform-role.mapper';
+import {
   CreatePlatformRoleRequest,
   PlatformRoleDetail,
   PlatformRoleListResponse,
@@ -22,32 +32,35 @@ export class PlatformRoleManagementApiService {
 
   getRoles(): Observable<PlatformRoleListResponse> {
     return this.http
-      .get<ApiResponse<PlatformRoleListResponse>>(this.baseUrl)
-      .pipe(map((response) => response.data ?? { roles: [] }));
+      .get<ApiResponse<PlatformRoleListResponseApiDto>>(this.baseUrl)
+      .pipe(map((response) => mapPlatformRoleListResponse(response.data)));
   }
 
   createRole(request: CreatePlatformRoleRequest): Observable<PlatformRoleDetail> {
     return this.http
-      .post<ApiResponse<PlatformRoleDetail>>(this.baseUrl, request)
-      .pipe(map((response) => response.data));
+      .post<ApiResponse<PlatformRoleListItemApiDto>>(this.baseUrl, mapCreatePlatformRoleRequest(request))
+      .pipe(map((response) => mapPlatformRoleDetail(response.data)));
   }
 
   getRole(roleId: string): Observable<PlatformRoleDetail> {
     return this.http
-      .get<ApiResponse<PlatformRoleDetail>>(`${this.baseUrl}/${roleId}`)
-      .pipe(map((response) => response.data));
+      .get<ApiResponse<PlatformRoleListItemApiDto>>(`${this.baseUrl}/${roleId}`)
+      .pipe(map((response) => mapPlatformRoleDetail(response.data)));
   }
 
   updateRole(roleId: string, request: UpdatePlatformRoleRequest): Observable<PlatformRoleDetail> {
     return this.http
-      .put<ApiResponse<PlatformRoleDetail>>(`${this.baseUrl}/${roleId}`, request)
-      .pipe(map((response) => response.data));
+      .put<ApiResponse<PlatformRoleListItemApiDto>>(
+        `${this.baseUrl}/${roleId}`,
+        mapUpdatePlatformRoleRequest(request)
+      )
+      .pipe(map((response) => mapPlatformRoleDetail(response.data)));
   }
 
   getRolePermissions(roleId: string): Observable<PlatformRolePermissionsResponse> {
     return this.http
-      .get<ApiResponse<PlatformRolePermissionsResponse>>(`${this.baseUrl}/${roleId}/permissions`)
-      .pipe(map((response) => response.data));
+      .get<ApiResponse<PlatformRolePermissionsResponseApiDto>>(`${this.baseUrl}/${roleId}/permissions`)
+      .pipe(map((response) => mapPlatformRolePermissionsResponse(response.data)));
   }
 
   updateRolePermissions(
@@ -55,7 +68,7 @@ export class PlatformRoleManagementApiService {
     request: UpdatePlatformRolePermissionsRequest
   ): Observable<PlatformRolePermissionsResponse> {
     return this.http
-      .put<ApiResponse<PlatformRolePermissionsResponse>>(`${this.baseUrl}/${roleId}/permissions`, request)
-      .pipe(map((response) => response.data));
+      .put<ApiResponse<PlatformRolePermissionsResponseApiDto>>(`${this.baseUrl}/${roleId}/permissions`, request)
+      .pipe(map((response) => mapPlatformRolePermissionsResponse(response.data)));
   }
 }

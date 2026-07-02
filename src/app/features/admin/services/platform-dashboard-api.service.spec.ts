@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 
-import { createDashboard } from '../../../testing/test-fixtures';
+import { createDashboardApiDto } from '../../../testing/test-fixtures';
 import { PlatformDashboardApiService } from './platform-dashboard-api.service';
 
 describe('PlatformDashboardApiService', () => {
@@ -31,7 +31,7 @@ describe('PlatformDashboardApiService', () => {
     const request = httpTesting.expectOne('/api/v1/platform-admin/dashboard');
     expect(request.request.method).toBe('GET');
 
-    request.flush({ success: true, message: 'ok', data: createDashboard() });
+    request.flush({ success: true, message: 'ok', data: createDashboardApiDto() });
     expect(totalTenants).toBe(3);
   });
 });

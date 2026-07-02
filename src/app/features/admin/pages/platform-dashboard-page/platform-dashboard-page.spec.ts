@@ -46,7 +46,8 @@ describe('PlatformDashboardPage', () => {
     expect(text).toContain('Active Subscriptions');
     expect(text).toContain('2');
     expect(text).toContain('LKR');
-    expect(text).toContain('125,000');
+    expect(text).toContain('Items Requiring Attention');
+    expect(text).toContain('Demo Tenant Alpha');
   });
 
   it('shows clean empty states when backend data is empty', async () => {

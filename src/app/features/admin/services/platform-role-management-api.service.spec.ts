@@ -4,14 +4,15 @@ import { TestBed } from '@angular/core/testing';
 
 import { PlatformRoleManagementApiService } from './platform-role-management-api.service';
 
-interface RoleFixture {
+interface RoleApiFixture {
   id: string;
-  code: string;
+  roleCode: string;
   name: string;
   description: string;
   isSystem: boolean;
+  isProtected: boolean;
   status: string;
-  assignedUserCount: number;
+  userCount: number;
   permissionCount: number;
   createdAt: string;
   updatedAt: string;
@@ -36,6 +37,8 @@ describe('PlatformRoleManagementApiService', () => {
   it('calls GET /api/v1/platform-admin/roles', () => {
     service.getRoles().subscribe((response) => {
       expect(response.roles.length).toBe(1);
+      expect(response.roles[0]?.code).toBe('support_admin');
+      expect(response.roles[0]?.assignedUserCount).toBe(0);
     });
 
     const request = httpTesting.expectOne('/api/v1/platform-admin/roles');
@@ -49,12 +52,13 @@ describe('PlatformRoleManagementApiService', () => {
     const request = httpTesting.expectOne('/api/v1/platform-admin/roles');
     expect(request.request.method).toBe('POST');
     expect(request.request.body.code).toBe('support_admin');
-    request.flush({ success: true, message: 'ok', data: role({ code: 'support_admin', name: 'Support Admin' }) });
+    request.flush({ success: true, message: 'ok', data: role({ roleCode: 'support_admin', name: 'Support Admin' }) });
   });
 
   it('calls GET /api/v1/platform-admin/roles/{roleId}', () => {
     service.getRole('role-1').subscribe((response) => {
       expect(response.id).toBe('role-1');
+      expect(response.code).toBe('support_admin');
     });
 
     const request = httpTesting.expectOne('/api/v1/platform-admin/roles/role-1');
@@ -86,11 +90,8 @@ describe('PlatformRoleManagementApiService', () => {
         roleId: 'role-1',
         roleCode: 'support_admin',
         roleName: 'Support Admin',
-        isSystem: false,
-        status: 'Active',
-        assignedUserCount: 0,
         assignedPermissionCodes: [],
-        assignedPermissionIds: []
+        updatedAt: '2026-06-23T00:00:00Z'
       }
     });
 
@@ -106,25 +107,23 @@ describe('PlatformRoleManagementApiService', () => {
         roleId: 'role-1',
         roleCode: 'support_admin',
         roleName: 'Support Admin',
-        isSystem: false,
-        status: 'Active',
-        assignedUserCount: 0,
         assignedPermissionCodes: ['platform.roles.view'],
-        assignedPermissionIds: []
+        updatedAt: '2026-06-23T00:00:00Z'
       }
     });
   });
 });
 
-function role(overrides: Partial<RoleFixture> = {}): RoleFixture {
+function role(overrides: Partial<RoleApiFixture> = {}): RoleApiFixture {
   return {
     id: 'role-1',
-    code: 'support_admin',
+    roleCode: 'support_admin',
     name: 'Support Admin',
     description: 'Support team role',
     isSystem: false,
+    isProtected: false,
     status: 'Active',
-    assignedUserCount: 0,
+    userCount: 0,
     permissionCount: 1,
     createdAt: '2026-06-23T00:00:00Z',
     updatedAt: '2026-06-23T00:00:00Z',

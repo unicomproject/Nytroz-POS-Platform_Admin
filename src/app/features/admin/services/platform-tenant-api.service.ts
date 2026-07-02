@@ -6,6 +6,18 @@ import { apiEndpoints } from '../../../core/config/api-endpoints';
 import { appSettings } from '../../../core/config/app-settings';
 import { ApiResponse } from '../../../core/models/api-response.model';
 import {
+  mapPlatformTenantDetail,
+  mapPlatformTenantFilterOptions,
+  mapPlatformTenantListQueryParams,
+  mapPlatformTenantListResponse,
+  mapPlatformTenantSummary,
+  PlatformTenantDetailApiDto,
+  PlatformTenantFilterOptionsApiDto,
+  PlatformTenantListResponseApiDto,
+  PlatformTenantSummaryApiDto
+} from '../mappers/platform-tenant.mapper';
+import {
+  PlatformTenantDetail,
   PlatformTenantFilterOptions,
   PlatformTenantListQuery,
   PlatformTenantListResponse,
@@ -18,82 +30,42 @@ export class PlatformTenantApiService {
 
   getTenants(query: PlatformTenantListQuery): Observable<PlatformTenantListResponse> {
     return this.http
-      .get<ApiResponse<PlatformTenantListResponse>>(
+      .get<ApiResponse<PlatformTenantListResponseApiDto>>(
         `${appSettings.apiBaseUrl}${apiEndpoints.platform.tenants}`,
         { params: this.toParams(query) }
       )
-      .pipe(map((response) => response.data ?? {
-        items: [],
-        pageNumber: query.pageNumber ?? 1,
-        pageSize: query.pageSize ?? 10,
-        totalCount: 0,
-        totalPages: 0
-      }));
+      .pipe(map((response) => mapPlatformTenantListResponse(response.data, query)));
   }
 
   getSummary(): Observable<PlatformTenantSummary> {
     return this.http
-      .get<ApiResponse<PlatformTenantSummary>>(
+      .get<ApiResponse<PlatformTenantSummaryApiDto>>(
         `${appSettings.apiBaseUrl}${apiEndpoints.platform.tenantSummary}`
       )
-      .pipe(map((response) => response.data ?? {
-        totalTenants: 0,
-        activeTenants: 0,
-        suspendedTenants: 0,
-        inactiveTenants: 0,
-        trialTenants: 0
-      }));
+      .pipe(map((response) => mapPlatformTenantSummary(response.data)));
   }
 
   getFilterOptions(): Observable<PlatformTenantFilterOptions> {
     return this.http
-      .get<ApiResponse<PlatformTenantFilterOptions>>(
+      .get<ApiResponse<PlatformTenantFilterOptionsApiDto>>(
         `${appSettings.apiBaseUrl}${apiEndpoints.platform.tenantFilterOptions}`
       )
-      .pipe(map((response) => response.data ?? { plans: [], regions: [], statuses: [] }));
+      .pipe(map((response) => mapPlatformTenantFilterOptions(response.data)));
+  }
+
+  getTenantById(tenantId: string): Observable<PlatformTenantDetail> {
+    return this.http
+      .get<ApiResponse<PlatformTenantDetailApiDto>>(
+        `${appSettings.apiBaseUrl}${apiEndpoints.platform.tenants}/${tenantId}`
+      )
+      .pipe(map((response) => mapPlatformTenantDetail(response.data)));
   }
 
   private toParams(query: PlatformTenantListQuery): HttpParams {
     let params = new HttpParams();
 
-    if (query.pageNumber) {
-      params = params.set('pageNumber', String(query.pageNumber));
-    }
-
-    if (query.pageSize) {
-      params = params.set('pageSize', String(query.pageSize));
-    }
-
-    if (query.search?.trim()) {
-      params = params.set('search', query.search.trim());
-    }
-
-    if (query.status?.trim()) {
-      params = params.set('status', query.status.trim());
-    }
-
-    if (query.plan?.trim()) {
-      params = params.set('plan', query.plan.trim());
-    }
-
-    if (query.region?.trim()) {
-      params = params.set('region', query.region.trim());
-    }
-
-    if (query.createdFrom) {
-      params = params.set('createdFrom', query.createdFrom);
-    }
-
-    if (query.createdTo) {
-      params = params.set('createdTo', query.createdTo);
-    }
-
-    if (query.sortBy?.trim()) {
-      params = params.set('sortBy', query.sortBy.trim());
-    }
-
-    if (query.sortDirection) {
-      params = params.set('sortDirection', query.sortDirection);
+    for (const [key, value] of Object.entries(mapPlatformTenantListQueryParams(query))) {
+      params = params.set(key, value);
     }
 
     return params;

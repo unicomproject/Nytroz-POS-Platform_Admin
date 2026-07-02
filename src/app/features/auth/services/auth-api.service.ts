@@ -58,10 +58,14 @@ export class AuthApiService {
   }
 
   private toAuthSession(response: PlatformLoginResponse): AuthSession {
+    const fullName =
+      response.user.fullName?.trim() ||
+      deriveDisplayNameFromEmail(response.user.email);
+
     const user: CurrentUser = {
       id: String(response.user.id),
       email: response.user.email,
-      fullName: response.user.fullName,
+      fullName,
       status: response.user.status,
       platformPermissions: response.user.platformPermissions ?? []
     };
@@ -75,4 +79,17 @@ export class AuthApiService {
       user
     };
   }
+}
+
+function deriveDisplayNameFromEmail(email: string): string {
+  const localPart = email.split('@')[0]?.trim();
+  if (!localPart) {
+    return email;
+  }
+
+  return localPart
+    .split(/[._-]+/)
+    .filter(Boolean)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(' ');
 }
