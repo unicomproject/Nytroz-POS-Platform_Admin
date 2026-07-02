@@ -5,6 +5,8 @@ import { forkJoin, of, Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 
 import { ApiErrorService } from '../../../../core/services/api-error.service';
+import { AccessControlService } from '../../../../core/services/access-control.service';
+import { platformPermissions } from '../../../../core/config/permission-keys';
 import {
   PermissionCatalogFeature,
   PermissionCatalogModule,
@@ -78,7 +80,9 @@ interface RoleSnapshot {
                 <h2>Roles</h2>
                 <p>{{ roles().length }} platform role{{ roles().length === 1 ? '' : 's' }}</p>
               </div>
-              <button type="button" class="primary-button" (click)="startCreate()">+ Create Role</button>
+              @if (canCreateRole()) {
+                <button type="button" class="primary-button" (click)="startCreate()">+ Create Role</button>
+              }
             </div>
 
             <label class="field search-field">
@@ -1390,6 +1394,7 @@ export class PlatformPermissionCatalogPage {
   private readonly catalogApi = inject(PlatformPermissionCatalogApiService);
   private readonly roleApi = inject(PlatformRoleManagementApiService);
   private readonly apiError = inject(ApiErrorService);
+  private readonly accessControl = inject(AccessControlService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly permissionSearchChanges$ = new Subject<string>();
 
@@ -1485,15 +1490,46 @@ export class PlatformPermissionCatalogPage {
 
     return !sameForm(snapshot.form, this.form()) || !sameCodes(snapshot.permissionCodes, [...this.selectedPermissionCodes()]);
   });
-  readonly formDisabled = computed(() => this.isSaving() || this.selectedRole()?.isSystem === true);
-  readonly permissionsDisabled = computed(() => this.isSaving() || this.isDetailLoading() || this.selectedRole()?.isSystem === true);
+  readonly formDisabled = computed(
+    () => this.isSaving() || this.selectedRole()?.isSystem === true || !this.canEditRoleMetadata()
+  );
+  readonly permissionsDisabled = computed(
+    () =>
+      this.isSaving() ||
+      this.isDetailLoading() ||
+      this.selectedRole()?.isSystem === true ||
+      !this.canEditRolePermissions()
+  );
+  readonly canCreateRole = computed(() => this.accessControl.hasPermission(platformPermissions.rolesCreate));
   readonly canSave = computed(() => {
     const form = this.form();
     const hasRequiredFields = this.isCreateMode()
       ? Boolean(form.code.trim()) && Boolean(form.name.trim())
       : Boolean(form.name.trim());
 
-    return hasRequiredFields && this.isDirty() && !this.isSaving() && this.selectedRole()?.isSystem !== true;
+    if (!hasRequiredFields || !this.isDirty() || this.isSaving() || this.selectedRole()?.isSystem === true) {
+      return false;
+    }
+
+    if (this.isCreateMode()) {
+      return this.canEditRoleMetadata() && this.canEditRolePermissions();
+    }
+
+    const snapshot = this.snapshot();
+    const formChanged = snapshot ? !sameForm(snapshot.form, form) : false;
+    const permissionsChanged = snapshot
+      ? !sameCodes(snapshot.permissionCodes, [...this.selectedPermissionCodes()])
+      : false;
+
+    if (formChanged && !this.canEditRoleMetadata()) {
+      return false;
+    }
+
+    if (permissionsChanged && !this.canEditRolePermissions()) {
+      return false;
+    }
+
+    return formChanged || permissionsChanged;
   });
 
   constructor() {
@@ -1683,6 +1719,16 @@ export class PlatformPermissionCatalogPage {
 
   hasPermission(code: string): boolean {
     return this.selectedPermissionCodes().has(code);
+  }
+
+  canEditRoleMetadata(): boolean {
+    return this.isCreateMode()
+      ? this.accessControl.hasPermission(platformPermissions.rolesCreate)
+      : this.accessControl.hasPermission(platformPermissions.rolesUpdate);
+  }
+
+  canEditRolePermissions(): boolean {
+    return this.accessControl.hasPermission(platformPermissions.rolePermissionsUpdate);
   }
 
   resetChanges(): void {

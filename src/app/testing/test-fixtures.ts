@@ -1,4 +1,5 @@
 import { AuthSession } from '../core/models/auth-session.model';
+import { allPlatformPermissionCodes } from '../core/config/permission-keys';
 import { PlatformDashboard } from '../features/admin/models/platform-dashboard.model';
 import {
   PlatformTenantFilterOptions,
@@ -19,13 +20,7 @@ export function createAuthSession(overrides: Partial<AuthSession> = {}): AuthSes
       email: 'admin@nytroz.local',
       fullName: 'Nytroz Platform Admin',
       status: 'active',
-      platformPermissions: [
-        'platform.tenant.update',
-        'platform.subscription.manage',
-        'platform.subscription_plans.view',
-        'platform.subscription_plans.create',
-        'platform.audit.view'
-      ]
+      platformPermissions: [...allPlatformPermissionCodes]
     },
     ...overrides
   };

@@ -2,6 +2,8 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of, Subject, throwError } from 'rxjs';
 
 import { ApiErrorService } from '../../../../core/services/api-error.service';
+import { AuthSessionService } from '../../../../core/services/auth-session.service';
+import { createAuthSession } from '../../../../testing/test-fixtures';
 import { PlatformPermissionCatalogApiService } from '../../services/platform-permission-catalog-api.service';
 import { PlatformRoleManagementApiService } from '../../services/platform-role-management-api.service';
 import { PlatformPermissionCatalogPage } from './platform-permission-catalog-page';
@@ -88,10 +90,18 @@ describe('PlatformPermissionCatalogPage', () => {
     ]
   };
 
+  const authSessionProviders = [
+    {
+      provide: AuthSessionService,
+      useValue: { currentUser: () => createAuthSession().user }
+    }
+  ];
+
   async function createComponent(): Promise<ComponentFixture<PlatformPermissionCatalogPage>> {
     await TestBed.configureTestingModule({
       imports: [PlatformPermissionCatalogPage],
       providers: [
+        ...authSessionProviders,
         { provide: PlatformPermissionCatalogApiService, useValue: catalogApi },
         { provide: PlatformRoleManagementApiService, useValue: roleApi },
         { provide: ApiErrorService, useValue: { toSafeMessage: () => 'API failed safely' } }
@@ -131,6 +141,7 @@ describe('PlatformPermissionCatalogPage', () => {
     await TestBed.configureTestingModule({
       imports: [PlatformPermissionCatalogPage],
       providers: [
+        ...authSessionProviders,
         { provide: PlatformPermissionCatalogApiService, useValue: catalogApi },
         { provide: PlatformRoleManagementApiService, useValue: roleApi },
         { provide: ApiErrorService, useValue: { toSafeMessage: () => 'API failed safely' } }

@@ -73,7 +73,7 @@ import { PlatformTenantSearchService } from '../../features/admin/services/platf
         <div class="avatar">{{ initials() }}</div>
         <div class="user-summary">
           <strong>{{ authSession.currentUser()?.fullName ?? 'Platform session required' }}</strong>
-          <span>Super Administrator</span>
+          <span>Platform account</span>
         </div>
         <span class="dropdown-caret" aria-hidden="true">▾</span>
       </div>

@@ -6,56 +6,60 @@ import { tenantContextGuard } from '../../../core/guards/tenant-context.guard';
 export const adminRoutes: Routes = [
   {
     path: 'dashboard',
-    loadComponent: () => import('../pages/platform-dashboard-page/platform-dashboard-page').then((m) => m.PlatformDashboardPage)
+    loadComponent: () => import('../pages/platform-dashboard-page/platform-dashboard-page').then((m) => m.PlatformDashboardPage),
+    data: { title: 'Dashboard', requiredPermission: platformPermissions.dashboardView }
   },
   {
     path: 'tenants',
     loadComponent: () =>
-      import('../pages/platform-tenant-list-page/platform-tenant-list-page').then((m) => m.PlatformTenantListPage)
+      import('../pages/platform-tenant-list-page/platform-tenant-list-page').then((m) => m.PlatformTenantListPage),
+    data: { title: 'Tenants', requiredPermission: platformPermissions.tenantsView }
   },
   {
     path: 'outlets',
     loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
-    data: { title: 'Outlets' }
+    data: { title: 'Outlets', requiredPermission: platformPermissions.tenantsView }
   },
   {
     path: 'tills-devices',
     loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
-    data: { title: 'Tills & Devices' }
+    data: { title: 'Tills & Devices', requiredPermission: platformPermissions.tenantsView }
   },
   {
     path: 'products',
     loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
-    data: { title: 'Products' }
+    data: { title: 'Products', requiredPermission: platformPermissions.tenantsView }
   },
   {
     path: 'alerts',
     loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
-    data: { title: 'Alerts Center' }
+    data: { title: 'Alerts Center', requiredPermission: platformPermissions.dashboardView }
   },
   {
     path: 'tenants/create',
     loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
-    data: { title: 'Create Tenant', requiredPermission: platformPermissions.tenantCreate }
+    data: { title: 'Create Tenant', requiredPermission: platformPermissions.tenantsCreate }
   },
   {
     path: 'subscriptions/create',
     loadComponent: () =>
       import('../pages/platform-create-subscription-plan-page/platform-create-subscription-plan-page').then(
         (m) => m.PlatformCreateSubscriptionPlanPage
-      )
+      ),
+    data: { title: 'Create Subscription Plan', requiredPermission: platformPermissions.subscriptionPlansCreate }
   },
   {
     path: 'subscriptions',
     loadComponent: () =>
       import('../pages/platform-subscription-plans-page/platform-subscription-plans-page').then(
         (m) => m.PlatformSubscriptionPlansPage
-      )
+      ),
+    data: { title: 'Subscription Plans', requiredPermission: platformPermissions.subscriptionPlansView }
   },
   {
     path: 'modules',
     loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
-    data: { title: 'Modules and Features', requiredPermission: platformPermissions.featureEntitle }
+    data: { title: 'Modules and Features', requiredPermission: platformPermissions.featuresView }
   },
   {
     path: 'roles-permissions',
@@ -68,22 +72,22 @@ export const adminRoutes: Routes = [
   {
     path: 'platform-users',
     loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
-    data: { title: 'Platform Users', requiredPermission: platformPermissions.tenantUpdate }
+    data: { title: 'Platform Users', requiredPermission: platformPermissions.usersView }
   },
   {
     path: 'billing',
     loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
-    data: { title: 'Billing', requiredPermission: platformPermissions.subscriptionManage }
+    data: { title: 'Billing', requiredPermission: platformPermissions.billingView }
   },
   {
     path: 'reports',
     loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
-    data: { title: 'Platform Reports' }
+    data: { title: 'Platform Reports', requiredPermission: platformPermissions.dashboardView }
   },
   {
     path: 'settings/system',
     loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
-    data: { title: 'System Settings', requiredPermission: platformPermissions.tenantUpdate }
+    data: { title: 'System Settings', requiredPermission: platformPermissions.settingsView }
   },
   {
     path: 'audit-logs',
