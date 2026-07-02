@@ -166,7 +166,7 @@ describe('PlatformPermissionCatalogPage', () => {
     expect(text).toContain('Roles & Permissions');
     expect(text).toContain('Support Admin');
     expect(text).toContain('Edit Role');
-    expect(text).toContain('Available Permissions');
+    expect(text).toContain('Business Permissions');
     expect(text).toContain('Preview Impact');
     expect(fixture.nativeElement.querySelector('.roles-panel')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('.editor-panel')).toBeTruthy();

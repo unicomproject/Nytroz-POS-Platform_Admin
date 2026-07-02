@@ -14,8 +14,6 @@ import {
 import { PlatformTenantApiService } from '../../services/platform-tenant-api.service';
 import { PlatformTenantSearchService } from '../../services/platform-tenant-search.service';
 
-type CreatedOnFilter = 'all' | '7d' | '30d' | '90d';
-
 @Component({
   selector: 'app-platform-tenant-list-page',
   standalone: true,
@@ -29,11 +27,11 @@ type CreatedOnFilter = 'all' | '7d' | '30d' | '90d';
           <span class="title-accent" aria-hidden="true"></span>
         </div>
         <div class="page-actions">
-          <button type="button" class="btn outline" disabled title="Import Tenants is not available in Release 1">
+          <button type="button" class="btn outline" disabled title="Import Tenants is not available in TM-EPOS MVP">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v10M8 9l4 4 4-4M5 21h14" /></svg>
             Import Tenants
           </button>
-          <button type="button" class="btn primary" disabled title="Create Tenant is not available in Release 1">
+          <button type="button" class="btn primary" disabled title="Create Tenant is not available in TM-EPOS MVP">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
             Create Tenant
           </button>
@@ -126,31 +124,8 @@ type CreatedOnFilter = 'all' | '7d' | '30d' | '90d';
             }
           </select>
         </label>
-        <label class="filter-field">
-          <span class="field-label">Region</span>
-          <select [ngModel]="regionFilter()" (ngModelChange)="onRegionChange($event)">
-            <option value="">All Regions</option>
-            @for (region of filterOptions().regions; track region) {
-              <option [value]="region">{{ region }}</option>
-            }
-          </select>
-        </label>
-        <label class="filter-field">
-          <span class="field-label">Created On</span>
-          <span class="input-wrap select-wrap">
-            <select [ngModel]="createdOnFilter()" (ngModelChange)="onCreatedOnChange($event)">
-              <option value="all">All Time</option>
-              <option value="7d">Last 7 days</option>
-              <option value="30d">Last 30 days</option>
-              <option value="90d">Last 90 days</option>
-            </select>
-            <svg class="calendar-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" />
-            </svg>
-          </span>
-        </label>
         <div class="filter-actions">
-          <button type="button" class="btn outline" disabled title="More Filters is not available in Release 1">
+          <button type="button" class="btn outline" disabled title="More Filters is not available in TM-EPOS MVP">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4" /></svg>
             More Filters
           </button>
@@ -178,7 +153,6 @@ type CreatedOnFilter = 'all' | '7d' | '30d' | '90d';
                   <tr>
                     <th>Tenant</th>
                     <th>Plan</th>
-                    <th>Region</th>
                     <th>Status</th>
                     <th>Users</th>
                     <th>Outlets</th>
@@ -195,12 +169,11 @@ type CreatedOnFilter = 'all' | '7d' | '30d' | '90d';
                           <span class="avatar" [style.background]="avatarColor(tenant.name)">{{ initials(tenant.name) }}</span>
                           <span class="tenant-meta">
                             <strong>{{ tenant.name }}</strong>
-                            <small>{{ tenant.email || 'No email on record' }}</small>
+                            <small>{{ tenant.code }}</small>
                           </span>
                         </div>
                       </td>
                       <td class="cell-text">{{ tenant.planName || '—' }}</td>
-                      <td class="cell-text">{{ tenant.region || '—' }}</td>
                       <td>
                         <span class="status-badge" [class]="statusClass(tenant.status)">{{ tenant.status }}</span>
                       </td>
@@ -430,7 +403,7 @@ type CreatedOnFilter = 'all' | '7d' | '30d' | '90d';
       align-items: end;
       display: grid;
       gap: 0.9rem 1rem;
-      grid-template-columns: 1.35fr repeat(4, minmax(0, 1fr)) auto;
+      grid-template-columns: 1.35fr repeat(2, minmax(0, 1fr)) auto;
       padding: 1.1rem 1.15rem;
     }
 
@@ -706,8 +679,6 @@ export class PlatformTenantListPage {
 
   readonly statusFilter = signal('');
   readonly planFilter = signal('');
-  readonly regionFilter = signal('');
-  readonly createdOnFilter = signal<CreatedOnFilter>('all');
   readonly pageNumber = signal(1);
   readonly pageSize = signal(10);
 
@@ -781,24 +752,10 @@ export class PlatformTenantListPage {
     this.loadPage();
   }
 
-  onRegionChange(value: string): void {
-    this.regionFilter.set(value);
-    this.pageNumber.set(1);
-    this.loadPage();
-  }
-
-  onCreatedOnChange(value: CreatedOnFilter): void {
-    this.createdOnFilter.set(value);
-    this.pageNumber.set(1);
-    this.loadPage();
-  }
-
   resetFilters(): void {
     this.tenantSearch.searchTerm.set('');
     this.statusFilter.set('');
     this.planFilter.set('');
-    this.regionFilter.set('');
-    this.createdOnFilter.set('all');
     this.pageNumber.set(1);
     this.loadPage();
   }
@@ -883,16 +840,5 @@ export class PlatformTenantListPage {
     };
 
     return query;
-  }
-
-  private createdOnRange(filter: CreatedOnFilter): { from?: string; to?: string } {
-    if (filter === 'all') {
-      return {};
-    }
-
-    const days = filter === '7d' ? 7 : filter === '30d' ? 30 : 90;
-    const from = new Date();
-    from.setDate(from.getDate() - days);
-    return { from: from.toISOString() };
   }
 }

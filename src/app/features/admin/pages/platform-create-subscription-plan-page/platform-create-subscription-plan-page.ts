@@ -187,7 +187,7 @@ type WizardStep = 'basics' | 'modules' | 'features' | 'pricing' | 'limits' | 're
                 } @else if (catalogError()) {
                   <div class="empty-step"><strong>Module catalog could not be loaded</strong><span>{{ catalogError() }}</span></div>
                 } @else if (!modules().length) {
-                  <div class="empty-step"><strong>No subscription modules found</strong><span>The backend subscription catalog did not return Release 1 modules.</span></div>
+                  <div class="empty-step"><strong>No subscription modules found</strong><span>The backend subscription catalog did not return TM-EPOS MVP modules.</span></div>
                 } @else {
                   <div class="module-grid">
                     @for (module of modules(); track module.id) {

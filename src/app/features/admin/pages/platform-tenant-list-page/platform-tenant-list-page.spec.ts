@@ -77,9 +77,9 @@ describe('PlatformTenantListPage', () => {
 
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain('Demo Tenant Alpha');
-    expect(text).toContain('No email on record');
+    expect(text).toContain('demo-alpha');
     expect(text).toContain('Professional');
-    expect(text).toContain('—');
+    expect(text).not.toContain('No email on record');
     expect(text).not.toContain('Sydney Football Stadium');
   });
 

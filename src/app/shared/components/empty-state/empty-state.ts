@@ -31,5 +31,5 @@ import { Component, input } from '@angular/core';
 })
 export class EmptyState {
   readonly title = input('No records yet');
-  readonly message = input('Records will appear here after the backend returns data for this Release 1 feature.');
+  readonly message = input('Records will appear here after the backend returns data for this TM-EPOS MVP feature.');
 }

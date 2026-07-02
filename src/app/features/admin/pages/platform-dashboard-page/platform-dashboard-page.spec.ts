@@ -45,7 +45,8 @@ describe('PlatformDashboardPage', () => {
     expect(text).toContain('3');
     expect(text).toContain('Active Subscriptions');
     expect(text).toContain('2');
-    expect(text).toContain('LKR');
+    expect(text).toContain('Not tracked in TM-EPOS MVP');
+    expect(text).toContain('No change yet');
     expect(text).toContain('Items Requiring Attention');
     expect(text).toContain('Demo Tenant Alpha');
   });
@@ -81,6 +82,8 @@ describe('PlatformDashboardPage', () => {
     const component = fixture.componentInstance;
 
     expect(component.money(2500)).toContain('2,500');
+    expect(component.mrrLabel(0)).toBe('Not tracked in TM-EPOS MVP');
+    expect(component.change(0)).toBe('No change yet');
     expect(component.chartPoints([{ date: '2026-06-16', tenants: 1, subscriptions: 2, mrr: 3 }], 'mrr')).toBe('45.0,40.0');
   });
 });

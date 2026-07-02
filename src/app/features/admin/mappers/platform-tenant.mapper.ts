@@ -102,6 +102,7 @@ export function mapPlatformTenantListResponse(
 export function mapPlatformTenantListItem(dto: PlatformTenantListItemApiDto): PlatformTenantListItem {
   return {
     id: String(dto.id),
+    code: dto.code,
     name: dto.name,
     email: null,
     ownerName: null,
