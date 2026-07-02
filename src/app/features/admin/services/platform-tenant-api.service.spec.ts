@@ -6,8 +6,10 @@ import {
   createTenantFilterOptionsApiDto,
   createTenantListResponseApiDto,
   createTenantSummaryApiDto,
+  createTenantCreateOptionsApiDto,
   createTenantDetailApiDto
 } from '../../../testing/test-fixtures';
+import { CreatePlatformTenantRequest } from '../models/platform-tenant-create.model';
 import { PlatformTenantApiService } from './platform-tenant-api.service';
 
 describe('PlatformTenantApiService', () => {
@@ -95,6 +97,46 @@ describe('PlatformTenantApiService', () => {
 
     request.flush({ success: true, message: 'ok', data: createTenantDetailApiDto() });
     expect(tenantCode).toBe('demo-alpha');
+  });
+
+  it('calls GET /api/v1/platform-admin/tenants/create-options and maps response data', () => {
+    let planCode = '';
+
+    service.getCreateOptions().subscribe((options) => {
+      planCode = options.plans[0]?.planCode ?? '';
+    });
+
+    const request = httpTesting.expectOne('/api/v1/platform-admin/tenants/create-options');
+    expect(request.request.method).toBe('GET');
+
+    request.flush({ success: true, message: 'ok', data: createTenantCreateOptionsApiDto() });
+    expect(planCode).toBe('STARTER');
+  });
+
+  it('calls POST /api/v1/platform-admin/tenants and maps tenant detail response', () => {
+    let createdTenantId = '';
+    const payload: CreatePlatformTenantRequest = {
+      code: 'TEN-NEW',
+      name: 'New Tenant',
+      subscriptionPlanId: 'plan-1',
+      tenantAdmin: {
+        firstName: 'Ada',
+        email: 'ada@tenant.com',
+        sendInvite: true
+      }
+    };
+
+    service.createTenant(payload).subscribe((tenant) => {
+      createdTenantId = tenant.id;
+    });
+
+    const request = httpTesting.expectOne('/api/v1/platform-admin/tenants');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body.code).toBe('TEN-NEW');
+    expect(request.request.body.tenantAdmin.sendInvite).toBe(true);
+
+    request.flush({ success: true, message: 'ok', data: createTenantDetailApiDto({ id: 'tenant-new' }) });
+    expect(createdTenantId).toBe('tenant-new');
   });
 
   it('calls POST /api/v1/platform-admin/tenants/{tenantId}/activate and maps response data', () => {

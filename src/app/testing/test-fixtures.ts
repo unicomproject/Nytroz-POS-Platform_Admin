@@ -24,9 +24,11 @@ import {
   SubscriptionPlanListItemApiDto,
   SubscriptionPlanListResponseApiDto
 } from '../features/admin/mappers/platform-subscription-plan.mapper';
+import { TenantCreateOptionsApiDto, mapCreateOptions } from '../features/admin/mappers/platform-tenant-create.mapper';
 import { mapPlatformDashboard } from '../features/admin/mappers/platform-dashboard.mapper';
 import { mapPlatformTenantFilterOptions, mapPlatformTenantListResponse, mapPlatformTenantSummary, mapPlatformTenantDetail } from '../features/admin/mappers/platform-tenant.mapper';
 import { mapSubscriptionPlanListResponse } from '../features/admin/mappers/platform-subscription-plan.mapper';
+import { TenantCreateOptions } from '../features/admin/models/platform-tenant-create.model';
 
 export function createAuthSession(overrides: Partial<AuthSession> = {}): AuthSession {
   return {
@@ -246,6 +248,73 @@ export function createSubscriptionPlanListResponse(
 ): SubscriptionPlanListResponse {
   return {
     ...mapSubscriptionPlanListResponse(createSubscriptionPlanListResponseApiDto()),
+    ...overrides
+  };
+}
+
+export function createTenantCreateOptionsApiDto(
+  overrides: Partial<TenantCreateOptionsApiDto> = {}
+): TenantCreateOptionsApiDto {
+  return {
+    plans: [
+      {
+        id: 'plan-1',
+        planCode: 'STARTER',
+        name: 'Starter',
+        description: 'Starter plan',
+        status: 'active',
+        billingCycle: 'monthly',
+        baseCurrency: 'LKR',
+        basePrice: 50,
+        maxOutlets: 5,
+        maxTills: 10,
+        maxUsers: 20,
+        includedFeatureIds: ['feature-1', 'feature-2'],
+        includedFeatureCodes: ['online_store', 'inventory_management']
+      }
+    ],
+    addons: [
+      {
+        id: 'addon-1',
+        addonCode: 'EXTRA_OUTLET',
+        name: 'Extra Outlet',
+        description: 'Adds one outlet',
+        unitPrice: 5,
+        currency: 'LKR',
+        relatedFeatureCode: null,
+        limitIncrementByKey: { max_outlets: 1 }
+      }
+    ],
+    catalogModules: [
+      {
+        id: 'module-1',
+        moduleCode: 'core_pos',
+        name: 'Core POS',
+        description: 'Core module',
+        sortOrder: 1,
+        features: [
+          { id: 'feature-1', featureCode: 'online_store', name: 'Online Store', description: null, sortOrder: 1 },
+          { id: 'feature-2', featureCode: 'inventory_management', name: 'Inventory', description: null, sortOrder: 2 }
+        ]
+      }
+    ],
+    billingModes: [{ value: 'manual', label: 'Manual' }],
+    currencies: [{ value: 'LKR', label: 'LKR - Sri Lankan Rupee' }],
+    timezones: [{ value: 'Asia/Colombo', label: 'Asia/Colombo' }],
+    locales: [{ value: 'en-LK', label: 'English (Sri Lanka)' }],
+    businessTypes: [{ value: 'retail', label: 'Retail' }],
+    operatingModes: [{ value: 'unified_epos', label: 'Unified EPOS' }],
+    subscriptionStatuses: [{ value: 'trial', label: 'Trial' }, { value: 'active', label: 'Active' }],
+    billingCycles: [{ value: 'monthly', label: 'Monthly' }],
+    ...overrides
+  };
+}
+
+export function createTenantCreateOptions(
+  overrides: Partial<TenantCreateOptions> = {}
+): TenantCreateOptions {
+  return {
+    ...mapCreateOptions(createTenantCreateOptionsApiDto()),
     ...overrides
   };
 }

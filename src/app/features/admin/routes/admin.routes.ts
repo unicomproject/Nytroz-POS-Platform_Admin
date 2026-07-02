@@ -16,6 +16,12 @@ export const adminRoutes: Routes = [
     data: { title: 'Tenants', requiredPermission: platformPermissions.tenantsView }
   },
   {
+    path: 'tenants/create',
+    loadComponent: () =>
+      import('../pages/platform-create-tenant-page/platform-create-tenant-page').then((m) => m.PlatformCreateTenantPage),
+    data: { title: 'Create Tenant', requiredPermission: platformPermissions.tenantsCreate }
+  },
+  {
     path: 'tenants/:tenantId',
     loadComponent: () =>
       import('../pages/platform-tenant-detail-page/platform-tenant-detail-page').then((m) => m.PlatformTenantDetailPage),
@@ -40,11 +46,6 @@ export const adminRoutes: Routes = [
     path: 'alerts',
     loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
     data: { title: 'Alerts Center', requiredPermission: platformPermissions.dashboardView }
-  },
-  {
-    path: 'tenants/create',
-    loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
-    data: { title: 'Create Tenant', requiredPermission: platformPermissions.tenantsCreate }
   },
   {
     path: 'subscriptions/create',

@@ -16,6 +16,8 @@ import {
   PlatformTenantListResponseApiDto,
   PlatformTenantSummaryApiDto
 } from '../mappers/platform-tenant.mapper';
+import { mapCreateOptions, TenantCreateOptionsApiDto } from '../mappers/platform-tenant-create.mapper';
+import { CreatePlatformTenantRequest, TenantCreateOptions } from '../models/platform-tenant-create.model';
 import {
   PlatformTenantDetail,
   PlatformTenantFilterOptions,
@@ -51,6 +53,23 @@ export class PlatformTenantApiService {
         `${appSettings.apiBaseUrl}${apiEndpoints.platform.tenantFilterOptions}`
       )
       .pipe(map((response) => mapPlatformTenantFilterOptions(response.data)));
+  }
+
+  getCreateOptions(): Observable<TenantCreateOptions> {
+    return this.http
+      .get<ApiResponse<TenantCreateOptionsApiDto>>(
+        `${appSettings.apiBaseUrl}${apiEndpoints.platform.tenantCreateOptions}`
+      )
+      .pipe(map((response) => mapCreateOptions(response.data)));
+  }
+
+  createTenant(request: CreatePlatformTenantRequest): Observable<PlatformTenantDetail> {
+    return this.http
+      .post<ApiResponse<PlatformTenantDetailApiDto>>(
+        `${appSettings.apiBaseUrl}${apiEndpoints.platform.tenants}`,
+        request
+      )
+      .pipe(map((response) => mapPlatformTenantDetail(response.data)));
   }
 
   getTenantById(tenantId: string): Observable<PlatformTenantDetail> {

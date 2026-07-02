@@ -32,7 +32,7 @@ import { PlatformTenantSearchService } from '../../services/platform-tenant-sear
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v10M8 9l4 4 4-4M5 21h14" /></svg>
             Import Tenants
           </button>
-          <button type="button" class="btn primary" disabled title="Create Tenant is not available in TM-EPOS MVP">
+          <button type="button" class="btn primary" routerLink="/admin/tenants/create">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
             Create Tenant
           </button>
