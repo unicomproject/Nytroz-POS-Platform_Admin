@@ -7,7 +7,8 @@ import {
   createTenantListResponseApiDto,
   createTenantSummaryApiDto,
   createTenantCreateOptionsApiDto,
-  createTenantDetailApiDto
+  createTenantDetailApiDto,
+  createTenantEntitlementOptionsApiDto
 } from '../../../testing/test-fixtures';
 import { CreatePlatformTenantRequest } from '../models/platform-tenant-create.model';
 import { PlatformTenantApiService } from './platform-tenant-api.service';
@@ -173,5 +174,46 @@ describe('PlatformTenantApiService', () => {
       data: createTenantDetailApiDto({ status: 'suspended', canActivate: true, canSuspend: false })
     });
     expect(status).toBe('suspended');
+  });
+
+  it('calls GET /api/v1/platform-admin/tenants/{tenantId}/entitlement-options and maps response data', () => {
+    let planCode = '';
+
+    service.getEntitlementOptions('tenant-1').subscribe((options) => {
+      planCode = options.currentSubscriptionPlanCode ?? '';
+    });
+
+    const request = httpTesting.expectOne('/api/v1/platform-admin/tenants/tenant-1/entitlement-options');
+    expect(request.request.method).toBe('GET');
+
+    request.flush({ success: true, message: 'ok', data: createTenantEntitlementOptionsApiDto() });
+    expect(planCode).toBe('PRO');
+  });
+
+  it('calls PUT /api/v1/platform-admin/tenants/{tenantId}/entitlements and maps response data', () => {
+    let enabledFeatureCount = 0;
+
+    service
+      .updateEntitlements('tenant-1', {
+        subscriptionPlanId: 'plan-1',
+        enabledFeatureIds: ['feature-offline'],
+        enabledFeatureCodes: ['offline_operation_sync']
+      })
+      .subscribe((tenant) => {
+        enabledFeatureCount = tenant.enabledFeatureIds.length;
+      });
+
+    const request = httpTesting.expectOne('/api/v1/platform-admin/tenants/tenant-1/entitlements');
+    expect(request.request.method).toBe('PUT');
+    expect(request.request.body.subscriptionPlanId).toBe('plan-1');
+    expect(request.request.body.enabledFeatureIds).toEqual(['feature-offline']);
+    expect(request.request.body.enabledFeatureCodes).toEqual(['offline_operation_sync']);
+
+    request.flush({
+      success: true,
+      message: 'ok',
+      data: createTenantDetailApiDto({ enabledFeatureIds: ['feature-offline'], enabledFeatureCodes: ['offline_operation_sync'] })
+    });
+    expect(enabledFeatureCount).toBe(1);
   });
 });

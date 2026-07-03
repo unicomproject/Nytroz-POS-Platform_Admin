@@ -19,6 +19,12 @@ import {
 import { mapCreateOptions, TenantCreateOptionsApiDto } from '../mappers/platform-tenant-create.mapper';
 import { CreatePlatformTenantRequest, TenantCreateOptions } from '../models/platform-tenant-create.model';
 import {
+  mapUpdatePlatformTenantEntitlementsRequest,
+  mapPlatformTenantEntitlementOptions,
+  PlatformTenantEntitlementOptionsApiDto
+} from '../mappers/platform-tenant-entitlements.mapper';
+import { UpdatePlatformTenantEntitlementsRequest, PlatformTenantEntitlementOptions } from '../models/platform-tenant-entitlements.model';
+import {
   PlatformTenantDetail,
   PlatformTenantFilterOptions,
   PlatformTenantListQuery,
@@ -94,6 +100,26 @@ export class PlatformTenantApiService {
       .post<ApiResponse<PlatformTenantDetailApiDto>>(
         `${appSettings.apiBaseUrl}${apiEndpoints.platform.tenants}/${tenantId}/suspend`,
         {}
+      )
+      .pipe(map((response) => mapPlatformTenantDetail(response.data)));
+  }
+
+  getEntitlementOptions(tenantId: string): Observable<PlatformTenantEntitlementOptions> {
+    return this.http
+      .get<ApiResponse<PlatformTenantEntitlementOptionsApiDto>>(
+        `${appSettings.apiBaseUrl}${apiEndpoints.platform.tenants}/${tenantId}/entitlement-options`
+      )
+      .pipe(map((response) => mapPlatformTenantEntitlementOptions(response.data)));
+  }
+
+  updateEntitlements(
+    tenantId: string,
+    request: UpdatePlatformTenantEntitlementsRequest
+  ): Observable<PlatformTenantDetail> {
+    return this.http
+      .put<ApiResponse<PlatformTenantDetailApiDto>>(
+        `${appSettings.apiBaseUrl}${apiEndpoints.platform.tenants}/${tenantId}/entitlements`,
+        mapUpdatePlatformTenantEntitlementsRequest(request)
       )
       .pipe(map((response) => mapPlatformTenantDetail(response.data)));
   }

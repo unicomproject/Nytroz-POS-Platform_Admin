@@ -5,7 +5,7 @@ import { of, Subject, throwError } from 'rxjs';
 import { platformPermissions } from '../../../../core/config/permission-keys';
 import { AccessControlService } from '../../../../core/services/access-control.service';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
-import { createTenantDetail } from '../../../../testing/test-fixtures';
+import { createTenantDetail, createTenantEntitlementOptions } from '../../../../testing/test-fixtures';
 import { PlatformTenantApiService } from '../../services/platform-tenant-api.service';
 import { PlatformTenantDetailPage } from './platform-tenant-detail-page';
 
@@ -14,6 +14,8 @@ describe('PlatformTenantDetailPage', () => {
     getTenantById: ReturnType<typeof vi.fn>;
     activateTenant: ReturnType<typeof vi.fn>;
     suspendTenant: ReturnType<typeof vi.fn>;
+    getEntitlementOptions: ReturnType<typeof vi.fn>;
+    updateEntitlements: ReturnType<typeof vi.fn>;
   };
   let accessControl: { hasPermission: ReturnType<typeof vi.fn> };
 
@@ -44,11 +46,17 @@ describe('PlatformTenantDetailPage', () => {
     api = {
       getTenantById: vi.fn(),
       activateTenant: vi.fn(),
-      suspendTenant: vi.fn()
+      suspendTenant: vi.fn(),
+      getEntitlementOptions: vi.fn(),
+      updateEntitlements: vi.fn()
     };
     accessControl = {
       hasPermission: vi.fn((permission: string) =>
-        [platformPermissions.tenantsActivate, platformPermissions.tenantsSuspend].includes(permission as typeof platformPermissions.tenantsActivate)
+        [
+          platformPermissions.tenantsActivate,
+          platformPermissions.tenantsSuspend,
+          platformPermissions.tenantsEntitlementsUpdate
+        ].includes(permission as typeof platformPermissions.tenantsActivate)
       )
     };
   });
@@ -72,8 +80,7 @@ describe('PlatformTenantDetailPage', () => {
     expect(text).toContain('Demo Tenant Alpha');
     expect(text).toContain('demo-alpha');
     expect(text).toContain('Professional');
-    expect(text).toContain('Offline Mode');
-    expect(text).toContain('Enabled');
+    expect(text).toContain('offline_operation_sync');
   });
 
   it('shows lifecycle buttons based on backend flags and permissions', async () => {
@@ -123,5 +130,135 @@ describe('PlatformTenantDetailPage', () => {
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain('Tenant detail could not be loaded');
     expect(text).toContain('Tenant detail failed safely');
+  });
+
+  it('hides edit entitlements button without platform.tenants.entitlements.update permission', async () => {
+    accessControl.hasPermission.mockImplementation((permission: string) =>
+      permission !== platformPermissions.tenantsEntitlementsUpdate
+    );
+    api.getTenantById.mockReturnValue(of(createTenantDetail({ canManageEntitlements: true })));
+
+    const fixture = await createComponent();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('Edit Entitlements');
+  });
+
+  it('loads entitlement options when the editor opens', async () => {
+    api.getTenantById.mockReturnValue(of(createTenantDetail()));
+    api.getEntitlementOptions.mockReturnValue(of(createTenantEntitlementOptions()));
+
+    const fixture = await createComponent();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const editButton = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('Edit Entitlements')
+    );
+    editButton?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(api.getEntitlementOptions).toHaveBeenCalledWith('tenant-1');
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Offline Operation Sync');
+  });
+
+  it('preselects current enabled features in the editor', async () => {
+    api.getTenantById.mockReturnValue(of(createTenantDetail()));
+    api.getEntitlementOptions.mockReturnValue(of(createTenantEntitlementOptions()));
+
+    const fixture = await createComponent();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    fixture.componentInstance.openEntitlementEditor();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.selectedFeatureIds()).toEqual(['feature-offline']);
+    expect(fixture.componentInstance.selectedPlanId()).toBe('plan-1');
+  });
+
+  it('constrains available features when the selected plan changes', async () => {
+    api.getTenantById.mockReturnValue(of(createTenantDetail()));
+    api.getEntitlementOptions.mockReturnValue(
+      of(
+        createTenantEntitlementOptions({
+          enabledFeatureIds: ['feature-offline', 'feature-online'],
+          enabledFeatureCodes: ['offline_operation_sync', 'online_store']
+        })
+      )
+    );
+
+    const fixture = await createComponent();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    fixture.componentInstance.openEntitlementEditor();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    fixture.componentInstance.onPlanChange('plan-2');
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.selectedFeatureIds()).toEqual(['feature-offline']);
+    const onlineCheckbox = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('input[type="checkbox"]')
+    ).find((input) => input.closest('li')?.textContent?.includes('Online Store')) as HTMLInputElement | undefined;
+    expect(onlineCheckbox?.disabled).toBe(true);
+  });
+
+  it('calls PUT entitlements with subscriptionPlanId and enabled feature arrays', async () => {
+    api.getTenantById.mockReturnValue(of(createTenantDetail()));
+    api.getEntitlementOptions.mockReturnValue(of(createTenantEntitlementOptions()));
+    api.updateEntitlements.mockReturnValue(
+      of(
+        createTenantDetail({
+          enabledFeatureIds: ['feature-offline', 'feature-online'],
+          enabledFeatureCodes: ['offline_operation_sync', 'online_store']
+        })
+      )
+    );
+
+    const fixture = await createComponent();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    fixture.componentInstance.openEntitlementEditor();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    fixture.componentInstance.selectedFeatureIds.set(['feature-offline', 'feature-online']);
+    fixture.componentInstance.saveEntitlements();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(api.updateEntitlements).toHaveBeenCalledWith('tenant-1', {
+      subscriptionPlanId: 'plan-1',
+      enabledFeatureIds: ['feature-offline', 'feature-online'],
+      enabledFeatureCodes: ['offline_operation_sync', 'online_store']
+    });
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Tenant entitlements updated successfully.');
+  });
+
+  it('shows entitlement editor loading and error states', async () => {
+    api.getTenantById.mockReturnValue(of(createTenantDetail()));
+    api.getEntitlementOptions.mockReturnValueOnce(new Subject().asObservable());
+
+    const fixture = await createComponent();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    fixture.componentInstance.openEntitlementEditor();
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Loading entitlement options');
+
+    api.getEntitlementOptions.mockReturnValueOnce(throwError(() => new Error('options failed')));
+    fixture.componentInstance.openEntitlementEditor();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Entitlement options could not be loaded');
   });
 });
