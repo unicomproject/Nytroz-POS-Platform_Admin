@@ -18,7 +18,7 @@ export const apiEndpoints = {
     features: '/features',
     auditLogs: '/platform/audit-logs',
     users: '/platform-admin/users',
-    settings: '/platform/settings'
+    settings: '/platform-admin/settings'
   },
   tenant: {
     users: '/users',
