@@ -58,6 +58,13 @@ export const platformMenuConfig: MenuSectionConfig[] = [
         requiredPermission: platformPermissions.subscriptionPlansView
       },
       {
+        label: 'Modules & Features',
+        path: '/admin/modules',
+        requiresTenant: false,
+        icon: 'roles',
+        requiredPermission: platformPermissions.modulesView
+      },
+      {
         label: 'Outlets',
         path: '/admin/outlets',
         requiresTenant: false,

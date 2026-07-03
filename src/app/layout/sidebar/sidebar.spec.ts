@@ -88,7 +88,7 @@ describe('Sidebar', () => {
     expect(subscriptionsLink?.classList.contains('active')).toBe(true);
   });
 
-  it('renders all 13 platform sidebar menu items', async () => {
+  it('renders all 14 platform sidebar menu items', async () => {
     await TestBed.configureTestingModule({
       imports: [Sidebar],
       providers: [
@@ -104,7 +104,10 @@ describe('Sidebar', () => {
     fixture.detectChanges();
 
     const menuItems = (fixture.nativeElement as HTMLElement).querySelectorAll('a.menu-item');
-    expect(menuItems.length).toBe(13);
+    expect(menuItems.length).toBe(14);
+
+    const modulesLink = [...menuItems].find((link) => link.textContent?.includes('Modules & Features'));
+    expect(modulesLink?.getAttribute('href')).toBe('/admin/modules');
 
     const alertsLink = [...menuItems].find((link) => link.textContent?.includes('Alerts Center'));
     expect(alertsLink).toBeTruthy();
