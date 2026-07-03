@@ -6,12 +6,21 @@ import { apiEndpoints } from '../../../core/config/api-endpoints';
 import { appSettings } from '../../../core/config/app-settings';
 import { ApiResponse } from '../../../core/models/api-response.model';
 import {
+  mapAssignPlatformUserRolesRequest,
+  mapCreatePlatformUserRequest,
   mapPlatformUserDetail,
   mapPlatformUserListResponse,
+  mapUpdatePlatformUserRequest,
   PlatformUserDetailApiDto,
   PlatformUserListResponseApiDto
 } from '../mappers/platform-user.mapper';
-import { PlatformUserDetail, PlatformUserListResponse } from '../models/platform-user.model';
+import {
+  AssignPlatformUserRolesRequest,
+  CreatePlatformUserRequest,
+  PlatformUserDetail,
+  PlatformUserListResponse,
+  UpdatePlatformUserRequest
+} from '../models/platform-user.model';
 
 @Injectable({ providedIn: 'root' })
 export class PlatformUserApiService {
@@ -28,6 +37,30 @@ export class PlatformUserApiService {
   getUserById(userId: string): Observable<PlatformUserDetail> {
     return this.http
       .get<ApiResponse<PlatformUserDetailApiDto>>(`${this.baseUrl}/${userId}`)
+      .pipe(map((response) => mapPlatformUserDetail(response.data)));
+  }
+
+  createUser(request: CreatePlatformUserRequest): Observable<PlatformUserDetail> {
+    return this.http
+      .post<ApiResponse<PlatformUserDetailApiDto>>(this.baseUrl, mapCreatePlatformUserRequest(request))
+      .pipe(map((response) => mapPlatformUserDetail(response.data)));
+  }
+
+  updateUser(userId: string, request: UpdatePlatformUserRequest): Observable<PlatformUserDetail> {
+    return this.http
+      .put<ApiResponse<PlatformUserDetailApiDto>>(
+        `${this.baseUrl}/${userId}`,
+        mapUpdatePlatformUserRequest(request)
+      )
+      .pipe(map((response) => mapPlatformUserDetail(response.data)));
+  }
+
+  assignRoles(userId: string, request: AssignPlatformUserRolesRequest): Observable<PlatformUserDetail> {
+    return this.http
+      .put<ApiResponse<PlatformUserDetailApiDto>>(
+        `${this.baseUrl}/${userId}/roles`,
+        mapAssignPlatformUserRolesRequest(request)
+      )
       .pipe(map((response) => mapPlatformUserDetail(response.data)));
   }
 }
