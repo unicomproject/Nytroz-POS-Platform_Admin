@@ -16,7 +16,7 @@ export const apiEndpoints = {
     modulesCatalog: '/platform-admin/catalog/modules',
     subscriptionPlans: '/platform/subscription-plans',
     features: '/features',
-    auditLogs: '/platform/audit-logs',
+    auditLogs: '/platform-admin/audit-logs',
     users: '/platform-admin/users',
     settings: '/platform-admin/settings'
   },
