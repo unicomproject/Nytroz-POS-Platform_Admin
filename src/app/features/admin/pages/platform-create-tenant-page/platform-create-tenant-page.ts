@@ -1,5 +1,5 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
-import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Component, inject, OnInit, signal } from '@angular/core';
+import { AbstractControl, FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 
 import { ApiErrorService } from '../../../../core/services/api-error.service';
@@ -12,6 +12,12 @@ import {
   TenantCreateWizardState
 } from '../../models/platform-tenant-create.model';
 import { PlatformTenantApiService } from '../../services/platform-tenant-api.service';
+import {
+  controlIssueMessage,
+  controlValidationMessage,
+  isoCountryCodeValidator,
+  isoCurrencyCodeValidator
+} from '../../validators/platform-tenant-create.validators';
 
 type WizardStep =
   | 'business-info'
@@ -42,6 +48,9 @@ type WizardStep =
           <li [class.active]="currentStep() === step.key" [class.done]="stepIndex(currentStep()) > index">
             <span class="step-num">{{ index + 1 }}</span>
             <span class="step-label">{{ step.label }}</span>
+            @if (stepErrorCount(step.key) > 0) {
+              <span class="step-errors">{{ stepErrorCount(step.key) }}</span>
+            }
           </li>
         }
       </ol>
@@ -59,15 +68,31 @@ type WizardStep =
                 <label><span>Legal Name</span><input formControlName="legalName" /></label>
                 <label><span>Registration Number</span><input formControlName="registrationNumber" /></label>
                 <label><span>Tax Number</span><input formControlName="taxNumber" /></label>
-                <label><span>Country Code *</span><input formControlName="countryCode" /></label>
+                <label>
+                  <span>Country *</span>
+                  <select formControlName="countryCode">
+                    <option value="">Select country</option>
+                    @for (item of createOptions().countryCodes; track item.value) {
+                      <option [value]="item.value">{{ item.label }}</option>
+                    }
+                  </select>
+                  @if (countryOptionsLoadError()) {
+                    <small class="error">{{ countryOptionsLoadError() }}</small>
+                  } @else if (fieldMessage(businessInfoForm.controls.countryCode, 'Country')) {
+                    <small class="error">{{ fieldMessage(businessInfoForm.controls.countryCode, 'Country') }}</small>
+                  }
+                </label>
                 <label>
                   <span>Currency *</span>
                   <select formControlName="baseCurrency">
-                    <option value="">Select</option>
+                    <option value="">Select currency</option>
                     @for (item of createOptions().currencies; track item.value) {
                       <option [value]="item.value">{{ item.label }}</option>
                     }
                   </select>
+                  @if (fieldMessage(businessInfoForm.controls.baseCurrency, 'Currency')) {
+                    <small class="error">{{ fieldMessage(businessInfoForm.controls.baseCurrency, 'Currency') }}</small>
+                  }
                 </label>
                 <label>
                   <span>Timezone *</span>
@@ -104,6 +129,20 @@ type WizardStep =
                       <option [value]="item.value">{{ item.label }}</option>
                     }
                   </select>
+                </label>
+                <label><span>Address Line 1</span><input formControlName="addressLine1" /></label>
+                <label><span>City</span><input formControlName="addressCity" /></label>
+                <label>
+                  <span>Address Country</span>
+                  <select formControlName="addressCountryCode">
+                    <option value="">Same as business country</option>
+                    @for (item of createOptions().countryCodes; track item.value) {
+                      <option [value]="item.value">{{ item.label }}</option>
+                    }
+                  </select>
+                  @if (fieldMessage(businessInfoForm.controls.addressCountryCode, 'Address country')) {
+                    <small class="error">{{ fieldMessage(businessInfoForm.controls.addressCountryCode, 'Address country') }}</small>
+                  }
                 </label>
               </form>
             }
@@ -215,13 +254,16 @@ type WizardStep =
               <header class="step-header"><h2>Billing & Subscription</h2></header>
               <form [formGroup]="billingSubscriptionForm" class="grid two">
                 <label>
-                  <span>Billing Mode *</span>
-                  <select formControlName="billingMode">
+                  <span>Billing Status *</span>
+                  <select formControlName="billingStatus">
                     <option value="">Select</option>
-                    @for (item of createOptions().billingModes; track item.value) {
+                    @for (item of createOptions().billingStatuses; track item.value) {
                       <option [value]="item.value">{{ item.label }}</option>
                     }
                   </select>
+                  @if (fieldMessage(billingSubscriptionForm.controls.billingStatus, 'Billing status')) {
+                    <small class="error">{{ fieldMessage(billingSubscriptionForm.controls.billingStatus, 'Billing status') }}</small>
+                  }
                 </label>
                 <label>
                   <span>Billing Cycle *</span>
@@ -242,7 +284,15 @@ type WizardStep =
                   </select>
                 </label>
                 <label><span>Invoice Email</span><input formControlName="invoiceEmail" /></label>
-                <label><span>Payment Method</span><input formControlName="paymentMethod" /></label>
+                <label>
+                  <span>Payment Method</span>
+                  <select formControlName="paymentMethod">
+                    <option value="">Select</option>
+                    @for (item of createOptions().paymentMethods; track item.value) {
+                      <option [value]="item.value">{{ item.label }}</option>
+                    }
+                  </select>
+                </label>
                 <label class="full"><span>Notes</span><textarea rows="3" formControlName="notes"></textarea></label>
                 <label class="checkbox"><input type="checkbox" formControlName="autoRenew" /><span>Auto renew</span></label>
                 <label class="checkbox"><input type="checkbox" formControlName="createDraftInvoice" /><span>Create draft invoice</span></label>
@@ -251,12 +301,23 @@ type WizardStep =
 
             @case ('review-create') {
               <header class="step-header"><h2>Review & Create</h2></header>
+              @if (validationSummary().length) {
+                <div class="validation-summary" role="alert">
+                  <strong>Fix the following before creating:</strong>
+                  <ul>
+                    @for (item of validationSummary(); track $index) {
+                      <li>{{ item }}</li>
+                    }
+                  </ul>
+                </div>
+              }
               <dl class="review-list">
                 <div><dt>Tenant</dt><dd>{{ businessInfoForm.controls.name.value || '—' }}</dd></div>
                 <div><dt>Code</dt><dd>{{ businessInfoForm.controls.code.value || '—' }}</dd></div>
                 <div><dt>Plan</dt><dd>{{ selectedPlan()?.name || '—' }}</dd></div>
                 <div><dt>Features</dt><dd>{{ selectedFeatureIds().length }}</dd></div>
                 <div><dt>Admin Email</dt><dd>{{ tenantAdminForm.controls.email.value || '—' }}</dd></div>
+                <div><dt>Billing Status</dt><dd>{{ billingSubscriptionForm.controls.billingStatus.value || '—' }}</dd></div>
                 <div><dt>Subscription Status</dt><dd>{{ billingSubscriptionForm.controls.subscriptionStatus.value || '—' }}</dd></div>
               </dl>
             }
@@ -267,9 +328,9 @@ type WizardStep =
       <footer class="action-bar">
         <button type="button" class="btn outline" (click)="goBack()" [disabled]="isSaving()">Back</button>
         @if (currentStep() !== 'review-create') {
-          <button type="button" class="btn primary" (click)="nextStep()" [disabled]="isSaving() || isLoadingOptions()">Next</button>
+          <button type="button" class="btn primary" (click)="nextStep()" [disabled]="isSaving() || isLoadingOptions() || !isCurrentStepValid()">Next</button>
         } @else {
-          <button type="button" class="btn primary" (click)="createTenant()" [disabled]="isSaving() || isLoadingOptions()">
+          <button type="button" class="btn primary" (click)="createTenant()" [disabled]="isSaving() || isLoadingOptions() || !canCreateTenant()">
             {{ isSaving() ? 'Creating...' : 'Create Tenant' }}
           </button>
         }
@@ -285,6 +346,7 @@ type WizardStep =
     .stepper { display: flex; list-style: none; margin: 0; padding: 0; gap: 0.35rem; flex-wrap: wrap; }
     .stepper li { align-items: center; color: #667085; display: inline-flex; gap: 0.45rem; }
     .stepper li.done, .stepper li.active { color: #0b5cff; font-weight: 600; }
+    .step-errors { background: #fef3f2; border-radius: 999px; color: #b42318; font-size: 0.72rem; font-weight: 700; padding: 0.1rem 0.45rem; }
     .step-num { align-items: center; background: #f2f4f7; border-radius: 50%; display: inline-flex; height: 1.6rem; justify-content: center; width: 1.6rem; font-size: 0.75rem; }
     .stepper li.done .step-num, .stepper li.active .step-num { background: #0b5cff; color: #fff; }
     .card { background: #fff; border: 1px solid #eaecf0; border-radius: 14px; padding: 1rem; }
@@ -310,6 +372,8 @@ type WizardStep =
     .feature-group li { border: 1px solid #eaecf0; border-radius: 8px; padding: 0.45rem 0.65rem; }
     .feature-group li.disabled { opacity: 0.55; }
     .feature-group small { color: #667085; margin-left: 0.35rem; }
+    .validation-summary { background: #fffaeb; border: 1px solid #fedf89; border-radius: 10px; margin-bottom: 0.85rem; padding: 0.75rem 0.9rem; }
+    .validation-summary ul { margin: 0.45rem 0 0; padding-left: 1.1rem; }
     .review-list { display: grid; gap: 0.5rem; margin: 0; }
     .review-list div { display: grid; grid-template-columns: 10rem 1fr; }
     .review-list dt { color: #667085; }
@@ -348,7 +412,9 @@ export class PlatformCreateTenantPage implements OnInit {
     plans: [],
     addons: [],
     catalogModules: [],
-    billingModes: [],
+    billingStatuses: [],
+    paymentMethods: [],
+    countryCodes: [],
     currencies: [],
     timezones: [],
     locales: [],
@@ -362,6 +428,7 @@ export class PlatformCreateTenantPage implements OnInit {
   readonly isLoadingOptions = signal(true);
   readonly isSaving = signal(false);
   readonly errorMessage = signal<string | null>(null);
+  readonly countryOptionsLoadError = signal<string | null>(null);
 
   readonly businessInfoForm = this.fb.nonNullable.group({
     code: ['', Validators.required],
@@ -369,12 +436,15 @@ export class PlatformCreateTenantPage implements OnInit {
     legalName: [''],
     registrationNumber: [''],
     taxNumber: [''],
-    baseCurrency: ['', Validators.required],
+    baseCurrency: ['', [Validators.required, isoCurrencyCodeValidator()]],
     defaultTimezone: ['', Validators.required],
     defaultLocale: ['', Validators.required],
     operatingMode: ['', Validators.required],
     businessType: [''],
-    countryCode: ['', Validators.required]
+    countryCode: ['', [Validators.required, isoCountryCodeValidator()]],
+    addressLine1: [''],
+    addressCity: [''],
+    addressCountryCode: ['', isoCountryCodeValidator()]
   });
 
   readonly planSelectionForm = this.fb.nonNullable.group({
@@ -395,7 +465,7 @@ export class PlatformCreateTenantPage implements OnInit {
   });
 
   readonly billingSubscriptionForm = this.fb.nonNullable.group({
-    billingMode: ['', Validators.required],
+    billingStatus: ['', Validators.required],
     billingCycle: ['', Validators.required],
     subscriptionStatus: ['', Validators.required],
     createDraftInvoice: [false],
@@ -405,9 +475,10 @@ export class PlatformCreateTenantPage implements OnInit {
     notes: ['']
   });
 
-  readonly selectedPlan = computed<TenantCreatePlanOption | null>(() =>
-    this.createOptions().plans.find((plan) => plan.id === this.planSelectionForm.controls.subscriptionPlanId.value) ?? null
-  );
+  selectedPlan(): TenantCreatePlanOption | null {
+    const planId = this.planSelectionForm.controls.subscriptionPlanId.value;
+    return this.createOptions().plans.find((plan) => plan.id === planId) ?? null;
+  }
 
   ngOnInit(): void {
     this.loadCreateOptions();
@@ -498,7 +569,7 @@ export class PlatformCreateTenantPage implements OnInit {
   }
 
   createTenant(): void {
-    if (!this.validateCurrentStep()) {
+    if (!this.validateAllSteps()) {
       return;
     }
 
@@ -513,10 +584,31 @@ export class PlatformCreateTenantPage implements OnInit {
         void this.router.navigate(['/admin/tenants', tenant.id]);
       },
       error: (error) => {
+        this.applyServerFieldErrors(error);
         this.errorMessage.set(this.apiError.toSafeMessage(error));
         this.isSaving.set(false);
       }
     });
+  }
+
+  fieldMessage(control: AbstractControl, label: string): string | null {
+    return controlValidationMessage(control, label);
+  }
+
+  stepErrorCount(step: WizardStep): number {
+    return this.collectStepIssues(step).length;
+  }
+
+  isCurrentStepValid(): boolean {
+    return this.collectStepIssues(this.currentStep()).length === 0;
+  }
+
+  canCreateTenant(): boolean {
+    return this.steps.every((step) => this.collectStepIssues(step.key).length === 0);
+  }
+
+  validationSummary(): string[] {
+    return this.steps.flatMap((step) => this.collectStepIssues(step.key));
   }
 
   private validateCurrentStep(): boolean {
@@ -565,27 +657,143 @@ export class PlatformCreateTenantPage implements OnInit {
       return this.billingSubscriptionForm.valid;
     }
 
+    if (step === 'review-create') {
+      return this.validateAllSteps();
+    }
+
     return true;
+  }
+
+  private validateAllSteps(): boolean {
+    this.businessInfoForm.markAllAsTouched();
+    this.planSelectionForm.markAllAsTouched();
+    this.limitsAddonsForm.markAllAsTouched();
+    this.tenantAdminForm.markAllAsTouched();
+    this.billingSubscriptionForm.markAllAsTouched();
+
+    const issues = this.validationSummary();
+    if (issues.length) {
+      this.errorMessage.set('Please fix validation issues before creating the tenant.');
+      return false;
+    }
+
+    return true;
+  }
+
+  private collectStepIssues(step: WizardStep): string[] {
+    const issues: string[] = [];
+
+    if (step === 'business-info') {
+      if (this.countryOptionsLoadError()) {
+        issues.push(this.countryOptionsLoadError()!);
+      }
+
+      this.pushControlIssue(issues, this.businessInfoForm.controls.code, 'Tenant code');
+      this.pushControlIssue(issues, this.businessInfoForm.controls.name, 'Business name');
+      this.pushControlIssue(issues, this.businessInfoForm.controls.countryCode, 'Country');
+      this.pushControlIssue(issues, this.businessInfoForm.controls.baseCurrency, 'Currency');
+      this.pushControlIssue(issues, this.businessInfoForm.controls.defaultTimezone, 'Timezone');
+      this.pushControlIssue(issues, this.businessInfoForm.controls.defaultLocale, 'Locale');
+      this.pushControlIssue(issues, this.businessInfoForm.controls.operatingMode, 'Operating mode');
+      this.pushControlIssue(issues, this.businessInfoForm.controls.addressCountryCode, 'Address country');
+      return issues;
+    }
+
+    if (step === 'plan-selection' && this.planSelectionForm.invalid) {
+      issues.push('Subscription plan is required.');
+    }
+
+    if (step === 'limits-addons') {
+      this.pushControlIssue(issues, this.limitsAddonsForm.controls.maxOutlets, 'Max outlets');
+      this.pushControlIssue(issues, this.limitsAddonsForm.controls.maxTills, 'Max tills');
+      this.pushControlIssue(issues, this.limitsAddonsForm.controls.maxUsers, 'Max users');
+    }
+
+    if (step === 'feature-entitlements') {
+      if (!this.selectedPlan()) {
+        issues.push('Select a plan before configuring features.');
+      } else if (!this.selectedFeatureIds().length) {
+        issues.push('Select at least one allowed feature.');
+      }
+    }
+
+    if (step === 'tenant-admin') {
+      this.pushControlIssue(issues, this.tenantAdminForm.controls.firstName, 'First name');
+      this.pushControlIssue(issues, this.tenantAdminForm.controls.email, 'Admin email');
+    }
+
+    if (step === 'billing-subscription') {
+      this.pushControlIssue(issues, this.billingSubscriptionForm.controls.billingStatus, 'Billing status');
+      this.pushControlIssue(issues, this.billingSubscriptionForm.controls.billingCycle, 'Billing cycle');
+      this.pushControlIssue(issues, this.billingSubscriptionForm.controls.subscriptionStatus, 'Subscription status');
+      this.pushControlIssue(issues, this.billingSubscriptionForm.controls.invoiceEmail, 'Invoice email');
+    }
+
+    return issues;
+  }
+
+  private pushControlIssue(issues: string[], control: AbstractControl | null, label: string): void {
+    const message = controlIssueMessage(control, label);
+    if (message) {
+      issues.push(message);
+    }
+  }
+
+  private applyServerFieldErrors(error: unknown): void {
+    this.apiError.applyFieldErrors(this.apiError.toFieldErrors(error), {
+      countryCode: this.businessInfoForm.controls.countryCode,
+      'address.countryCode': this.businessInfoForm.controls.addressCountryCode,
+      baseCurrency: this.businessInfoForm.controls.baseCurrency,
+      billingStatus: this.billingSubscriptionForm.controls.billingStatus,
+      'subscription.subscriptionStatus': this.billingSubscriptionForm.controls.subscriptionStatus,
+      'subscription.paymentMethod': this.billingSubscriptionForm.controls.paymentMethod,
+      'tenantAdmin.email': this.tenantAdminForm.controls.email
+    });
   }
 
   private loadCreateOptions(): void {
     this.isLoadingOptions.set(true);
+    this.countryOptionsLoadError.set(null);
+    this.businessInfoForm.controls.countryCode.disable({ emitEvent: false });
+    this.businessInfoForm.controls.addressCountryCode.disable({ emitEvent: false });
     this.api.getCreateOptions().subscribe({
       next: (options) => {
         this.createOptions.set(options);
         this.applyLookupDefaults(options);
+        this.syncCountryControlState(options);
         this.isLoadingOptions.set(false);
       },
       error: (error) => {
+        this.countryOptionsLoadError.set('Country list could not be loaded. Please retry.');
         this.errorMessage.set(this.apiError.toSafeMessage(error));
+        this.businessInfoForm.controls.countryCode.disable({ emitEvent: false });
+        this.businessInfoForm.controls.addressCountryCode.disable({ emitEvent: false });
         this.isLoadingOptions.set(false);
       }
     });
   }
 
+  private syncCountryControlState(options: TenantCreateOptions): void {
+    if (options.countryCodes.length === 0) {
+      this.countryOptionsLoadError.set('Country list could not be loaded. Please retry.');
+      this.businessInfoForm.controls.countryCode.disable({ emitEvent: false });
+      this.businessInfoForm.controls.addressCountryCode.disable({ emitEvent: false });
+      return;
+    }
+
+    this.countryOptionsLoadError.set(null);
+    this.businessInfoForm.controls.countryCode.enable({ emitEvent: false });
+    this.businessInfoForm.controls.addressCountryCode.enable({ emitEvent: false });
+  }
+
   private applyLookupDefaults(options: TenantCreateOptions): void {
+    const defaultCountryCode = this.resolveDefaultCountryCode(options);
+    const defaultCurrency = this.resolveDefaultCurrency(options);
+
     this.businessInfoForm.patchValue({
-      baseCurrency: this.businessInfoForm.controls.baseCurrency.value || options.currencies[0]?.value || '',
+      countryCode: this.businessInfoForm.controls.countryCode.value || defaultCountryCode,
+      addressCountryCode: this.businessInfoForm.controls.addressCountryCode.value || defaultCountryCode,
+      baseCurrency: this.businessInfoForm.controls.baseCurrency.value || defaultCurrency,
       defaultTimezone: this.businessInfoForm.controls.defaultTimezone.value || options.timezones[0]?.value || '',
       defaultLocale: this.businessInfoForm.controls.defaultLocale.value || options.locales[0]?.value || '',
       operatingMode: this.businessInfoForm.controls.operatingMode.value || options.operatingModes[0]?.value || '',
@@ -593,11 +801,34 @@ export class PlatformCreateTenantPage implements OnInit {
     });
 
     this.billingSubscriptionForm.patchValue({
-      billingMode: this.billingSubscriptionForm.controls.billingMode.value || options.billingModes[0]?.value || '',
+      billingStatus: this.billingSubscriptionForm.controls.billingStatus.value || options.billingStatuses[0]?.value || '',
       billingCycle: this.billingSubscriptionForm.controls.billingCycle.value || options.billingCycles[0]?.value || '',
       subscriptionStatus:
-        this.billingSubscriptionForm.controls.subscriptionStatus.value || options.subscriptionStatuses[0]?.value || ''
+        this.billingSubscriptionForm.controls.subscriptionStatus.value || options.subscriptionStatuses[0]?.value || '',
+      paymentMethod: this.billingSubscriptionForm.controls.paymentMethod.value || options.paymentMethods[0]?.value || ''
     });
+  }
+
+  private resolveDefaultCountryCode(options: TenantCreateOptions): string {
+    if (options.countryCodes.length === 1) {
+      return options.countryCodes[0].value;
+    }
+
+    const sriLanka = options.countryCodes.find((item) => item.value === 'LK');
+    return sriLanka?.value ?? options.countryCodes[0]?.value ?? '';
+  }
+
+  private resolveDefaultCurrency(options: TenantCreateOptions): string {
+    const lkr = options.currencies.find((item) => item.value === 'LKR');
+    if (lkr) {
+      return lkr.value;
+    }
+
+    if (options.currencies.length === 1) {
+      return options.currencies[0].value;
+    }
+
+    return options.currencies[0]?.value ?? '';
   }
 
   private applyPlanDefaults(): void {

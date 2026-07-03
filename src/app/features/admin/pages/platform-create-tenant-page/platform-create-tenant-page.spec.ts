@@ -25,7 +25,30 @@ describe('PlatformCreateTenantPage', () => {
       providers: [
         provideRouter([]),
         { provide: PlatformTenantApiService, useValue: api },
-        { provide: ApiErrorService, useValue: { toSafeMessage: () => 'Create tenant failed safely' } }
+        {
+          provide: ApiErrorService,
+          useValue: {
+            toSafeMessage: (error: unknown) => {
+              const body = (error as { error?: { message?: string } })?.error;
+              return body?.message ?? 'Create tenant failed safely';
+            },
+            toFieldErrors: (error: unknown) => (error as { error?: { errors?: { field: string; message: string }[] } })?.error?.errors ?? [],
+            applyFieldErrors: (
+              fieldErrors: { field: string; message: string }[],
+              controlsByField: Record<string, { setErrors: (errors: Record<string, string>) => void; markAsTouched: () => void } | null | undefined>
+            ) => {
+              for (const item of fieldErrors) {
+                const control = controlsByField[item.field];
+                if (!control) {
+                  continue;
+                }
+
+                control.setErrors({ server: item.message });
+                control.markAsTouched();
+              }
+            }
+          }
+        }
       ]
     }).compileComponents();
 
@@ -44,7 +67,14 @@ describe('PlatformCreateTenantPage', () => {
       code: 'TEN-NEW',
       name: 'New Tenant',
       legalName: 'New Tenant Legal',
-      countryCode: 'LK'
+      countryCode: 'LK',
+      addressLine1: '123 Main Street',
+      addressCity: 'Colombo',
+      addressCountryCode: 'LK',
+      baseCurrency: 'LKR',
+      defaultTimezone: 'Asia/Colombo',
+      defaultLocale: 'en-LK',
+      operatingMode: 'unified_epos'
     });
   }
 
@@ -59,7 +89,7 @@ describe('PlatformCreateTenantPage', () => {
 
   function fillBilling(component: PlatformCreateTenantPage): void {
     component.billingSubscriptionForm.patchValue({
-      billingMode: 'manual',
+      billingStatus: 'pending',
       billingCycle: 'monthly',
       subscriptionStatus: 'trial',
       createDraftInvoice: true,
@@ -68,6 +98,16 @@ describe('PlatformCreateTenantPage', () => {
       paymentMethod: 'manual',
       notes: 'Create from wizard'
     });
+  }
+
+  function fillValidWizard(component: PlatformCreateTenantPage): void {
+    fillBusinessInfo(component);
+    component.selectPlan('plan-1');
+    component.limitsAddonsForm.patchValue({ maxOutlets: 5, maxTills: 10, maxUsers: 20 });
+    const feature = component.createOptions().catalogModules[0].features[0];
+    component.toggleFeature(feature, { target: { checked: true } } as unknown as Event);
+    fillTenantAdmin(component);
+    fillBilling(component);
   }
 
   it('renders all 7 wizard steps', () => {
@@ -89,7 +129,127 @@ describe('PlatformCreateTenantPage', () => {
 
     expect(api.getCreateOptions).toHaveBeenCalledOnce();
     expect(component.createOptions().plans.length).toBe(1);
-    expect(component.createOptions().billingModes[0]?.value).toBe('manual');
+    expect(component.createOptions().billingStatuses[0]?.value).toBe('pending');
+    expect(component.createOptions().paymentMethods[0]?.value).toBe('manual');
+    expect(component.createOptions().countryCodes[0]?.value).toBe('LK');
+    expect(component.createOptions().countryCodes[0]?.label).toBe('Sri Lanka');
+  });
+
+  it('renders countryCodes as dropdown options from create-options', () => {
+    const fixture = createFixture();
+    fixture.detectChanges();
+
+    const countrySelect = (fixture.nativeElement as HTMLElement).querySelector('select[formcontrolname="countryCode"]') as HTMLSelectElement;
+    const options = Array.from(countrySelect.options).map((option) => ({
+      value: option.value,
+      label: option.textContent?.trim() ?? ''
+    }));
+
+    expect(options.some((option) => option.value === 'LK' && option.label === 'Sri Lanka')).toBe(true);
+  });
+
+  it('auto-selects LK when only one country option exists', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+
+    expect(component.businessInfoForm.controls.countryCode.value).toBe('LK');
+    expect(component.businessInfoForm.controls.addressCountryCode.value).toBe('LK');
+    expect(component.businessInfoForm.controls.countryCode.disabled).toBe(false);
+    expect(component.businessInfoForm.controls.addressCountryCode.disabled).toBe(false);
+  });
+
+  it('shows country load error and disables Next when countryCodes is empty', () => {
+    api.getCreateOptions.mockReturnValueOnce(
+      of(createTenantCreateOptions({ countryCodes: [] }))
+    );
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    expect(component.countryOptionsLoadError()).toBe('Country list could not be loaded. Please retry.');
+    expect(component.isCurrentStepValid()).toBe(false);
+    const nextButton = (fixture.nativeElement as HTMLElement).querySelector('.action-bar .btn.primary') as HTMLButtonElement;
+    expect(nextButton.disabled).toBe(true);
+  });
+
+  it('enables country field after options load', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+
+    expect(component.businessInfoForm.controls.countryCode.disabled).toBe(false);
+    expect(component.countryOptionsLoadError()).toBeNull();
+  });
+
+  it('posts LK country and LKR currency values, not labels', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    fillValidWizard(component);
+    component.currentStep.set('review-create');
+
+    component.createTenant();
+    fixture.detectChanges();
+
+    expect(api.createTenant).toHaveBeenCalledWith(
+      expect.objectContaining({
+        countryCode: 'LK',
+        baseCurrency: 'LKR',
+        address: expect.objectContaining({ countryCode: 'LK' })
+      })
+    );
+  });
+
+  it('shows visible country validation error for invalid country code', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    component.businessInfoForm.patchValue({ countryCode: 'Sri Lanka' });
+    component.businessInfoForm.controls.countryCode.markAsTouched();
+    fixture.detectChanges();
+
+    expect(component.fieldMessage(component.businessInfoForm.controls.countryCode, 'Country')).toContain('2-letter ISO');
+    expect(component.isCurrentStepValid()).toBe(false);
+  });
+
+  it('disables Next when current step is invalid', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    expect(component.isCurrentStepValid()).toBe(false);
+    const nextButton = (fixture.nativeElement as HTMLElement).querySelector('.action-bar .btn.primary') as HTMLButtonElement;
+    expect(nextButton.disabled).toBe(true);
+  });
+
+  it('shows review validation summary when create is blocked', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    component.currentStep.set('review-create');
+    fixture.detectChanges();
+
+    expect(component.validationSummary().length).toBeGreaterThan(0);
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Fix the following before creating');
+  });
+
+  it('maps server validation errors to form fields', () => {
+    api.createTenant.mockReturnValueOnce(
+      throwError(() => ({
+        error: {
+          success: false,
+          message: 'One or more tenant create fields are invalid.',
+          errorCode: 'platform_tenants.validation_failed',
+          errors: [{ field: 'countryCode', message: 'Country must be a 2-letter ISO code (for example LK).' }]
+        }
+      }))
+    );
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    fillValidWizard(component);
+    component.currentStep.set('review-create');
+
+    component.createTenant();
+    fixture.detectChanges();
+
+    expect(component.fieldMessage(component.businessInfoForm.controls.countryCode, 'Country')).toContain('2-letter ISO');
+    expect(component.errorMessage()).toBe('One or more tenant create fields are invalid.');
   });
 
   it('validates each step before moving forward', () => {
@@ -160,7 +320,7 @@ describe('PlatformCreateTenantPage', () => {
     const component = fixture.componentInstance;
     component.currentStep.set('billing-subscription');
     component.billingSubscriptionForm.patchValue({
-      billingMode: '',
+      billingStatus: '',
       billingCycle: '',
       subscriptionStatus: ''
     });
@@ -175,14 +335,11 @@ describe('PlatformCreateTenantPage', () => {
   it('sends expected POST payload shape on create', () => {
     const fixture = createFixture();
     const component = fixture.componentInstance;
-    fillBusinessInfo(component);
-    component.selectPlan('plan-1');
+    fillValidWizard(component);
     component.limitsAddonsForm.patchValue({ maxOutlets: 6, maxTills: 10, maxUsers: 20 });
     component.setAddonQuantity(component.createOptions().addons[0], 2);
     const feature = component.createOptions().catalogModules[0].features[0];
     component.toggleFeature(feature, { target: { checked: true } } as unknown as Event);
-    fillTenantAdmin(component);
-    fillBilling(component);
     component.currentStep.set('review-create');
 
     component.createTenant();
@@ -205,8 +362,11 @@ describe('PlatformCreateTenantPage', () => {
         subscription: expect.objectContaining({
           billingCycle: 'monthly',
           subscriptionStatus: 'trial',
+          paymentMethod: 'manual',
           createDraftInvoice: true
-        })
+        }),
+        billingStatus: 'pending',
+        address: expect.objectContaining({ countryCode: 'LK' })
       })
     );
   });
@@ -214,13 +374,7 @@ describe('PlatformCreateTenantPage', () => {
   it('navigates to tenant detail on successful create', () => {
     const fixture = createFixture();
     const component = fixture.componentInstance;
-    fillBusinessInfo(component);
-    component.selectPlan('plan-1');
-    component.limitsAddonsForm.patchValue({ maxOutlets: 5, maxTills: 10, maxUsers: 20 });
-    const feature = component.createOptions().catalogModules[0].features[0];
-    component.toggleFeature(feature, { target: { checked: true } } as unknown as Event);
-    fillTenantAdmin(component);
-    fillBilling(component);
+    fillValidWizard(component);
     component.currentStep.set('review-create');
 
     component.createTenant();
@@ -229,17 +383,34 @@ describe('PlatformCreateTenantPage', () => {
     expect(router.navigate).toHaveBeenCalledWith(['/admin/tenants', 'tenant-123']);
   });
 
+  it('shows API error message when create fails with invalid billing status', () => {
+    api.createTenant.mockReturnValueOnce(throwError(() => ({
+      error: {
+        success: false,
+        message: 'One or more tenant create fields are invalid.',
+        errorCode: 'platform_tenants.validation_failed',
+        errors: [{ field: 'billingStatus', message: 'Billing status must be one of pending, paid, overdue, failed, or waived.' }]
+      }
+    })));
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    fillValidWizard(component);
+    component.billingSubscriptionForm.patchValue({ billingStatus: 'trial' });
+    component.currentStep.set('review-create');
+
+    component.createTenant();
+    fixture.detectChanges();
+
+    expect(api.createTenant).toHaveBeenCalledWith(expect.objectContaining({ billingStatus: 'trial' }));
+    expect(component.errorMessage()).toBe('One or more tenant create fields are invalid.');
+    expect(component.isSaving()).toBe(false);
+  });
+
   it('shows API error message when create fails', () => {
     api.createTenant.mockReturnValueOnce(throwError(() => new Error('network failed')));
     const fixture = createFixture();
     const component = fixture.componentInstance;
-    fillBusinessInfo(component);
-    component.selectPlan('plan-1');
-    component.limitsAddonsForm.patchValue({ maxOutlets: 5, maxTills: 10, maxUsers: 20 });
-    const feature = component.createOptions().catalogModules[0].features[0];
-    component.toggleFeature(feature, { target: { checked: true } } as unknown as Event);
-    fillTenantAdmin(component);
-    fillBilling(component);
+    fillValidWizard(component);
     component.currentStep.set('review-create');
 
     component.createTenant();

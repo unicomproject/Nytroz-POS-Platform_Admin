@@ -298,7 +298,9 @@ export function createTenantCreateOptionsApiDto(
         ]
       }
     ],
-    billingModes: [{ value: 'manual', label: 'Manual' }],
+    billingStatuses: [{ value: 'pending', label: 'Pending' }],
+    paymentMethods: [{ value: 'manual', label: 'Manual' }],
+    countryCodes: [{ code: 'LK', name: 'Sri Lanka' }],
     currencies: [{ value: 'LKR', label: 'LKR - Sri Lankan Rupee' }],
     timezones: [{ value: 'Asia/Colombo', label: 'Asia/Colombo' }],
     locales: [{ value: 'en-LK', label: 'English (Sri Lanka)' }],

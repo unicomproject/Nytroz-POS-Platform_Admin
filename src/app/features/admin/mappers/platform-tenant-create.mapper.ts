@@ -1,12 +1,20 @@
 import {
+  CreatePlatformTenantAddressRequest,
   CreatePlatformTenantRequest,
   TenantCreateOptions,
   TenantCreateWizardState
 } from '../models/platform-tenant-create.model';
 
+export interface TenantCreateCountryOptionApiDto {
+  code: string;
+  name: string;
+}
+
 export interface TenantCreateLookupOptionApiDto {
-  value: string;
-  label: string;
+  value?: string;
+  label?: string;
+  code?: string;
+  name?: string;
 }
 
 export interface TenantCreatePlanOptionApiDto {
@@ -57,7 +65,9 @@ export interface TenantCreateOptionsApiDto {
   plans: TenantCreatePlanOptionApiDto[];
   addons: TenantCreateAddonOptionApiDto[];
   catalogModules: TenantCreateCatalogModuleApiDto[];
-  billingModes: TenantCreateLookupOptionApiDto[];
+  billingStatuses: TenantCreateLookupOptionApiDto[];
+  paymentMethods: TenantCreateLookupOptionApiDto[];
+  countryCodes: TenantCreateCountryOptionApiDto[];
   currencies: TenantCreateLookupOptionApiDto[];
   timezones: TenantCreateLookupOptionApiDto[];
   locales: TenantCreateLookupOptionApiDto[];
@@ -72,7 +82,9 @@ export function mapCreateOptions(dto: TenantCreateOptionsApiDto | null | undefin
     plans: [],
     addons: [],
     catalogModules: [],
-    billingModes: [],
+    billingStatuses: [],
+    paymentMethods: [],
+    countryCodes: [],
     currencies: [],
     timezones: [],
     locales: [],
@@ -122,14 +134,16 @@ export function mapCreateOptions(dto: TenantCreateOptionsApiDto | null | undefin
         sortOrder: feature.sortOrder
       }))
     })),
-    billingModes: (data.billingModes ?? []).map((item) => ({ value: item.value, label: item.label })),
-    currencies: (data.currencies ?? []).map((item) => ({ value: item.value, label: item.label })),
-    timezones: (data.timezones ?? []).map((item) => ({ value: item.value, label: item.label })),
-    locales: (data.locales ?? []).map((item) => ({ value: item.value, label: item.label })),
-    businessTypes: (data.businessTypes ?? []).map((item) => ({ value: item.value, label: item.label })),
-    operatingModes: (data.operatingModes ?? []).map((item) => ({ value: item.value, label: item.label })),
-    subscriptionStatuses: (data.subscriptionStatuses ?? []).map((item) => ({ value: item.value, label: item.label })),
-    billingCycles: (data.billingCycles ?? []).map((item) => ({ value: item.value, label: item.label }))
+    billingStatuses: (data.billingStatuses ?? []).map((item) => mapLookupOption(item)),
+    paymentMethods: (data.paymentMethods ?? []).map((item) => mapLookupOption(item)),
+    countryCodes: (data.countryCodes ?? []).map((item) => mapCountryOption(item)),
+    currencies: (data.currencies ?? []).map((item) => mapLookupOption(item)),
+    timezones: (data.timezones ?? []).map((item) => mapLookupOption(item)),
+    locales: (data.locales ?? []).map((item) => mapLookupOption(item)),
+    businessTypes: (data.businessTypes ?? []).map((item) => mapLookupOption(item)),
+    operatingModes: (data.operatingModes ?? []).map((item) => mapLookupOption(item)),
+    subscriptionStatuses: (data.subscriptionStatuses ?? []).map((item) => mapLookupOption(item)),
+    billingCycles: (data.billingCycles ?? []).map((item) => mapLookupOption(item))
   };
 }
 
@@ -140,13 +154,14 @@ export function mapCreateTenantRequest(state: TenantCreateWizardState): CreatePl
     legalName: asValue(state.businessInfo.legalName),
     registrationNumber: asValue(state.businessInfo.registrationNumber),
     taxNumber: asValue(state.businessInfo.taxNumber),
-    baseCurrency: asValue(state.businessInfo.baseCurrency),
+    baseCurrency: asValue(state.businessInfo.baseCurrency)?.toUpperCase(),
     defaultTimezone: asValue(state.businessInfo.defaultTimezone),
     defaultLocale: asValue(state.businessInfo.defaultLocale),
     operatingMode: asValue(state.businessInfo.operatingMode),
     businessType: asValue(state.businessInfo.businessType),
-    countryCode: asValue(state.businessInfo.countryCode),
-    billingStatus: asValue(state.billingSubscription.subscriptionStatus),
+    countryCode: asValue(state.businessInfo.countryCode)?.toUpperCase(),
+    address: buildAddress(state.businessInfo),
+    billingStatus: asValue(state.billingSubscription.billingStatus),
     subscriptionPlanId: asValue(state.planSelection.subscriptionPlanId),
     limits: {
       maxOutlets: toOptionalNumber(state.limitsAddons.maxOutlets),
@@ -171,10 +186,37 @@ export function mapCreateTenantRequest(state: TenantCreateWizardState): CreatePl
       autoRenew: state.billingSubscription.autoRenew,
       createDraftInvoice: state.billingSubscription.createDraftInvoice,
       invoiceEmail: asValue(state.billingSubscription.invoiceEmail),
-      paymentMethod: asValue(state.billingSubscription.billingMode || state.billingSubscription.paymentMethod),
+      paymentMethod: asValue(state.billingSubscription.paymentMethod),
       notes: asValue(state.billingSubscription.notes)
     }
   };
+}
+
+function buildAddress(businessInfo: TenantCreateWizardState['businessInfo']): CreatePlatformTenantAddressRequest | undefined {
+  const line1 = asValue(businessInfo.addressLine1);
+  const city = asValue(businessInfo.addressCity);
+  const countryCode = asValue(businessInfo.addressCountryCode || businessInfo.countryCode)?.toUpperCase();
+
+  if (!line1 && !city && !countryCode) {
+    return undefined;
+  }
+
+  return { line1, city, countryCode };
+}
+
+function mapCountryOption(
+  item: TenantCreateCountryOptionApiDto | TenantCreateLookupOptionApiDto
+): { value: string; label: string } {
+  if ('code' in item && item.code) {
+    return { value: item.code.trim(), label: (item.name ?? item.code).trim() };
+  }
+
+  const lookup = item as TenantCreateLookupOptionApiDto;
+  return { value: (lookup.value ?? '').trim(), label: (lookup.label ?? lookup.value ?? '').trim() };
+}
+
+function mapLookupOption(item: TenantCreateLookupOptionApiDto): { value: string; label: string } {
+  return { value: item.value ?? '', label: item.label ?? item.value ?? '' };
 }
 
 function asValue(value: string | null | undefined): string | undefined {

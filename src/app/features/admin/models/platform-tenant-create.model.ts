@@ -51,7 +51,9 @@ export interface TenantCreateOptions {
   plans: TenantCreatePlanOption[];
   addons: TenantCreateAddonOption[];
   catalogModules: TenantCreateCatalogModule[];
-  billingModes: TenantCreateLookupOption[];
+  billingStatuses: TenantCreateLookupOption[];
+  paymentMethods: TenantCreateLookupOption[];
+  countryCodes: TenantCreateLookupOption[];
   currencies: TenantCreateLookupOption[];
   timezones: TenantCreateLookupOption[];
   locales: TenantCreateLookupOption[];
@@ -73,6 +75,9 @@ export interface TenantCreateBusinessInfoForm {
   operatingMode: string;
   businessType: string;
   countryCode: string;
+  addressLine1: string;
+  addressCity: string;
+  addressCountryCode: string;
 }
 
 export interface TenantCreatePlanSelectionForm {
@@ -104,7 +109,7 @@ export interface TenantCreateTenantAdminForm {
 }
 
 export interface TenantCreateBillingSubscriptionForm {
-  billingMode: string;
+  billingStatus: string;
   billingCycle: string;
   subscriptionStatus: string;
   createDraftInvoice: boolean;
