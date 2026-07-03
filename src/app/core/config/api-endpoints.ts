@@ -10,6 +10,7 @@ export const apiEndpoints = {
     permissionCatalogFlat: '/platform-admin/permission-catalog/flat',
     roles: '/platform-admin/roles',
     tenants: '/platform-admin/tenants',
+    tenantCreateOptions: '/platform-admin/tenants/create-options',
     tenantSummary: '/platform-admin/tenants/summary',
     tenantFilterOptions: '/platform-admin/tenants/filter-options',
     subscriptionPlans: '/platform/subscription-plans',
