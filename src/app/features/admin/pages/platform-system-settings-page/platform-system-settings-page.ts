@@ -1,7 +1,7 @@
 import { Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { forkJoin } from 'rxjs';
+import { catchError, of } from 'rxjs';
 
 import { platformPermissions } from '../../../../core/config/permission-keys';
 import { AccessControlService } from '../../../../core/services/access-control.service';
@@ -24,6 +24,8 @@ interface SettingsFormValue {
   defaultTimezone: string;
   defaultLocale: string;
 }
+
+const emptyCreateOptions: TenantCreateLookupOption[] = [];
 
 @Component({
   selector: 'app-platform-system-settings-page',
@@ -50,7 +52,7 @@ interface SettingsFormValue {
         <div class="state-card card error">
           <strong>Platform settings could not be loaded</strong>
           <span>{{ errorMessage() }}</span>
-          <button type="button" class="btn primary" (click)="loadPageData()">Try again</button>
+          <button type="button" class="btn primary" (click)="reloadPage()">Try again</button>
         </div>
       } @else {
         @if (successMessage()) {
@@ -95,7 +97,7 @@ interface SettingsFormValue {
                   <span class="field-label">Default Country <span class="required">*</span></span>
                   <select formControlName="defaultCountryCode">
                     <option value="">Select country</option>
-                    @for (item of countryOptions(); track item.value) {
+                    @for (item of countryOptions(); track $index) {
                       <option [value]="item.value">{{ item.label }}</option>
                     }
                   </select>
@@ -110,7 +112,7 @@ interface SettingsFormValue {
                   <span class="field-label">Default Currency <span class="required">*</span></span>
                   <select formControlName="defaultCurrencyCode">
                     <option value="">Select currency</option>
-                    @for (item of currencyOptions(); track item.value) {
+                    @for (item of currencyOptions(); track $index) {
                       <option [value]="item.value">{{ item.label }}</option>
                     }
                   </select>
@@ -123,7 +125,7 @@ interface SettingsFormValue {
                   <span class="field-label">Default Timezone <span class="required">*</span></span>
                   <select formControlName="defaultTimezone">
                     <option value="">Select timezone</option>
-                    @for (item of timezoneOptions(); track item.value) {
+                    @for (item of timezoneOptions(); track $index) {
                       <option [value]="item.value">{{ item.label }}</option>
                     }
                   </select>
@@ -136,7 +138,7 @@ interface SettingsFormValue {
                   <span class="field-label">Default Locale <span class="required">*</span></span>
                   <select formControlName="defaultLocale">
                     <option value="">Select locale</option>
-                    @for (item of localeOptions(); track item.value) {
+                    @for (item of localeOptions(); track $index) {
                       <option [value]="item.value">{{ item.label }}</option>
                     }
                   </select>
@@ -161,27 +163,27 @@ interface SettingsFormValue {
             <dl class="summary-list">
               <div>
                 <dt>Platform Display Name</dt>
-                <dd>{{ summaryValue(form.controls.platformDisplayName.value) }}</dd>
+                <dd>{{ summaryValue(formSnapshot().platformDisplayName) }}</dd>
               </div>
               <div>
                 <dt>Support Email</dt>
-                <dd>{{ summaryValue(form.controls.supportEmail.value) }}</dd>
+                <dd>{{ summaryValue(formSnapshot().supportEmail) }}</dd>
               </div>
               <div>
                 <dt>Default Country</dt>
-                <dd>{{ lookupLabel(countryOptions(), form.controls.defaultCountryCode.value) }}</dd>
+                <dd>{{ lookupLabel(countryOptions(), formSnapshot().defaultCountryCode) }}</dd>
               </div>
               <div>
                 <dt>Default Currency</dt>
-                <dd>{{ lookupLabel(currencyOptions(), form.controls.defaultCurrencyCode.value) }}</dd>
+                <dd>{{ lookupLabel(currencyOptions(), formSnapshot().defaultCurrencyCode) }}</dd>
               </div>
               <div>
                 <dt>Default Timezone</dt>
-                <dd>{{ lookupLabel(timezoneOptions(), form.controls.defaultTimezone.value) }}</dd>
+                <dd>{{ lookupLabel(timezoneOptions(), formSnapshot().defaultTimezone) }}</dd>
               </div>
               <div>
                 <dt>Default Locale</dt>
-                <dd>{{ lookupLabel(localeOptions(), form.controls.defaultLocale.value) }}</dd>
+                <dd>{{ lookupLabel(localeOptions(), formSnapshot().defaultLocale) }}</dd>
               </div>
             </dl>
           </aside>
@@ -498,6 +500,14 @@ export class PlatformSystemSettingsPage implements OnInit {
   readonly localeOptions = signal<TenantCreateLookupOption[]>([]);
 
   private readonly loadedSettings = signal<PlatformSettings | null>(null);
+  readonly formSnapshot = signal<SettingsFormValue>({
+    platformDisplayName: '',
+    supportEmail: '',
+    defaultCountryCode: '',
+    defaultCurrencyCode: '',
+    defaultTimezone: '',
+    defaultLocale: ''
+  });
 
   readonly form = this.fb.nonNullable.group({
     platformDisplayName: ['', Validators.required],
@@ -522,13 +532,20 @@ export class PlatformSystemSettingsPage implements OnInit {
   readonly canSave = computed(() => this.canUpdate() && this.isDirty() && !this.isSaving() && this.form.valid);
 
   ngOnInit(): void {
-    this.loadPageData();
+    this.syncFormSnapshot();
+    this.reloadPage();
     this.applyReadOnlyState();
 
     this.form.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+      this.syncFormSnapshot();
       this.saveError.set(null);
       this.successMessage.set(null);
     });
+  }
+
+  reloadPage(): void {
+    this.loadPageData();
+    this.loadCreateOptions();
   }
 
   loadPageData(): void {
@@ -536,19 +553,12 @@ export class PlatformSystemSettingsPage implements OnInit {
     this.errorMessage.set(null);
     this.successMessage.set(null);
 
-    forkJoin({
-      settings: this.settingsApi.getSettings(),
-      options: this.tenantApi.getCreateOptions()
-    })
+    this.settingsApi
+      .getSettings()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: ({ settings, options }) => {
+        next: (settings) => {
           this.loadedSettings.set(settings);
-          this.countryOptions.set(options.countryCodes);
-          this.currencyOptions.set(options.currencies);
-          this.timezoneOptions.set(options.timezones);
-          this.localeOptions.set(options.locales);
-          this.optionsError.set(options.countryCodes.length ? null : 'Lookup options could not be loaded.');
           this.patchFormFromSettings(settings);
           this.applyReadOnlyState();
           this.isLoading.set(false);
@@ -556,6 +566,38 @@ export class PlatformSystemSettingsPage implements OnInit {
         error: (error) => {
           this.errorMessage.set(this.apiErrorService.toSafeMessage(error));
           this.isLoading.set(false);
+        }
+      });
+  }
+
+  private loadCreateOptions(): void {
+    this.tenantApi
+      .getCreateOptions()
+      .pipe(
+        catchError(() => {
+          this.optionsError.set('Lookup options could not be loaded.');
+          return of(null);
+        }),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe((options) => {
+        if (!options) {
+          this.countryOptions.set(emptyCreateOptions);
+          this.currencyOptions.set(emptyCreateOptions);
+          this.timezoneOptions.set(emptyCreateOptions);
+          this.localeOptions.set(emptyCreateOptions);
+          return;
+        }
+
+        this.countryOptions.set(options.countryCodes ?? emptyCreateOptions);
+        this.currencyOptions.set(options.currencies ?? emptyCreateOptions);
+        this.timezoneOptions.set(options.timezones ?? emptyCreateOptions);
+        this.localeOptions.set(options.locales ?? emptyCreateOptions);
+
+        if (!options.countryCodes?.length) {
+          this.optionsError.set('Lookup options could not be loaded.');
+        } else {
+          this.optionsError.set(null);
         }
       });
   }
@@ -653,6 +695,11 @@ export class PlatformSystemSettingsPage implements OnInit {
       },
       { emitEvent: false }
     );
+    this.syncFormSnapshot();
+  }
+
+  private syncFormSnapshot(): void {
+    this.formSnapshot.set(this.form.getRawValue());
   }
 
   private toUpdateRequest(value: SettingsFormValue): UpdatePlatformSettingsRequest {

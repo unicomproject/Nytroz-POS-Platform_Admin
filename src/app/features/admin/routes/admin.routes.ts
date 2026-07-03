@@ -96,6 +96,11 @@ export const adminRoutes: Routes = [
     data: { title: 'Platform Reports', requiredPermission: platformPermissions.dashboardView }
   },
   {
+    path: 'settings',
+    pathMatch: 'full',
+    redirectTo: 'settings/system'
+  },
+  {
     path: 'settings/system',
     loadComponent: () =>
       import('../pages/platform-system-settings-page/platform-system-settings-page').then(

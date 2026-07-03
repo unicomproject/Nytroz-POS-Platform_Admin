@@ -198,4 +198,18 @@ describe('PlatformSystemSettingsPage', () => {
     expect(root.textContent).not.toContain('Save Changes');
     expect(fixture.componentInstance.form.disabled).toBe(true);
   });
+
+  it('renders settings when create-options fails', async () => {
+    settingsApi.getSettings.mockReturnValue(of(loadedSettings));
+    tenantApi.getCreateOptions.mockReturnValue(throwError(() => new Error('options failed')));
+
+    const fixture = await createComponent();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.textContent).toContain('General Platform Settings');
+    expect(root.textContent).toContain('SCS-TIX');
+    expect(root.textContent).toContain('Lookup options could not be loaded.');
+  });
 });
