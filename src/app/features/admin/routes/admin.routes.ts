@@ -97,7 +97,10 @@ export const adminRoutes: Routes = [
   },
   {
     path: 'settings/system',
-    loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
+    loadComponent: () =>
+      import('../pages/platform-system-settings-page/platform-system-settings-page').then(
+        (m) => m.PlatformSystemSettingsPage
+      ),
     data: { title: 'System Settings', requiredPermission: platformPermissions.settingsView }
   },
   {
