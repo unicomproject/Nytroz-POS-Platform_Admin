@@ -25,6 +25,8 @@ export interface PlatformTenantListItemApiDto {
   onlineStoreEnabled: boolean;
   clickCollectEnabled: boolean;
   offlineEnabled: boolean;
+  enabledFeatureIds?: string[];
+  enabledFeatureCodes?: string[];
   createdAt: string;
   updatedAt?: string | null;
 }
@@ -174,6 +176,8 @@ export function mapPlatformTenantDetail(dto: PlatformTenantDetailApiDto): Platfo
     onlineStoreEnabled: dto.onlineStoreEnabled,
     clickCollectEnabled: dto.clickCollectEnabled,
     offlineEnabled: dto.offlineEnabled,
+    enabledFeatureIds: (dto.enabledFeatureIds ?? []).map(String),
+    enabledFeatureCodes: dto.enabledFeatureCodes ?? [],
     subscription: dto.subscription
       ? {
           planId: String(dto.subscription.planId),

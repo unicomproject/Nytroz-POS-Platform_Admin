@@ -25,6 +25,11 @@ import {
   SubscriptionPlanListResponseApiDto
 } from '../features/admin/mappers/platform-subscription-plan.mapper';
 import { TenantCreateOptionsApiDto, mapCreateOptions } from '../features/admin/mappers/platform-tenant-create.mapper';
+import {
+  PlatformTenantEntitlementOptionsApiDto,
+  mapPlatformTenantEntitlementOptions
+} from '../features/admin/mappers/platform-tenant-entitlements.mapper';
+import { PlatformTenantEntitlementOptions } from '../features/admin/models/platform-tenant-entitlements.model';
 import { mapPlatformDashboard } from '../features/admin/mappers/platform-dashboard.mapper';
 import { mapPlatformTenantFilterOptions, mapPlatformTenantListResponse, mapPlatformTenantSummary, mapPlatformTenantDetail } from '../features/admin/mappers/platform-tenant.mapper';
 import { mapSubscriptionPlanListResponse } from '../features/admin/mappers/platform-subscription-plan.mapper';
@@ -132,6 +137,8 @@ export function createTenantListItemApiDto(
     onlineStoreEnabled: false,
     clickCollectEnabled: false,
     offlineEnabled: true,
+    enabledFeatureIds: ['feature-offline'],
+    enabledFeatureCodes: ['offline_operation_sync'],
     createdAt: '2026-06-01T00:00:00Z',
     updatedAt: '2026-06-12T00:00:00Z',
     ...overrides
@@ -416,6 +423,74 @@ export function createPlatformUserListResponse(
 ): PlatformUserListResponse {
   return {
     users: [createPlatformUserSummary()],
+    ...overrides
+  };
+}
+
+export function createTenantEntitlementOptionsApiDto(
+  overrides: Partial<PlatformTenantEntitlementOptionsApiDto> = {}
+): PlatformTenantEntitlementOptionsApiDto {
+  return {
+    tenantId: 'tenant-1',
+    currentSubscriptionPlanId: 'plan-1',
+    currentSubscriptionPlanCode: 'PRO',
+    currentSubscriptionPlanName: 'Professional',
+    enabledFeatureIds: ['feature-offline'],
+    enabledFeatureCodes: ['offline_operation_sync'],
+    plans: [
+      {
+        id: 'plan-1',
+        code: 'PRO',
+        name: 'Professional',
+        status: 'active',
+        includedFeatureIds: ['feature-offline', 'feature-online'],
+        includedFeatureCodes: ['offline_operation_sync', 'online_store']
+      },
+      {
+        id: 'plan-2',
+        code: 'STARTER',
+        name: 'Starter',
+        status: 'active',
+        includedFeatureIds: ['feature-offline'],
+        includedFeatureCodes: ['offline_operation_sync']
+      }
+    ],
+    catalogModules: [
+      {
+        id: 'module-core',
+        code: 'core',
+        name: 'Core POS',
+        features: [
+          {
+            id: 'feature-offline',
+            code: 'offline_operation_sync',
+            name: 'Offline Operation Sync',
+            description: 'Offline sync capability'
+          },
+          {
+            id: 'feature-online',
+            code: 'online_store',
+            name: 'Online Store',
+            description: 'Online storefront'
+          },
+          {
+            id: 'feature-click',
+            code: 'click_collect',
+            name: 'Click & Collect',
+            description: 'Click and collect orders'
+          }
+        ]
+      }
+    ],
+    ...overrides
+  };
+}
+
+export function createTenantEntitlementOptions(
+  overrides: Partial<PlatformTenantEntitlementOptions> = {}
+): PlatformTenantEntitlementOptions {
+  return {
+    ...mapPlatformTenantEntitlementOptions(createTenantEntitlementOptionsApiDto()),
     ...overrides
   };
 }
