@@ -20,14 +20,16 @@ describe('PlatformModulesCatalogApiService', () => {
     httpTesting.verify();
   });
 
-  it('loads modules and features from the subscription catalog API', () => {
-    let moduleName = '';
+  it('loads modules and features from the platform catalog API', () => {
+    let moduleCode = '';
+    let featureCode = '';
 
     service.getCatalog().subscribe((catalog) => {
-      moduleName = catalog.modules[0]?.name ?? '';
+      moduleCode = catalog.modules[0]?.moduleCode ?? '';
+      featureCode = catalog.modules[0]?.features[0]?.featureCode ?? '';
     });
 
-    const request = httpTesting.expectOne('/api/v1/platform/subscription-plans/catalog');
+    const request = httpTesting.expectOne('/api/v1/platform-admin/catalog/modules');
     expect(request.request.method).toBe('GET');
 
     request.flush({
@@ -41,13 +43,15 @@ describe('PlatformModulesCatalogApiService', () => {
             name: 'Core POS',
             description: 'Core module',
             sortOrder: 1,
+            status: 'ACTIVE',
             features: [
               {
                 id: 'feature-1',
                 featureCode: 'pos.sales',
                 name: 'POS Sales',
                 description: 'Start sale',
-                sortOrder: 1
+                sortOrder: 1,
+                status: 'ACTIVE'
               }
             ]
           }
@@ -55,6 +59,7 @@ describe('PlatformModulesCatalogApiService', () => {
       }
     });
 
-    expect(moduleName).toBe('Core POS');
+    expect(moduleCode).toBe('core_pos');
+    expect(featureCode).toBe('pos.sales');
   });
 });

@@ -6,9 +6,9 @@ import { platformPermissions } from '../../../../core/config/permission-keys';
 import { AccessControlService } from '../../../../core/services/access-control.service';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import {
-  SubscriptionPlanCatalogFeature,
-  SubscriptionPlanCatalogModule
-} from '../../models/platform-subscription-plan.model';
+  PlatformModulesCatalogFeature,
+  PlatformModulesCatalogModule
+} from '../../models/platform-modules-catalog.model';
 import { PlatformModulesCatalogApiService } from '../../services/platform-modules-catalog-api.service';
 
 @Component({
@@ -81,14 +81,14 @@ import { PlatformModulesCatalogApiService } from '../../services/platform-module
               <header class="module-header">
                 <div>
                   <h2>{{ module.name }}</h2>
-                  <p>{{ module.code }}</p>
+                  <p>{{ module.moduleCode }}</p>
                   @if (module.description) {
                     <p class="module-description">{{ module.description }}</p>
                   }
                 </div>
                 <div class="module-meta">
                   <span class="meta-badge">{{ module.features.length }} features</span>
-                  <span class="meta-badge active">Active</span>
+                  <span class="meta-badge active">{{ module.status }}</span>
                 </div>
               </header>
 
@@ -111,9 +111,9 @@ import { PlatformModulesCatalogApiService } from '../../services/platform-module
                       @for (feature of module.features; track feature.id) {
                         <tr>
                           <td><strong>{{ feature.name }}</strong></td>
-                          <td><code>{{ feature.code }}</code></td>
+                          <td><code>{{ feature.featureCode }}</code></td>
                           <td>{{ feature.description || '—' }}</td>
-                          <td><span class="status-badge active">Active</span></td>
+                          <td><span class="status-badge active">{{ feature.status }}</span></td>
                         </tr>
                       }
                     </tbody>
@@ -381,7 +381,7 @@ export class PlatformModulesCatalogPage implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
 
   readonly searchTerm = signal('');
-  readonly catalog = signal<{ modules: SubscriptionPlanCatalogModule[] } | null>(null);
+  readonly catalog = signal<{ modules: PlatformModulesCatalogModule[] } | null>(null);
   readonly isLoading = signal(true);
   readonly errorMessage = signal<string | null>(null);
 
@@ -421,9 +421,9 @@ export class PlatformModulesCatalogPage implements OnInit {
 }
 
 function filterModules(
-  modules: SubscriptionPlanCatalogModule[],
+  modules: PlatformModulesCatalogModule[],
   searchTerm: string
-): SubscriptionPlanCatalogModule[] {
+): PlatformModulesCatalogModule[] {
   const term = searchTerm.trim().toLowerCase();
   if (!term) {
     return modules;
@@ -437,14 +437,14 @@ function filterModules(
     .filter((module) => matchesModule(module, term) || module.features.length > 0);
 }
 
-function matchesModule(module: SubscriptionPlanCatalogModule, term: string): boolean {
-  return module.name.toLowerCase().includes(term) || module.code.toLowerCase().includes(term);
+function matchesModule(module: PlatformModulesCatalogModule, term: string): boolean {
+  return module.name.toLowerCase().includes(term) || module.moduleCode.toLowerCase().includes(term);
 }
 
-function matchesFeature(feature: SubscriptionPlanCatalogFeature, term: string): boolean {
+function matchesFeature(feature: PlatformModulesCatalogFeature, term: string): boolean {
   return (
     feature.name.toLowerCase().includes(term) ||
-    feature.code.toLowerCase().includes(term) ||
+    feature.featureCode.toLowerCase().includes(term) ||
     (feature.description?.toLowerCase().includes(term) ?? false)
   );
 }

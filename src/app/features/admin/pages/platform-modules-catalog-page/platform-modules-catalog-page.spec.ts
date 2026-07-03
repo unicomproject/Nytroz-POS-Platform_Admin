@@ -4,7 +4,7 @@ import { of, Subject, throwError } from 'rxjs';
 import { platformPermissions } from '../../../../core/config/permission-keys';
 import { AccessControlService } from '../../../../core/services/access-control.service';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
-import { SubscriptionPlanCatalogModule } from '../../models/platform-subscription-plan.model';
+import { PlatformModulesCatalogModule } from '../../models/platform-modules-catalog.model';
 import { PlatformModulesCatalogApiService } from '../../services/platform-modules-catalog-api.service';
 import { PlatformModulesCatalogPage } from './platform-modules-catalog-page';
 
@@ -12,50 +12,40 @@ describe('PlatformModulesCatalogPage', () => {
   let api: { getCatalog: ReturnType<typeof vi.fn> };
   let accessControl: { hasPermission: ReturnType<typeof vi.fn> };
 
-  const catalogModules: SubscriptionPlanCatalogModule[] = [
+  const catalogModules: PlatformModulesCatalogModule[] = [
     {
       id: 'module-1',
-      code: 'core_pos',
+      moduleCode: 'core_pos',
       name: 'Core POS',
       description: 'Core point of sale module',
       sortOrder: 1,
-      isCore: false,
-      isLocked: false,
-      defaultAvailability: 'not_available',
+      status: 'ACTIVE',
       features: [
         {
           id: 'feature-1',
-          code: 'pos.sales',
+          featureCode: 'pos.sales',
           name: 'POS Sales',
           description: 'Start sale',
-          entitlementKey: 'pos.sales',
           sortOrder: 1,
-          isCore: false,
-          isLocked: false,
-          defaultAvailability: 'not_available'
+          status: 'ACTIVE'
         }
       ]
     },
     {
       id: 'module-2',
-      code: 'inventory',
+      moduleCode: 'inventory',
       name: 'Inventory',
       description: null,
       sortOrder: 2,
-      isCore: false,
-      isLocked: false,
-      defaultAvailability: 'not_available',
+      status: 'ACTIVE',
       features: [
         {
           id: 'feature-2',
-          code: 'inventory_management',
+          featureCode: 'inventory_management',
           name: 'Inventory Management',
           description: 'Manage stock',
-          entitlementKey: 'inventory_management',
           sortOrder: 1,
-          isCore: false,
-          isLocked: false,
-          defaultAvailability: 'not_available'
+          status: 'ACTIVE'
         }
       ]
     }

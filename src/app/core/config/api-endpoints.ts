@@ -13,6 +13,7 @@ export const apiEndpoints = {
     tenantCreateOptions: '/platform-admin/tenants/create-options',
     tenantSummary: '/platform-admin/tenants/summary',
     tenantFilterOptions: '/platform-admin/tenants/filter-options',
+    modulesCatalog: '/platform-admin/catalog/modules',
     subscriptionPlans: '/platform/subscription-plans',
     features: '/features',
     auditLogs: '/platform/audit-logs',
