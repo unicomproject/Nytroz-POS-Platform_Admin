@@ -117,7 +117,7 @@ export const platformMenuConfig: MenuSectionConfig[] = [
         requiredPermission: platformPermissions.dashboardView
       },
       {
-        label: 'Audit Logs',
+        label: 'Platform Login Audit',
         path: '/admin/audit-logs',
         requiresTenant: false,
         icon: 'audit',

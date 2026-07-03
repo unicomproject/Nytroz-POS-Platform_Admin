@@ -110,8 +110,11 @@ export const adminRoutes: Routes = [
   },
   {
     path: 'audit-logs',
-    loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
-    data: { title: 'Audit Logs', requiredPermission: platformPermissions.auditView }
+    loadComponent: () =>
+      import('../pages/platform-audit-logs-page/platform-audit-logs-page').then(
+        (m) => m.PlatformAuditLogsPage
+      ),
+    data: { title: 'Platform Login Audit', requiredPermission: platformPermissions.auditView }
   },
   {
     path: 'tenant/:tenantId/outlets',
