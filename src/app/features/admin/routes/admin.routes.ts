@@ -65,8 +65,11 @@ export const adminRoutes: Routes = [
   },
   {
     path: 'modules',
-    loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
-    data: { title: 'Modules and Features', requiredPermission: platformPermissions.featuresView }
+    loadComponent: () =>
+      import('../pages/platform-modules-catalog-page/platform-modules-catalog-page').then(
+        (m) => m.PlatformModulesCatalogPage
+      ),
+    data: { title: 'Modules and Features', requiredPermission: platformPermissions.modulesView }
   },
   {
     path: 'roles-permissions',
