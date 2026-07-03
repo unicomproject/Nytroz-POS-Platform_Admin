@@ -40,7 +40,7 @@ type StatusTab = SubscriptionPlanStatusTab;
             <span class="current">Plans</span>
           </nav>
           <h1>Subscription Plans</h1>
-          <p>Create and manage plan templates for tenants.</p>
+          <p>Browse subscription plans. Use Create Plan to add a new draft plan.</p>
           <span class="title-accent" aria-hidden="true"></span>
         </div>
         @if (canCreate()) {
@@ -147,7 +147,6 @@ type StatusTab = SubscriptionPlanStatusTab;
                   <th>Active Tenants</th>
                   <th>Status</th>
                   <th>Last Updated</th>
-                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -179,7 +178,6 @@ type StatusTab = SubscriptionPlanStatusTab;
                     <th>Active Tenants</th>
                     <th>Status</th>
                     <th>Last Updated</th>
-                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -214,49 +212,6 @@ type StatusTab = SubscriptionPlanStatusTab;
                         <span class="status-badge" [class]="statusBadgeClass(plan.status)">{{ statusLabel(plan.status) }}</span>
                       </td>
                       <td class="cell-text">{{ plan.lastUpdatedAt | date: 'mediumDate' }}</td>
-                      <td class="actions-cell">
-                        <button type="button" class="icon-btn" aria-label="View plan" [disabled]="!plan.canView" title="View">
-                          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" /><circle cx="12" cy="12" r="3" /></svg>
-                        </button>
-                        <button type="button" class="icon-btn" aria-label="Edit plan" [disabled]="!plan.canEdit" title="Edit">
-                          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z" /></svg>
-                        </button>
-                        <button type="button" class="icon-btn" aria-label="Duplicate plan" [disabled]="!plan.canDuplicate" title="Duplicate">
-                          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></svg>
-                        </button>
-                        <div class="menu-wrap">
-                          <button
-                            type="button"
-                            class="icon-btn"
-                            aria-label="More actions"
-                            [attr.aria-expanded]="openMenuId() === plan.id"
-                            (click)="toggleMenu(plan.id)"
-                          >
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                              <circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none" />
-                              <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
-                              <circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none" />
-                            </svg>
-                          </button>
-                          @if (openMenuId() === plan.id) {
-                            <div class="action-menu" role="menu">
-                              @if (plan.status === 'draft') {
-                                <button type="button" role="menuitem" disabled title="Publish API pending">Publish</button>
-                              }
-                              <button type="button" role="menuitem" [disabled]="!plan.canArchive">Archive</button>
-                              <button
-                                type="button"
-                                role="menuitem"
-                                class="danger"
-                                [disabled]="!plan.canDelete"
-                                [title]="plan.canDelete ? 'Delete plan' : (plan.deleteBlockedReason ?? 'Delete not allowed')"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          }
-                        </div>
-                      </td>
                     </tr>
                   }
                 </tbody>
@@ -550,65 +505,6 @@ type StatusTab = SubscriptionPlanStatusTab;
     .status-badge.draft { background: #fff6ed; color: #b54708; }
     .status-badge.archived { background: #f2f4f7; color: #475467; }
 
-    .actions-cell { display: flex; gap: 0.25rem; position: relative; }
-
-    .icon-btn {
-      align-items: center;
-      background: transparent;
-      border: 0;
-      border-radius: 8px;
-      color: #667085;
-      cursor: pointer;
-      display: inline-flex;
-      height: 2rem;
-      justify-content: center;
-      width: 2rem;
-    }
-
-    .icon-btn:disabled { cursor: not-allowed; opacity: 0.4; }
-
-    .icon-btn svg {
-      fill: none;
-      height: 1rem;
-      stroke: currentColor;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-      stroke-width: 1.75;
-      width: 1rem;
-    }
-
-    .icon-btn:not(:disabled):hover { background: #f2f4f7; color: #0b5cff; }
-
-    .menu-wrap { position: relative; }
-
-    .action-menu {
-      background: #fff;
-      border: 1px solid #eaecf0;
-      border-radius: 10px;
-      box-shadow: 0 8px 24px rgba(16, 24, 40, 0.12);
-      display: grid;
-      min-width: 9rem;
-      padding: 0.35rem;
-      position: absolute;
-      right: 0;
-      top: calc(100% + 0.25rem);
-      z-index: 5;
-    }
-
-    .action-menu button {
-      background: transparent;
-      border: 0;
-      border-radius: 8px;
-      color: #344054;
-      cursor: pointer;
-      font-size: 0.82rem;
-      padding: 0.45rem 0.65rem;
-      text-align: left;
-    }
-
-    .action-menu button:disabled { cursor: not-allowed; opacity: 0.45; }
-    .action-menu button.danger { color: #b42318; }
-
     .pagination {
       align-items: center;
       display: flex;
@@ -683,7 +579,7 @@ export class PlatformSubscriptionPlansPage implements OnInit {
   private readonly searchChanges$ = new Subject<string>();
 
   readonly skeletonRows = [1, 2, 3, 4, 5];
-  readonly skeletonCols = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+  readonly skeletonCols = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
   readonly statusTabs = [
     { key: 'all' as StatusTab, label: 'All', icon: 'M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5' },
@@ -703,7 +599,6 @@ export class PlatformSubscriptionPlansPage implements OnInit {
   readonly currencyFilter = signal('');
   readonly pageNumber = signal(1);
   readonly pageSize = signal(10);
-  readonly openMenuId = signal<string | null>(null);
   readonly successMessage = signal<string | null>(null);
 
   ngOnInit(): void {
@@ -811,7 +706,6 @@ export class PlatformSubscriptionPlansPage implements OnInit {
   loadPage(): void {
     this.isLoading.set(true);
     this.errorMessage.set(null);
-    this.openMenuId.set(null);
 
     this.api.getSubscriptionPlans({
       pageNumber: this.pageNumber(),
@@ -838,10 +732,6 @@ export class PlatformSubscriptionPlansPage implements OnInit {
   goToPage(page: number): void {
     this.pageNumber.set(page);
     this.loadPage();
-  }
-
-  toggleMenu(planId: string): void {
-    this.openMenuId.set(this.openMenuId() === planId ? null : planId);
   }
 
   rangeLabel(list: SubscriptionPlanListResponse): string {

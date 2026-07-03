@@ -14,10 +14,7 @@ export const apiEndpoints = {
     tenantSummary: '/platform-admin/tenants/summary',
     tenantFilterOptions: '/platform-admin/tenants/filter-options',
     subscriptionPlans: '/platform/subscription-plans',
-    features: '/features',
-    auditLogs: '/platform/audit-logs',
-    users: '/platform-admin/users',
-    settings: '/platform/settings'
+    users: '/platform-admin/users'
   },
   tenant: {
     users: '/users',
