@@ -78,7 +78,8 @@ export const adminRoutes: Routes = [
   },
   {
     path: 'platform-users',
-    loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
+    loadComponent: () =>
+      import('../pages/platform-users-page/platform-users-page').then((m) => m.PlatformUsersPage),
     data: { title: 'Platform Users', requiredPermission: platformPermissions.usersView }
   },
   {

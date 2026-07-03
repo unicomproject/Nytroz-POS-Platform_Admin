@@ -29,6 +29,15 @@ import { mapPlatformDashboard } from '../features/admin/mappers/platform-dashboa
 import { mapPlatformTenantFilterOptions, mapPlatformTenantListResponse, mapPlatformTenantSummary, mapPlatformTenantDetail } from '../features/admin/mappers/platform-tenant.mapper';
 import { mapSubscriptionPlanListResponse } from '../features/admin/mappers/platform-subscription-plan.mapper';
 import { TenantCreateOptions } from '../features/admin/models/platform-tenant-create.model';
+import {
+  PlatformRoleListResponse,
+  PlatformRoleSummary
+} from '../features/admin/models/platform-role-management.model';
+import {
+  PlatformUserDetail,
+  PlatformUserListResponse,
+  PlatformUserSummary
+} from '../features/admin/models/platform-user.model';
 
 export function createAuthSession(overrides: Partial<AuthSession> = {}): AuthSession {
   return {
@@ -343,6 +352,70 @@ function createDashboardAttentionItemApiDto(
     description: 'Recent payment attempts failed',
     count: 1,
     severity: 'critical',
+    ...overrides
+  };
+}
+
+export function createPlatformRoleSummary(
+  overrides: Partial<PlatformRoleSummary> = {}
+): PlatformRoleSummary {
+  return {
+    id: 'role-1',
+    code: 'support_admin',
+    name: 'Support Admin',
+    description: 'Support team role',
+    isSystem: false,
+    status: 'Active',
+    assignedUserCount: 0,
+    permissionCount: 12,
+    createdAt: '2026-07-01T00:00:00Z',
+    updatedAt: '2026-07-01T00:00:00Z',
+    ...overrides
+  };
+}
+
+export function createPlatformRoleListResponse(
+  overrides: Partial<PlatformRoleListResponse> = {}
+): PlatformRoleListResponse {
+  return {
+    roles: [createPlatformRoleSummary()],
+    ...overrides
+  };
+}
+
+export function createPlatformUserSummary(
+  overrides: Partial<PlatformUserSummary> = {}
+): PlatformUserSummary {
+  return {
+    id: 'user-1',
+    email: 'staff@nytroz.local',
+    displayName: 'Staff User',
+    status: 'ACTIVE',
+    roleCodes: ['support_admin'],
+    roleNames: ['Support Admin'],
+    permissionCount: 12,
+    lastLoginAt: null,
+    createdAt: '2026-07-01T00:00:00Z',
+    updatedAt: '2026-07-01T00:00:00Z',
+    ...overrides
+  };
+}
+
+export function createPlatformUserDetail(
+  overrides: Partial<PlatformUserDetail> = {}
+): PlatformUserDetail {
+  return {
+    ...createPlatformUserSummary(),
+    invitePending: false,
+    ...overrides
+  };
+}
+
+export function createPlatformUserListResponse(
+  overrides: Partial<PlatformUserListResponse> = {}
+): PlatformUserListResponse {
+  return {
+    users: [createPlatformUserSummary()],
     ...overrides
   };
 }
