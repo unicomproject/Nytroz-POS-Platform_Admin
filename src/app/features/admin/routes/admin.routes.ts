@@ -56,6 +56,14 @@ export const adminRoutes: Routes = [
     data: { title: 'Create Subscription Plan', requiredPermission: platformPermissions.subscriptionPlansCreate }
   },
   {
+    path: 'subscriptions/:planId',
+    loadComponent: () =>
+      import('../pages/platform-subscription-plan-detail-page/platform-subscription-plan-detail-page').then(
+        (m) => m.PlatformSubscriptionPlanDetailPage
+      ),
+    data: { title: 'Subscription Plan Detail', requiredPermission: platformPermissions.subscriptionPlansView }
+  },
+  {
     path: 'subscriptions',
     loadComponent: () =>
       import('../pages/platform-subscription-plans-page/platform-subscription-plans-page').then(

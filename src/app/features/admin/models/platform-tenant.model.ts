@@ -81,3 +81,13 @@ export interface PlatformTenantDetail extends PlatformTenantListItem {
   canSuspend: boolean;
   canManageEntitlements: boolean;
 }
+
+export interface UpdatePlatformTenantRequest {
+  name: string;
+  baseCurrency: string;
+  defaultTimezone: string;
+  defaultLocale: string;
+  operatingMode: string;
+  businessType?: string | null;
+  billingStatus: string;
+}

@@ -660,6 +660,7 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
   readonly successMessage = signal<string | null>(null);
   readonly errorMessage = signal<string | null>(null);
   readonly savedPlanId = signal<string | null>(null);
+  readonly loadedForEdit = signal(false);
   readonly basicsSaved = signal(false);
   readonly featuresSaved = signal(false);
   readonly pricingSaved = signal(false);
@@ -805,6 +806,10 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
 
   ngOnInit(): void {
     this.loadCatalogs();
+    const state = history.state as { planId?: string; mode?: 'view' | 'edit' };
+    if (state?.planId) {
+      this.loadPlanForEdit(state.planId);
+    }
   }
 
   stepIndex(step: WizardStep): number {
@@ -1073,17 +1078,21 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
       return;
     }
 
-    if (this.basicsSaved() && this.savedPlanId()) {
-      this.successMessage.set('Subscription plan saved as draft');
-      this.errorMessage.set(null);
-      return;
-    }
-
     this.isSaving.set(true);
     this.successMessage.set(null);
     this.errorMessage.set(null);
 
-    this.api.createSubscriptionPlanDraft(this.buildDraft()).subscribe({
+    const existingPlanId = this.savedPlanId();
+    const saveRequest$ = existingPlanId
+      ? this.api.updateSubscriptionPlanDraft(existingPlanId, {
+        planCode: this.basicsForm.controls.planCode.value,
+        planName: this.basicsForm.controls.planName.value,
+        description: this.basicsForm.controls.description.value ?? '',
+        billingCycle: this.basicsForm.controls.billingCycle.value as SubscriptionDbBillingCycle
+      })
+      : this.api.createSubscriptionPlanDraft(this.buildDraft());
+
+    saveRequest$.subscribe({
       next: (response) => {
         this.applyDraftResponse(response);
         this.successMessage.set('Subscription plan saved as draft');
@@ -1097,16 +1106,21 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
   }
 
   private persistBasicsAndAdvance(): void {
-    if (this.basicsSaved() && this.savedPlanId()) {
-      this.currentStep.set('modules');
-      return;
-    }
-
     this.isSaving.set(true);
     this.errorMessage.set(null);
     this.successMessage.set(null);
 
-    this.api.createSubscriptionPlanDraft(this.buildDraft()).subscribe({
+    const existingPlanId = this.savedPlanId();
+    const saveRequest$ = existingPlanId
+      ? this.api.updateSubscriptionPlanDraft(existingPlanId, {
+        planCode: this.basicsForm.controls.planCode.value,
+        planName: this.basicsForm.controls.planName.value,
+        description: this.basicsForm.controls.description.value ?? '',
+        billingCycle: this.basicsForm.controls.billingCycle.value as SubscriptionDbBillingCycle
+      })
+      : this.api.createSubscriptionPlanDraft(this.buildDraft());
+
+    saveRequest$.subscribe({
       next: (response) => {
         this.applyDraftResponse(response);
         this.isSaving.set(false);
@@ -1518,6 +1532,35 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
         this.catalogError.set(this.apiError.toSafeMessage(error));
         this.modulesLoading.set(false);
         this.featuresLoading.set(false);
+      }
+    });
+  }
+
+  private loadPlanForEdit(planId: string): void {
+    this.api.getSubscriptionPlanDetail(planId).subscribe({
+      next: (plan) => {
+        this.savedPlanId.set(plan.id);
+        this.loadedForEdit.set(true);
+        this.basicsSaved.set(true);
+        this.pricingSaved.set(true);
+        this.limitsSaved.set(true);
+        this.basicsForm.patchValue({
+          planName: plan.planName,
+          planCode: plan.planCode,
+          description: plan.description ?? '',
+          billingCycle: plan.billingCycle,
+          baseCurrency: plan.baseCurrency
+        });
+        this.pricingForm.patchValue({ basePrice: plan.basePrice });
+        this.basePriceInput.set(plan.basePrice.toString());
+        this.limitsForm.patchValue({
+          maxOutlets: plan.maxOutlets,
+          maxTills: plan.maxTills,
+          maxUsers: plan.maxUsers
+        });
+      },
+      error: (error) => {
+        this.errorMessage.set(this.apiError.toSafeMessage(error));
       }
     });
   }

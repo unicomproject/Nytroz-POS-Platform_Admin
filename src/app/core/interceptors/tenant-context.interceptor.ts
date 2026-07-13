@@ -5,17 +5,18 @@ import { tenantScopedApiSegments } from '../config/api-endpoints';
 import { TenantContextService } from '../services/tenant-context.service';
 
 export const tenantContextInterceptor: HttpInterceptorFn = (request, next) => {
-  const tenant = inject(TenantContextService).selectedTenant();
+  const tenantContext = inject(TenantContextService);
+  const tenantId = tenantContext.selectedTenantId();
   const isTenantScopedApi = tenantScopedApiSegments.some((segment) => request.url.includes(segment));
 
-  if (!tenant || !isTenantScopedApi) {
+  if (!tenantId || !isTenantScopedApi) {
     return next(request);
   }
 
   return next(
     request.clone({
       setHeaders: {
-        'X-Tenant-Id': tenant.tenantId
+        'X-Tenant-Id': tenantId
       }
     })
   );

@@ -3,6 +3,7 @@ import {
   SubscriptionPlanCatalogFeature,
   SubscriptionPlanCatalogModule,
   SubscriptionPlanCatalogResponse,
+  SubscriptionPlanDetail,
   SubscriptionPlanDraft,
   SubscriptionPlanFeaturesMutationResponse,
   SubscriptionPlanFeaturesUpdateRequest,
@@ -82,6 +83,46 @@ export interface SubscriptionPlanMutationResponseApiDto {
   maxTills?: number | null;
   featureCount?: number;
   updatedAt?: string;
+}
+
+export interface SubscriptionPlanDetailApiDto {
+  id: string;
+  planCode: string;
+  name: string;
+  description?: string | null;
+  status: string;
+  billingCycle: string;
+  baseCurrency: string;
+  basePrice: number;
+  pricingModel: string;
+  trialDays: number;
+  maxOutlets?: number | null;
+  maxUsers?: number | null;
+  maxTills?: number | null;
+  featureCount: number;
+  activeTenantCount: number;
+  canEdit: boolean;
+  canDuplicate: boolean;
+  canArchive: boolean;
+  canDelete: boolean;
+  canReactivate: boolean;
+  createdAt: string;
+  updatedAt: string;
+  limits?: Array<{
+    id: string;
+    code: string;
+    name: string;
+    value?: number | null;
+    isUnlimited: boolean;
+    unitCode?: string | null;
+  }>;
+  modules?: Array<{
+    id: string;
+    code: string;
+    name: string;
+    description?: string | null;
+    features?: Array<{ id: string; code: string; name: string; description?: string | null }>;
+  }>;
 }
 
 export function mapSubscriptionPlanListResponse(
@@ -234,6 +275,53 @@ export function mapSubscriptionPlanMutationResponse(
   };
 }
 
+export function mapSubscriptionPlanDetailResponse(dto: SubscriptionPlanDetailApiDto): SubscriptionPlanDetail {
+  return {
+    id: String(dto.id),
+    planName: dto.name,
+    planCode: dto.planCode,
+    description: dto.description ?? null,
+    status: normalizePlanStatus(dto.status),
+    billingCycle: normalizeDbBillingCycle(dto.billingCycle),
+    baseCurrency: dto.baseCurrency,
+    basePrice: dto.basePrice,
+    pricingModel: dto.pricingModel,
+    trialDays: dto.trialDays,
+    maxOutlets: dto.maxOutlets ?? null,
+    maxTills: dto.maxTills ?? null,
+    maxUsers: dto.maxUsers ?? null,
+    featureCount: dto.featureCount,
+    activeTenantCount: dto.activeTenantCount,
+    canEdit: dto.canEdit,
+    canDuplicate: dto.canDuplicate,
+    canArchive: dto.canArchive,
+    canDelete: dto.canDelete,
+    canReactivate: dto.canReactivate,
+    createdAt: dto.createdAt,
+    updatedAt: dto.updatedAt,
+    limits: (dto.limits ?? []).map((limit) => ({
+      id: String(limit.id),
+      code: limit.code,
+      name: limit.name,
+      value: limit.value ?? null,
+      isUnlimited: limit.isUnlimited,
+      unitCode: limit.unitCode ?? null
+    })),
+    modules: (dto.modules ?? []).map((module) => ({
+      id: String(module.id),
+      code: module.code,
+      name: module.name,
+      description: module.description ?? null,
+      features: (module.features ?? []).map((feature) => ({
+        id: String(feature.id),
+        code: feature.code,
+        name: feature.name,
+        description: feature.description ?? null
+      }))
+    }))
+  };
+}
+
 export function mapSubscriptionPlanPricingMutationResponse(
   dto: SubscriptionPlanMutationResponseApiDto
 ): SubscriptionPlanPricingMutationResponse {
@@ -339,6 +427,27 @@ function normalizeBillingCycle(value: string): string {
   }
 
   return normalized;
+}
+
+function normalizeDbBillingCycle(value: string): 'monthly' | 'yearly' | 'custom' | 'trial' | 'demo' {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'monthly') {
+    return 'monthly';
+  }
+
+  if (normalized === 'yearly' || normalized === 'annual') {
+    return 'yearly';
+  }
+
+  if (normalized === 'trial') {
+    return 'trial';
+  }
+
+  if (normalized === 'demo') {
+    return 'demo';
+  }
+
+  return 'custom';
 }
 
 function derivePlanType(basePrice: number): string {

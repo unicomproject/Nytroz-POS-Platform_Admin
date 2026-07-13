@@ -13,7 +13,7 @@ import {
   PlatformTenantEntitlementOptions,
   PlatformTenantEntitlementPlanOption
 } from '../../models/platform-tenant-entitlements.model';
-import { PlatformTenantDetail } from '../../models/platform-tenant.model';
+import { PlatformTenantDetail, UpdatePlatformTenantRequest } from '../../models/platform-tenant.model';
 import { PlatformTenantApiService } from '../../services/platform-tenant-api.service';
 
 @Component({
@@ -45,6 +45,11 @@ import { PlatformTenantApiService } from '../../services/platform-tenant-api.ser
 
         @if (tenant(); as data) {
           <div class="page-actions">
+            @if (data.canUpdate && canUpdate()) {
+              <button type="button" class="btn secondary" [disabled]="isActionPending()" (click)="toggleEditTenant()">
+                {{ editMode() ? 'Cancel Edit' : 'Edit Tenant' }}
+              </button>
+            }
             @if (showActivate(data)) {
               <button type="button" class="btn success" [disabled]="isActionPending()" (click)="activateTenant()">
                 {{ isActionPending() ? 'Activating...' : 'Activate Tenant' }}
@@ -101,16 +106,53 @@ import { PlatformTenantApiService } from '../../services/platform-tenant-api.ser
         <div class="detail-grid">
           <article class="panel card">
             <h2>Profile</h2>
-            <dl>
-              <div><dt>Tenant Code</dt><dd>{{ data.code }}</dd></div>
-              <div><dt>Operating Mode</dt><dd>{{ data.operatingMode }}</dd></div>
-              <div><dt>Business Type</dt><dd>{{ data.businessType || '—' }}</dd></div>
-              <div><dt>Base Currency</dt><dd>{{ data.baseCurrency }}</dd></div>
-              <div><dt>Timezone</dt><dd>{{ data.defaultTimezone }}</dd></div>
-              <div><dt>Locale</dt><dd>{{ data.defaultLocale }}</dd></div>
-              <div><dt>Created On</dt><dd>{{ data.createdOn | date: 'medium' }}</dd></div>
-              <div><dt>Last Activity</dt><dd>{{ data.lastActivityAt ? (data.lastActivityAt | date: 'medium') : '—' }}</dd></div>
-            </dl>
+            @if (editMode()) {
+              <form class="edit-form" (ngSubmit)="saveTenantEdit()">
+                <label>
+                  <span>Name</span>
+                  <input type="text" [ngModel]="editDraft().name" (ngModelChange)="updateEditField('name', $event)" name="name" />
+                </label>
+                <label>
+                  <span>Operating Mode</span>
+                  <input type="text" [ngModel]="editDraft().operatingMode" (ngModelChange)="updateEditField('operatingMode', $event)" name="operatingMode" />
+                </label>
+                <label>
+                  <span>Business Type</span>
+                  <input type="text" [ngModel]="editDraft().businessType" (ngModelChange)="updateEditField('businessType', $event)" name="businessType" />
+                </label>
+                <label>
+                  <span>Base Currency</span>
+                  <input type="text" [ngModel]="editDraft().baseCurrency" (ngModelChange)="updateEditField('baseCurrency', $event)" name="baseCurrency" />
+                </label>
+                <label>
+                  <span>Timezone</span>
+                  <input type="text" [ngModel]="editDraft().defaultTimezone" (ngModelChange)="updateEditField('defaultTimezone', $event)" name="defaultTimezone" />
+                </label>
+                <label>
+                  <span>Locale</span>
+                  <input type="text" [ngModel]="editDraft().defaultLocale" (ngModelChange)="updateEditField('defaultLocale', $event)" name="defaultLocale" />
+                </label>
+                <label>
+                  <span>Billing Status</span>
+                  <input type="text" [ngModel]="editDraft().billingStatus" (ngModelChange)="updateEditField('billingStatus', $event)" name="billingStatus" />
+                </label>
+                <div class="edit-actions">
+                  <button type="button" class="btn ghost" [disabled]="isActionPending()" (click)="cancelEditTenant()">Cancel</button>
+                  <button type="submit" class="btn primary" [disabled]="isActionPending()">{{ isActionPending() ? 'Saving...' : 'Save Tenant' }}</button>
+                </div>
+              </form>
+            } @else {
+              <dl>
+                <div><dt>Tenant Code</dt><dd>{{ data.code }}</dd></div>
+                <div><dt>Operating Mode</dt><dd>{{ data.operatingMode }}</dd></div>
+                <div><dt>Business Type</dt><dd>{{ data.businessType || '—' }}</dd></div>
+                <div><dt>Base Currency</dt><dd>{{ data.baseCurrency }}</dd></div>
+                <div><dt>Timezone</dt><dd>{{ data.defaultTimezone }}</dd></div>
+                <div><dt>Locale</dt><dd>{{ data.defaultLocale }}</dd></div>
+                <div><dt>Created On</dt><dd>{{ data.createdOn | date: 'medium' }}</dd></div>
+                <div><dt>Last Activity</dt><dd>{{ data.lastActivityAt ? (data.lastActivityAt | date: 'medium') : '—' }}</dd></div>
+              </dl>
+            }
           </article>
 
           <article class="panel card">
@@ -382,6 +424,37 @@ import { PlatformTenantApiService } from '../../services/platform-tenant-api.ser
 
     dd { color: #344054; font-size: 0.88rem; margin: 0; }
 
+    .edit-form {
+      display: grid;
+      gap: 0.65rem;
+    }
+
+    .edit-form label {
+      display: grid;
+      gap: 0.35rem;
+    }
+
+    .edit-form label > span {
+      color: #667085;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .edit-form input {
+      border: 1px solid #d0d5dd;
+      border-radius: 10px;
+      min-height: 2.4rem;
+      padding: 0 0.7rem;
+    }
+
+    .edit-actions {
+      display: flex;
+      gap: 0.55rem;
+      justify-content: flex-end;
+      margin-top: 0.4rem;
+    }
+
     .section-note, .muted {
       color: #667085;
       font-size: 0.82rem;
@@ -618,6 +691,16 @@ export class PlatformTenantDetailPage {
   readonly errorMessage = signal<string | null>(null);
   readonly actionError = signal<string | null>(null);
   readonly successMessage = signal<string | null>(null);
+  readonly editMode = signal(false);
+  readonly editDraft = signal<UpdatePlatformTenantRequest>({
+    name: '',
+    baseCurrency: '',
+    defaultTimezone: '',
+    defaultLocale: '',
+    operatingMode: '',
+    businessType: '',
+    billingStatus: ''
+  });
 
   readonly editorOpen = signal(false);
   readonly editorLoading = signal(false);
@@ -656,6 +739,8 @@ export class PlatformTenantDetailPage {
       .subscribe({
         next: (tenant) => {
           this.tenant.set(tenant);
+          this.hydrateEditDraft(tenant);
+          this.editMode.set(false);
           this.isLoading.set(false);
         },
         error: (error) => {
@@ -677,6 +762,8 @@ export class PlatformTenantDetailPage {
     this.api.getTenantById(tenantId).subscribe({
       next: (tenant) => {
         this.tenant.set(tenant);
+        this.hydrateEditDraft(tenant);
+        this.editMode.set(false);
         this.isLoading.set(false);
       },
       error: (error) => {
@@ -843,6 +930,74 @@ export class PlatformTenantDetailPage {
     return this.accessControl.hasPermission(platformPermissions.tenantsEntitlementsUpdate);
   }
 
+  canUpdate(): boolean {
+    return this.accessControl.hasPermission(platformPermissions.tenantsUpdate);
+  }
+
+  toggleEditTenant(): void {
+    const tenant = this.tenant();
+    if (!tenant || !tenant.canUpdate || !this.canUpdate()) {
+      return;
+    }
+
+    if (this.editMode()) {
+      this.cancelEditTenant();
+      return;
+    }
+
+    this.hydrateEditDraft(tenant);
+    this.editMode.set(true);
+    this.actionError.set(null);
+  }
+
+  cancelEditTenant(): void {
+    const tenant = this.tenant();
+    if (tenant) {
+      this.hydrateEditDraft(tenant);
+    }
+
+    this.editMode.set(false);
+  }
+
+  updateEditField(field: keyof UpdatePlatformTenantRequest, value: string): void {
+    this.editDraft.update((current) => ({
+      ...current,
+      [field]: value
+    }));
+  }
+
+  saveTenantEdit(): void {
+    const tenantId = this.route.snapshot.paramMap.get('tenantId');
+    const tenant = this.tenant();
+    if (!tenantId || !tenant || !tenant.canUpdate || !this.canUpdate()) {
+      return;
+    }
+
+    const payload = this.editDraft();
+    if (!payload.name.trim()) {
+      this.actionError.set('Tenant name is required.');
+      return;
+    }
+
+    this.isActionPending.set(true);
+    this.actionError.set(null);
+    this.successMessage.set(null);
+
+    this.api.updateTenant(tenantId, payload).subscribe({
+      next: (updated) => {
+        this.tenant.set(updated);
+        this.hydrateEditDraft(updated);
+        this.editMode.set(false);
+        this.isActionPending.set(false);
+        this.successMessage.set('Tenant updated successfully.');
+      },
+      error: (error) => {
+        this.isActionPending.set(false);
+        this.actionError.set(this.apiError.toSafeMessage(error));
+      }
+    });
+  }
+
   statusClass(status: string): string {
     return status.toLowerCase();
   }
@@ -948,6 +1103,18 @@ export class PlatformTenantDetailPage {
         this.isActionPending.set(false);
         this.actionError.set(this.apiError.toSafeMessage(error));
       }
+    });
+  }
+
+  private hydrateEditDraft(tenant: PlatformTenantDetail): void {
+    this.editDraft.set({
+      name: tenant.name,
+      baseCurrency: tenant.baseCurrency,
+      defaultTimezone: tenant.defaultTimezone,
+      defaultLocale: tenant.defaultLocale,
+      operatingMode: tenant.operatingMode,
+      businessType: tenant.businessType,
+      billingStatus: tenant.billingStatus
     });
   }
 }
