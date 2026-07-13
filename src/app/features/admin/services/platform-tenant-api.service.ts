@@ -29,7 +29,8 @@ import {
   PlatformTenantFilterOptions,
   PlatformTenantListQuery,
   PlatformTenantListResponse,
-  PlatformTenantSummary
+  PlatformTenantSummary,
+  UpdatePlatformTenantRequest
 } from '../models/platform-tenant.model';
 
 @Injectable({ providedIn: 'root' })
@@ -82,6 +83,23 @@ export class PlatformTenantApiService {
     return this.http
       .get<ApiResponse<PlatformTenantDetailApiDto>>(
         `${appSettings.apiBaseUrl}${apiEndpoints.platform.tenants}/${tenantId}`
+      )
+      .pipe(map((response) => mapPlatformTenantDetail(response.data)));
+  }
+
+  updateTenant(tenantId: string, request: UpdatePlatformTenantRequest): Observable<PlatformTenantDetail> {
+    return this.http
+      .put<ApiResponse<PlatformTenantDetailApiDto>>(
+        `${appSettings.apiBaseUrl}${apiEndpoints.platform.tenants}/${tenantId}`,
+        {
+          name: request.name,
+          baseCurrency: request.baseCurrency,
+          defaultTimezone: request.defaultTimezone,
+          defaultLocale: request.defaultLocale,
+          operatingMode: request.operatingMode,
+          businessType: request.businessType,
+          billingStatus: request.billingStatus
+        }
       )
       .pipe(map((response) => mapPlatformTenantDetail(response.data)));
   }

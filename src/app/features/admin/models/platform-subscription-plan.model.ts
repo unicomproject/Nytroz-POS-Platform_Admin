@@ -105,6 +105,64 @@ export interface SubscriptionPlanMutationResponse {
   status: SubscriptionPlanStatus | string;
 }
 
+export interface SubscriptionPlanDetail {
+  id: string;
+  planName: string;
+  planCode: string;
+  description: string | null;
+  status: SubscriptionPlanStatus | string;
+  billingCycle: SubscriptionDbBillingCycle;
+  baseCurrency: string;
+  basePrice: number;
+  pricingModel: string;
+  trialDays: number;
+  maxOutlets: number | null;
+  maxTills: number | null;
+  maxUsers: number | null;
+  featureCount: number;
+  activeTenantCount: number;
+  canEdit: boolean;
+  canDuplicate: boolean;
+  canArchive: boolean;
+  canDelete: boolean;
+  canReactivate: boolean;
+  createdAt: string;
+  updatedAt: string;
+  limits: SubscriptionPlanDetailLimit[];
+  modules: SubscriptionPlanDetailModule[];
+}
+
+export interface SubscriptionPlanDetailLimit {
+  id: string;
+  code: string;
+  name: string;
+  value: number | null;
+  isUnlimited: boolean;
+  unitCode: string | null;
+}
+
+export interface SubscriptionPlanDetailModule {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  features: SubscriptionPlanDetailFeature[];
+}
+
+export interface SubscriptionPlanDetailFeature {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+}
+
+export interface SubscriptionPlanUpdateRequest {
+  planCode: string;
+  planName: string;
+  description: string;
+  billingCycle: SubscriptionDbBillingCycle;
+}
+
 export interface SubscriptionPlanPricingUpdateRequest {
   basePrice: number;
 }
