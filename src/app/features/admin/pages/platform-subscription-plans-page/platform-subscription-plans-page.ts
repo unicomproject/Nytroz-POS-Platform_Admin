@@ -189,7 +189,7 @@ type StatusTab = SubscriptionPlanStatusTab;
                             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4zM8 10h8M8 14h5" /></svg>
                           </span>
                           <span class="plan-meta">
-                            <strong>{{ plan.planName }}</strong>
+                            <a [routerLink]="['/admin/subscriptions', plan.id]">{{ plan.planName }}</a>
                             @if (plan.isDefault) {
                               <span class="pill default">Default</span>
                             }
@@ -212,6 +212,76 @@ type StatusTab = SubscriptionPlanStatusTab;
                         <span class="status-badge" [class]="statusBadgeClass(plan.status)">{{ statusLabel(plan.status) }}</span>
                       </td>
                       <td class="cell-text">{{ plan.lastUpdatedAt | date: 'mediumDate' }}</td>
+                      <td class="actions-cell">
+                        <button
+                          type="button"
+                          class="icon-btn"
+                          aria-label="View plan"
+                          [disabled]="!plan.canView"
+                          title="View"
+                          (click)="openPlan(plan)"
+                        >
+                          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" /><circle cx="12" cy="12" r="3" /></svg>
+                        </button>
+                        <button
+                          type="button"
+                          class="icon-btn"
+                          aria-label="Edit plan"
+                          [disabled]="!plan.canEdit"
+                          title="Edit"
+                          (click)="editPlan(plan)"
+                        >
+                          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z" /></svg>
+                        </button>
+                        <button
+                          type="button"
+                          class="icon-btn"
+                          aria-label="Duplicate plan"
+                          [disabled]="!plan.canDuplicate || isLoading()"
+                          title="Duplicate"
+                          (click)="duplicatePlan(plan)"
+                        >
+                          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></svg>
+                        </button>
+                        <div class="menu-wrap">
+                          <button
+                            type="button"
+                            class="icon-btn"
+                            aria-label="More actions"
+                            [attr.aria-expanded]="openMenuId() === plan.id"
+                            (click)="toggleMenu(plan.id)"
+                          >
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                              <circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none" />
+                              <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+                              <circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none" />
+                            </svg>
+                          </button>
+                          @if (openMenuId() === plan.id) {
+                            <div class="action-menu" role="menu">
+                            @if (plan.status === 'draft' && plan.canEdit && canEdit()) {
+                                <button type="button" role="menuitem" [disabled]="isLoading()" (click)="publishPlan(plan.id)">Publish</button>
+                              }
+                              @if (plan.status === 'active') {
+                                <button type="button" role="menuitem" [disabled]="!plan.canArchive || isLoading()" (click)="archivePlan(plan.id)">Archive</button>
+                              }
+                              @if (plan.status === 'retired') {
+                                <button type="button" role="menuitem" [disabled]="!canArchiveOrReactivate() || isLoading()" (click)="reactivatePlan(plan.id)">Reactivate</button>
+                              }
+                              <button
+                                type="button"
+                                role="menuitem"
+                                class="danger"
+                                [disabled]="!plan.canDelete || isLoading()"
+                                [title]="plan.canDelete ? 'Delete plan' : (plan.deleteBlockedReason ?? 'Delete not allowed')"
+                                (click)="deleteDraftPlan(plan)"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          }
+                        </div>
+                      </td>
                     </tr>
                   }
                 </tbody>
@@ -627,6 +697,14 @@ export class PlatformSubscriptionPlansPage implements OnInit {
     return this.accessControl.hasPermission(platformPermissions.subscriptionPlansCreate);
   }
 
+  canArchiveOrReactivate(): boolean {
+    return this.accessControl.hasPermission(platformPermissions.subscriptionPlansArchive);
+  }
+
+  canEdit(): boolean {
+    return this.accessControl.hasPermission(platformPermissions.subscriptionPlansEdit);
+  }
+
   tabCount(tab: StatusTab): number {
     const counts = this.planList()?.statusCounts;
     if (!counts) {
@@ -732,6 +810,116 @@ export class PlatformSubscriptionPlansPage implements OnInit {
   goToPage(page: number): void {
     this.pageNumber.set(page);
     this.loadPage();
+  }
+
+  toggleMenu(planId: string): void {
+    this.openMenuId.set(this.openMenuId() === planId ? null : planId);
+  }
+
+  openPlan(plan: SubscriptionPlanListResponse['items'][number]): void {
+    if (!plan.canView) {
+      return;
+    }
+
+    this.router.navigate(['/admin/subscriptions', plan.id]);
+  }
+
+  editPlan(plan: SubscriptionPlanListResponse['items'][number]): void {
+    if (!plan.canEdit) {
+      return;
+    }
+
+    this.router.navigate(['/admin/subscriptions/create'], {
+      state: { planId: plan.id, mode: 'edit' }
+    });
+  }
+
+  duplicatePlan(plan: SubscriptionPlanListResponse['items'][number]): void {
+    if (!plan.canDuplicate || !confirm(`Duplicate "${plan.planName}" as a new draft?`)) {
+      return;
+    }
+
+    this.api.duplicateSubscriptionPlan(plan.id).subscribe({
+      next: () => {
+        this.successMessage.set('Subscription plan duplicated successfully.');
+        this.loadPage();
+      },
+      error: (error) => {
+        this.errorMessage.set(this.apiError.toSafeMessage(error));
+      }
+    });
+  }
+
+  publishPlan(planId: string): void {
+    if (!confirm('Publish this draft plan?')) {
+      return;
+    }
+
+    this.api.publishSubscriptionPlan(planId).subscribe({
+      next: () => {
+        this.openMenuId.set(null);
+        this.successMessage.set('Subscription plan published successfully.');
+        this.loadPage();
+      },
+      error: (error) => {
+        this.errorMessage.set(this.apiError.toSafeMessage(error));
+      }
+    });
+  }
+
+  archivePlan(planId: string): void {
+    if (!confirm('Archive this active plan? It will no longer be available for new assignments.')) {
+      return;
+    }
+
+    this.api.archiveSubscriptionPlan(planId).subscribe({
+      next: () => {
+        this.openMenuId.set(null);
+        this.successMessage.set('Subscription plan archived successfully.');
+        this.loadPage();
+      },
+      error: (error) => {
+        this.errorMessage.set(this.apiError.toSafeMessage(error));
+      }
+    });
+  }
+
+  reactivatePlan(planId: string): void {
+    if (!confirm('Reactivate this archived plan?')) {
+      return;
+    }
+
+    this.api.reactivateSubscriptionPlan(planId).subscribe({
+      next: () => {
+        this.openMenuId.set(null);
+        this.successMessage.set('Subscription plan reactivated successfully.');
+        this.loadPage();
+      },
+      error: (error) => {
+        this.errorMessage.set(this.apiError.toSafeMessage(error));
+      }
+    });
+  }
+
+  deleteDraftPlan(plan: SubscriptionPlanListResponse['items'][number]): void {
+    if (!plan.canDelete) {
+      return;
+    }
+
+    if (!confirm(`Delete draft plan "${plan.planName}"? This cannot be undone.`)) {
+      return;
+    }
+
+    this.api.deleteDraftSubscriptionPlan(plan.id).subscribe({
+      next: () => {
+        this.openMenuId.set(null);
+        this.successMessage.set('Draft plan deleted successfully.');
+        this.loadPage();
+      },
+      error: (error) => {
+        this.errorMessage.set(this.apiError.toSafeMessage(error));
+      }
+    });
   }
 
   rangeLabel(list: SubscriptionPlanListResponse): string {

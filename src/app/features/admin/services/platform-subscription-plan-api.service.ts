@@ -7,6 +7,7 @@ import { appSettings } from '../../../core/config/app-settings';
 import { ApiResponse } from '../../../core/models/api-response.model';
 import {
   mapCreateSubscriptionPlanRequest,
+  mapSubscriptionPlanDetailResponse,
   mapSubscriptionPlanCatalog,
   mapSubscriptionPlanFeaturesMutationResponse,
   mapSubscriptionPlanFeaturesRequest,
@@ -16,6 +17,7 @@ import {
   mapSubscriptionPlanMutationResponse,
   mapSubscriptionPlanPricingMutationResponse,
   SubscriptionPlanCatalogResponseApiDto,
+  SubscriptionPlanDetailApiDto,
   SubscriptionPlanListResponseApiDto,
   SubscriptionPlanMutationResponseApiDto
 } from '../mappers/platform-subscription-plan.mapper';
@@ -24,6 +26,7 @@ import {
   PlatformModuleOption,
   SubscriptionPlanCatalogModule,
   SubscriptionPlanCatalogResponse,
+  SubscriptionPlanDetail,
   SubscriptionPlanDraft,
   SubscriptionPlanFeaturesMutationResponse,
   SubscriptionPlanFeaturesUpdateRequest,
@@ -33,7 +36,8 @@ import {
   SubscriptionPlanListResponse,
   SubscriptionPlanMutationResponse,
   SubscriptionPlanPricingMutationResponse,
-  SubscriptionPlanPricingUpdateRequest
+  SubscriptionPlanPricingUpdateRequest,
+  SubscriptionPlanUpdateRequest
 } from '../models/platform-subscription-plan.model';
 
 @Injectable({ providedIn: 'root' })
@@ -42,6 +46,14 @@ export class PlatformSubscriptionPlanApiService {
 
   getSubscriptionPlans(query: SubscriptionPlanListQuery): Observable<SubscriptionPlanListResponse> {
     return this.getPlans(query);
+  }
+
+  getSubscriptionPlanDetail(planId: string): Observable<SubscriptionPlanDetail> {
+    return this.http
+      .get<ApiResponse<SubscriptionPlanDetailApiDto>>(
+        `${appSettings.apiBaseUrl}${apiEndpoints.platform.subscriptionPlans}/${planId}`
+      )
+      .pipe(map((response) => mapSubscriptionPlanDetailResponse(response.data)));
   }
 
   getPlans(query: SubscriptionPlanListQuery): Observable<SubscriptionPlanListResponse> {
@@ -112,6 +124,87 @@ export class PlatformSubscriptionPlanApiService {
         map((response) => {
           if (!response.success || !response.data?.id) {
             throw new Error(response.message || 'Subscription plan could not be published.');
+          }
+
+          return mapSubscriptionPlanMutationResponse(response.data);
+        })
+      );
+  }
+
+  duplicateSubscriptionPlan(planId: string): Observable<SubscriptionPlanMutationResponse> {
+    return this.http
+      .post<ApiResponse<SubscriptionPlanMutationResponseApiDto>>(
+        `${appSettings.apiBaseUrl}${apiEndpoints.platform.subscriptionPlans}/${planId}/duplicate`,
+        {}
+      )
+      .pipe(
+        map((response) => {
+          if (!response.success || !response.data?.id) {
+            throw new Error(response.message || 'Subscription plan could not be duplicated.');
+          }
+
+          return mapSubscriptionPlanMutationResponse(response.data);
+        })
+      );
+  }
+
+  archiveSubscriptionPlan(planId: string): Observable<SubscriptionPlanMutationResponse> {
+    return this.http
+      .post<ApiResponse<SubscriptionPlanMutationResponseApiDto>>(
+        `${appSettings.apiBaseUrl}${apiEndpoints.platform.subscriptionPlans}/${planId}/archive`,
+        {}
+      )
+      .pipe(
+        map((response) => {
+          if (!response.success || !response.data?.id) {
+            throw new Error(response.message || 'Subscription plan could not be archived.');
+          }
+
+          return mapSubscriptionPlanMutationResponse(response.data);
+        })
+      );
+  }
+
+  reactivateSubscriptionPlan(planId: string): Observable<SubscriptionPlanMutationResponse> {
+    return this.http
+      .post<ApiResponse<SubscriptionPlanMutationResponseApiDto>>(
+        `${appSettings.apiBaseUrl}${apiEndpoints.platform.subscriptionPlans}/${planId}/reactivate`,
+        {}
+      )
+      .pipe(
+        map((response) => {
+          if (!response.success || !response.data?.id) {
+            throw new Error(response.message || 'Subscription plan could not be reactivated.');
+          }
+
+          return mapSubscriptionPlanMutationResponse(response.data);
+        })
+      );
+  }
+
+  deleteDraftSubscriptionPlan(planId: string): Observable<boolean> {
+    return this.http
+      .delete<ApiResponse<{ deleted: boolean }>>(
+        `${appSettings.apiBaseUrl}${apiEndpoints.platform.subscriptionPlans}/${planId}`
+      )
+      .pipe(map((response) => response.success && !!response.data?.deleted));
+  }
+
+  updateSubscriptionPlanDraft(planId: string, request: SubscriptionPlanUpdateRequest): Observable<SubscriptionPlanMutationResponse> {
+    return this.http
+      .put<ApiResponse<SubscriptionPlanMutationResponseApiDto>>(
+        `${appSettings.apiBaseUrl}${apiEndpoints.platform.subscriptionPlans}/${planId}`,
+        {
+          planCode: request.planCode,
+          name: request.planName,
+          description: request.description,
+          billingCycle: request.billingCycle
+        }
+      )
+      .pipe(
+        map((response) => {
+          if (!response.success || !response.data?.id) {
+            throw new Error(response.message || 'Subscription plan could not be updated.');
           }
 
           return mapSubscriptionPlanMutationResponse(response.data);

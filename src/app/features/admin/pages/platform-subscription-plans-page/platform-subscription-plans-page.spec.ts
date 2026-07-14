@@ -160,4 +160,17 @@ describe('PlatformSubscriptionPlansPage', () => {
 
     expect(createLink?.getAttribute('href')).toBe('/admin/subscriptions/create');
   });
+
+  it('links a plan name to its dedicated detail route', async () => {
+    api.getSubscriptionPlans.mockReturnValue(of(createSubscriptionPlanListResponse()));
+
+    const fixture = await createComponent();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const planLink = [...(fixture.nativeElement as HTMLElement).querySelectorAll('a')]
+      .find((link) => link.textContent?.includes('Test Subscription Plan'));
+
+    expect(planLink?.getAttribute('href')).toContain('/admin/subscriptions/');
+  });
 });

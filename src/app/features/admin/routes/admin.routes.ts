@@ -56,6 +56,14 @@ export const adminRoutes: Routes = [
     data: { title: 'Create Subscription Plan', requiredPermission: platformPermissions.subscriptionPlansCreate }
   },
   {
+    path: 'subscriptions/:planId',
+    loadComponent: () =>
+      import('../pages/platform-subscription-plan-detail-page/platform-subscription-plan-detail-page').then(
+        (m) => m.PlatformSubscriptionPlanDetailPage
+      ),
+    data: { title: 'Subscription Plan Detail', requiredPermission: platformPermissions.subscriptionPlansView }
+  },
+  {
     path: 'subscriptions',
     loadComponent: () =>
       import('../pages/platform-subscription-plans-page/platform-subscription-plans-page').then(
@@ -65,8 +73,11 @@ export const adminRoutes: Routes = [
   },
   {
     path: 'modules',
-    loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
-    data: { title: 'Modules and Features', requiredPermission: platformPermissions.featuresView }
+    loadComponent: () =>
+      import('../pages/platform-modules-catalog-page/platform-modules-catalog-page').then(
+        (m) => m.PlatformModulesCatalogPage
+      ),
+    data: { title: 'Modules and Features', requiredPermission: platformPermissions.modulesView }
   },
   {
     path: 'roles-permissions',
@@ -78,7 +89,8 @@ export const adminRoutes: Routes = [
   },
   {
     path: 'platform-users',
-    loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
+    loadComponent: () =>
+      import('../pages/platform-users-page/platform-users-page').then((m) => m.PlatformUsersPage),
     data: { title: 'Platform Users', requiredPermission: platformPermissions.usersView }
   },
   {
@@ -92,14 +104,25 @@ export const adminRoutes: Routes = [
     data: { title: 'Platform Reports', requiredPermission: platformPermissions.dashboardView }
   },
   {
+    path: 'settings',
+    pathMatch: 'full',
+    redirectTo: 'settings/system'
+  },
+  {
     path: 'settings/system',
-    loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
+    loadComponent: () =>
+      import('../pages/platform-system-settings-page/platform-system-settings-page').then(
+        (m) => m.PlatformSystemSettingsPage
+      ),
     data: { title: 'System Settings', requiredPermission: platformPermissions.settingsView }
   },
   {
     path: 'audit-logs',
-    loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
-    data: { title: 'Audit Logs', requiredPermission: platformPermissions.auditView }
+    loadComponent: () =>
+      import('../pages/platform-audit-logs-page/platform-audit-logs-page').then(
+        (m) => m.PlatformAuditLogsPage
+      ),
+    data: { title: 'Platform Login Audit', requiredPermission: platformPermissions.auditView }
   },
   {
     path: 'tenant/:tenantId/outlets',

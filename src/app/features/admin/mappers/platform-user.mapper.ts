@@ -1,4 +1,11 @@
-import { PlatformUserDetail, PlatformUserListResponse, PlatformUserSummary } from '../models/platform-user.model';
+import {
+  AssignPlatformUserRolesRequest,
+  CreatePlatformUserRequest,
+  PlatformUserDetail,
+  PlatformUserListResponse,
+  PlatformUserSummary,
+  UpdatePlatformUserRequest
+} from '../models/platform-user.model';
 
 export interface PlatformUserListItemApiDto {
   id: string;
@@ -48,5 +55,25 @@ export function mapPlatformUserDetail(dto: PlatformUserDetailApiDto): PlatformUs
   return {
     ...mapPlatformUserSummary(dto),
     invitePending: dto.invitePending
+  };
+}
+
+export function mapCreatePlatformUserRequest(request: CreatePlatformUserRequest): Record<string, unknown> {
+  return {
+    email: request.email.trim(),
+    status: request.status,
+    roleIds: request.roleIds
+  };
+}
+
+export function mapUpdatePlatformUserRequest(request: UpdatePlatformUserRequest): Record<string, unknown> {
+  return {
+    status: request.status
+  };
+}
+
+export function mapAssignPlatformUserRolesRequest(request: AssignPlatformUserRolesRequest): Record<string, unknown> {
+  return {
+    roleIds: request.roleIds
   };
 }

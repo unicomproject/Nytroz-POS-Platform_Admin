@@ -73,9 +73,21 @@ export interface PlatformTenantDetail extends PlatformTenantListItem {
   onlineStoreEnabled: boolean;
   clickCollectEnabled: boolean;
   offlineEnabled: boolean;
+  enabledFeatureIds: string[];
+  enabledFeatureCodes: string[];
   subscription: PlatformTenantSubscriptionDetail | null;
   canUpdate: boolean;
   canActivate: boolean;
   canSuspend: boolean;
   canManageEntitlements: boolean;
+}
+
+export interface UpdatePlatformTenantRequest {
+  name: string;
+  baseCurrency: string;
+  defaultTimezone: string;
+  defaultLocale: string;
+  operatingMode: string;
+  businessType?: string | null;
+  billingStatus: string;
 }

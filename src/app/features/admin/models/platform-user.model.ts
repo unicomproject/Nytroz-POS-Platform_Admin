@@ -18,3 +18,25 @@ export interface PlatformUserListResponse {
 export interface PlatformUserDetail extends PlatformUserSummary {
   invitePending: boolean;
 }
+
+export interface CreatePlatformUserRequest {
+  email: string;
+  status: string;
+  roleIds: string[];
+}
+
+export interface UpdatePlatformUserRequest {
+  status: string;
+}
+
+export interface AssignPlatformUserRolesRequest {
+  roleIds: string[];
+}
+
+export type PlatformUserEditorMode = 'create' | 'edit';
+
+export const platformUserStatusOptions = [
+  { value: 'ACTIVE', label: 'Active' },
+  { value: 'INACTIVE', label: 'Inactive' },
+  { value: 'LOCKED', label: 'Locked' }
+] as const;

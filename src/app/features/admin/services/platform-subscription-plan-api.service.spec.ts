@@ -86,6 +86,33 @@ describe('PlatformSubscriptionPlanApiService', () => {
     expect(savedId).toBe('plan-1');
   });
 
+  it('loads and maps the dedicated plan detail contract', () => {
+    let featureName = '';
+
+    service.getSubscriptionPlanDetail('plan-1').subscribe((detail) => {
+      featureName = detail.modules[0]?.features[0]?.name ?? '';
+    });
+
+    const request = httpTesting.expectOne('/api/v1/platform/subscription-plans/plan-1');
+    expect(request.request.method).toBe('GET');
+    request.flush({
+      success: true,
+      message: 'ok',
+      data: {
+        id: 'plan-1', planCode: 'PRO', name: 'Professional', description: null,
+        status: 'active', billingCycle: 'monthly', baseCurrency: 'LKR', basePrice: 1000,
+        pricingModel: 'fixed', trialDays: 0, maxOutlets: 2, maxUsers: 5, maxTills: 3,
+        featureCount: 1, activeTenantCount: 2, canEdit: false, canDuplicate: true,
+        canArchive: true, canDelete: false, canReactivate: false,
+        createdAt: '2026-07-01T00:00:00Z', updatedAt: '2026-07-02T00:00:00Z',
+        limits: [{ id: 'limit-1', code: 'MAX_OUTLETS', name: 'Maximum outlets', value: 2, isUnlimited: false }],
+        modules: [{ id: 'module-1', code: 'CORE', name: 'Core', features: [{ id: 'feature-1', code: 'SALES', name: 'Sales' }] }]
+      }
+    });
+
+    expect(featureName).toBe('Sales');
+  });
+
   it('calls POST publish endpoint only after successful save response', () => {
     let publishedStatus = '';
 
