@@ -18,7 +18,8 @@ export const apiEndpoints = {
     features: '/features',
     auditLogs: '/platform-admin/audit-logs',
     users: '/platform-admin/users',
-    settings: '/platform-admin/settings'
+    settings: '/platform-admin/settings',
+    billing: '/platform-admin/billing'
   },
   tenant: {
     users: '/users',

@@ -94,8 +94,13 @@ export const adminRoutes: Routes = [
     data: { title: 'Platform Users', requiredPermission: platformPermissions.usersView }
   },
   {
+    path: 'billing/invoices/:invoiceId',
+    loadComponent: () => import('../pages/platform-billing-page/platform-billing-page').then((m) => m.PlatformBillingPage),
+    data: { title: 'Billing Invoice', requiredPermission: platformPermissions.billingView }
+  },
+  {
     path: 'billing',
-    loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
+    loadComponent: () => import('../pages/platform-billing-page/platform-billing-page').then((m) => m.PlatformBillingPage),
     data: { title: 'Billing', requiredPermission: platformPermissions.billingView }
   },
   {
