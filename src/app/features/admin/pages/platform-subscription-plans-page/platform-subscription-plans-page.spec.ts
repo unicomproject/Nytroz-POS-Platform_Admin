@@ -133,6 +133,21 @@ describe('PlatformSubscriptionPlansPage', () => {
     expect(text).toContain('Try again');
   });
 
+  it('does not render unsupported row action buttons', async () => {
+    api.getSubscriptionPlans.mockReturnValue(of(createSubscriptionPlanListResponse()));
+
+    const fixture = await createComponent();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector('[aria-label="View plan"]')).toBeNull();
+    expect(root.querySelector('[aria-label="Edit plan"]')).toBeNull();
+    expect(root.querySelector('[aria-label="Duplicate plan"]')).toBeNull();
+    expect(root.querySelector('[aria-label="More actions"]')).toBeNull();
+    expect(root.querySelector('.action-menu')).toBeNull();
+  });
+
   it('links Create Plan to /admin/subscriptions/create', async () => {
     api.getSubscriptionPlans.mockReturnValue(of(createSubscriptionPlanListResponse()));
 

@@ -40,7 +40,7 @@ type StatusTab = SubscriptionPlanStatusTab;
             <span class="current">Plans</span>
           </nav>
           <h1>Subscription Plans</h1>
-          <p>Create and manage plan templates for tenants.</p>
+          <p>Browse subscription plans. Use Create Plan to add a new draft plan.</p>
           <span class="title-accent" aria-hidden="true"></span>
         </div>
         @if (canCreate()) {
@@ -147,7 +147,6 @@ type StatusTab = SubscriptionPlanStatusTab;
                   <th>Active Tenants</th>
                   <th>Status</th>
                   <th>Last Updated</th>
-                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -179,7 +178,6 @@ type StatusTab = SubscriptionPlanStatusTab;
                     <th>Active Tenants</th>
                     <th>Status</th>
                     <th>Last Updated</th>
-                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -577,65 +575,6 @@ type StatusTab = SubscriptionPlanStatusTab;
     .status-badge.draft { background: #fff6ed; color: #b54708; }
     .status-badge.archived { background: #f2f4f7; color: #475467; }
 
-    .actions-cell { display: flex; gap: 0.25rem; position: relative; }
-
-    .icon-btn {
-      align-items: center;
-      background: transparent;
-      border: 0;
-      border-radius: 8px;
-      color: #667085;
-      cursor: pointer;
-      display: inline-flex;
-      height: 2rem;
-      justify-content: center;
-      width: 2rem;
-    }
-
-    .icon-btn:disabled { cursor: not-allowed; opacity: 0.4; }
-
-    .icon-btn svg {
-      fill: none;
-      height: 1rem;
-      stroke: currentColor;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-      stroke-width: 1.75;
-      width: 1rem;
-    }
-
-    .icon-btn:not(:disabled):hover { background: #f2f4f7; color: #0b5cff; }
-
-    .menu-wrap { position: relative; }
-
-    .action-menu {
-      background: #fff;
-      border: 1px solid #eaecf0;
-      border-radius: 10px;
-      box-shadow: 0 8px 24px rgba(16, 24, 40, 0.12);
-      display: grid;
-      min-width: 9rem;
-      padding: 0.35rem;
-      position: absolute;
-      right: 0;
-      top: calc(100% + 0.25rem);
-      z-index: 5;
-    }
-
-    .action-menu button {
-      background: transparent;
-      border: 0;
-      border-radius: 8px;
-      color: #344054;
-      cursor: pointer;
-      font-size: 0.82rem;
-      padding: 0.45rem 0.65rem;
-      text-align: left;
-    }
-
-    .action-menu button:disabled { cursor: not-allowed; opacity: 0.45; }
-    .action-menu button.danger { color: #b42318; }
-
     .pagination {
       align-items: center;
       display: flex;
@@ -710,7 +649,7 @@ export class PlatformSubscriptionPlansPage implements OnInit {
   private readonly searchChanges$ = new Subject<string>();
 
   readonly skeletonRows = [1, 2, 3, 4, 5];
-  readonly skeletonCols = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+  readonly skeletonCols = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
   readonly statusTabs = [
     { key: 'all' as StatusTab, label: 'All', icon: 'M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5' },
@@ -730,7 +669,6 @@ export class PlatformSubscriptionPlansPage implements OnInit {
   readonly currencyFilter = signal('');
   readonly pageNumber = signal(1);
   readonly pageSize = signal(10);
-  readonly openMenuId = signal<string | null>(null);
   readonly successMessage = signal<string | null>(null);
 
   ngOnInit(): void {
@@ -846,7 +784,6 @@ export class PlatformSubscriptionPlansPage implements OnInit {
   loadPage(): void {
     this.isLoading.set(true);
     this.errorMessage.set(null);
-    this.openMenuId.set(null);
 
     this.api.getSubscriptionPlans({
       pageNumber: this.pageNumber(),
