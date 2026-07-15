@@ -670,6 +670,7 @@ export class PlatformSubscriptionPlansPage implements OnInit {
   readonly pageNumber = signal(1);
   readonly pageSize = signal(10);
   readonly successMessage = signal<string | null>(null);
+  readonly openMenuId = signal<string | null>(null);
 
   ngOnInit(): void {
     const navigationState = this.router.currentNavigation()?.extras.state

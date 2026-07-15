@@ -15,7 +15,6 @@ export const apiEndpoints = {
     tenantFilterOptions: '/platform-admin/tenants/filter-options',
     modulesCatalog: '/platform-admin/catalog/modules',
     subscriptionPlans: '/platform/subscription-plans',
-    users: '/platform-admin/users'
     features: '/features',
     auditLogs: '/platform-admin/audit-logs',
     users: '/platform-admin/users',
