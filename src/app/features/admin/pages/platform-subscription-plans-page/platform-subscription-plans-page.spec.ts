@@ -9,7 +9,10 @@ import { PlatformSubscriptionPlanApiService } from '../../services/platform-subs
 import { PlatformSubscriptionPlansPage } from './platform-subscription-plans-page';
 
 describe('PlatformSubscriptionPlansPage', () => {
-  let api: { getSubscriptionPlans: ReturnType<typeof vi.fn> };
+  let api: {
+    getSubscriptionPlans: ReturnType<typeof vi.fn>;
+    archiveSubscriptionPlan: ReturnType<typeof vi.fn>;
+  };
 
   async function createComponent(): Promise<ComponentFixture<PlatformSubscriptionPlansPage>> {
     await TestBed.configureTestingModule({
@@ -31,7 +34,10 @@ describe('PlatformSubscriptionPlansPage', () => {
   }
 
   beforeEach(() => {
-    api = { getSubscriptionPlans: vi.fn() };
+    api = {
+      getSubscriptionPlans: vi.fn(),
+      archiveSubscriptionPlan: vi.fn()
+    };
   });
 
   it('shows skeleton rows while loading', async () => {
@@ -133,7 +139,7 @@ describe('PlatformSubscriptionPlansPage', () => {
     expect(text).toContain('Try again');
   });
 
-  it('does not render unsupported row action buttons', async () => {
+  it('renders the supported row action controls', async () => {
     api.getSubscriptionPlans.mockReturnValue(of(createSubscriptionPlanListResponse()));
 
     const fixture = await createComponent();
@@ -141,10 +147,10 @@ describe('PlatformSubscriptionPlansPage', () => {
     fixture.detectChanges();
 
     const root = fixture.nativeElement as HTMLElement;
-    expect(root.querySelector('[aria-label="View plan"]')).toBeNull();
-    expect(root.querySelector('[aria-label="Edit plan"]')).toBeNull();
-    expect(root.querySelector('[aria-label="Duplicate plan"]')).toBeNull();
-    expect(root.querySelector('[aria-label="More actions"]')).toBeNull();
+    expect(root.querySelector('[aria-label="View plan"]')).toBeTruthy();
+    expect(root.querySelector('[aria-label="Edit plan"]')).toBeTruthy();
+    expect(root.querySelector('[aria-label="Duplicate plan"]')).toBeTruthy();
+    expect(root.querySelector('[aria-label="More actions"]')).toBeTruthy();
     expect(root.querySelector('.action-menu')).toBeNull();
   });
 
@@ -172,5 +178,51 @@ describe('PlatformSubscriptionPlansPage', () => {
       .find((link) => link.textContent?.includes('Test Subscription Plan'));
 
     expect(planLink?.getAttribute('href')).toContain('/admin/subscriptions/');
+  });
+
+  it('opens, closes, and switches the row action menu by plan id', async () => {
+    const firstPlan = {
+      ...createSubscriptionPlanListResponse().items[0],
+      id: 'plan-1'
+    };
+    const secondPlan = { ...firstPlan, id: 'plan-2', planName: 'Second Plan' };
+    api.getSubscriptionPlans.mockReturnValue(
+      of(createSubscriptionPlanListResponse({ items: [firstPlan, secondPlan], totalItems: 2 }))
+    );
+
+    const fixture = await createComponent();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const menuButtons = (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>(
+      '[aria-label="More actions"]'
+    );
+    expect(fixture.componentInstance.openMenuId()).toBeNull();
+
+    menuButtons[0].click();
+    fixture.detectChanges();
+    expect(fixture.componentInstance.openMenuId()).toBe('plan-1');
+
+    menuButtons[0].click();
+    fixture.detectChanges();
+    expect(fixture.componentInstance.openMenuId()).toBeNull();
+
+    menuButtons[0].click();
+    menuButtons[1].click();
+    fixture.detectChanges();
+    expect(fixture.componentInstance.openMenuId()).toBe('plan-2');
+  });
+
+  it('closes the row action menu after a successful action', async () => {
+    api.getSubscriptionPlans.mockReturnValue(of(createSubscriptionPlanListResponse()));
+    api.archiveSubscriptionPlan.mockReturnValue(of({}));
+    vi.spyOn(globalThis, 'confirm').mockReturnValue(true);
+
+    const fixture = await createComponent();
+    fixture.componentInstance.toggleMenu('plan-1');
+    fixture.componentInstance.archivePlan('plan-1');
+
+    expect(api.archiveSubscriptionPlan).toHaveBeenCalledWith('plan-1');
+    expect(fixture.componentInstance.openMenuId()).toBeNull();
   });
 });
