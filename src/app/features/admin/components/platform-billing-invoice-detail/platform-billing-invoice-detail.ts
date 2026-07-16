@@ -53,6 +53,33 @@ import { PlatformBillingInvoiceDetail } from '../../models/platform-billing.mode
         </div>
       </header>
 
+      @if (detail && (canIssueAction || canMarkPaidAction)) {
+        <div class="mutation-actions" role="group" aria-label="Invoice actions">
+          @if (canIssueAction) {
+            <button
+              type="button"
+              class="btn primary"
+              (click)="onIssue()"
+              [disabled]="mutationBusy"
+              [attr.aria-busy]="mutationBusy"
+            >
+              Issue invoice
+            </button>
+          }
+          @if (canMarkPaidAction) {
+            <button
+              type="button"
+              class="btn primary"
+              (click)="onMarkPaid()"
+              [disabled]="mutationBusy"
+              [attr.aria-busy]="mutationBusy"
+            >
+              Mark as paid
+            </button>
+          }
+        </div>
+      }
+
       @if (loading) {
         <div class="skeleton" aria-label="Loading invoice detail" aria-busy="true">
           @for (row of skeletonRows; track row) {
@@ -271,6 +298,24 @@ import { PlatformBillingInvoiceDetail } from '../../models/platform-billing.mode
       display: flex;
       gap: 0.55rem;
     }
+    .mutation-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.65rem;
+    }
+    .btn.primary {
+      background: #0b5cff;
+      border: 0;
+      border-radius: 8px;
+      color: #fff;
+      cursor: pointer;
+      font-weight: 700;
+      padding: 0.6rem 0.9rem;
+    }
+    .btn.primary:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
     .status {
       border-radius: 99px;
       display: inline-block;
@@ -454,8 +499,13 @@ export class PlatformBillingInvoiceDetailPanel implements AfterViewInit {
   @Input() loading = false;
   @Input() error: string | null = null;
   @Input() notFound = false;
+  @Input() canIssueAction = false;
+  @Input() canMarkPaidAction = false;
+  @Input() mutationBusy = false;
   @Output() readonly dismiss = new EventEmitter<void>();
   @Output() readonly retryLoad = new EventEmitter<void>();
+  @Output() readonly issueRequested = new EventEmitter<void>();
+  @Output() readonly markPaidRequested = new EventEmitter<void>();
   @ViewChild('closeButton') private readonly closeButton?: ElementRef<HTMLButtonElement>;
 
   readonly skeletonRows = [1, 2, 3, 4];
@@ -470,6 +520,20 @@ export class PlatformBillingInvoiceDetailPanel implements AfterViewInit {
 
   onRetry(): void {
     this.retryLoad.emit();
+  }
+
+  onIssue(): void {
+    if (!this.canIssueAction || this.mutationBusy) {
+      return;
+    }
+    this.issueRequested.emit();
+  }
+
+  onMarkPaid(): void {
+    if (!this.canMarkPaidAction || this.mutationBusy) {
+      return;
+    }
+    this.markPaidRequested.emit();
   }
 
   formatNullableDate(value: string | null): string {

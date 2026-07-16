@@ -1,7 +1,9 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, HostListener, OnDestroy, signal } from '@angular/core';
+import { Component, HostListener, OnDestroy, computed, inject, signal } from '@angular/core';
 import { Subscription } from 'rxjs';
 
+import { platformPermissions } from '../../../../core/config/permission-keys';
+import { AccessControlService } from '../../../../core/services/access-control.service';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import {
   DEFAULT_PLATFORM_BILLING_FILTER_VALUES,
@@ -9,6 +11,10 @@ import {
   PlatformBillingFilters,
 } from '../../components/platform-billing-filters/platform-billing-filters';
 import { PlatformBillingInvoiceDetailPanel } from '../../components/platform-billing-invoice-detail/platform-billing-invoice-detail';
+import {
+  PlatformBillingMutationConfirmation,
+  PlatformBillingMutationMode,
+} from '../../components/platform-billing-mutation-confirmation/platform-billing-mutation-confirmation';
 import { PlatformBillingPaymentHistory } from '../../components/platform-billing-payment-history/platform-billing-payment-history';
 import { PlatformBillingSummaryCards } from '../../components/platform-billing-summary-cards/platform-billing-summary-cards';
 import { PlatformInvoiceTable } from '../../components/platform-invoice-table/platform-invoice-table';
@@ -35,20 +41,30 @@ import { PlatformBillingApiService } from '../../services/platform-billing-api.s
     PlatformInvoiceTable,
     PlatformBillingInvoiceDetailPanel,
     PlatformBillingPaymentHistory,
+    PlatformBillingMutationConfirmation,
   ],
   template: `
     <section class="billing-page">
+      @if (successMessage()) {
+        <div class="toast success" role="status">{{ successMessage() }}</div>
+      }
+      @if (mutationError()) {
+        <div class="toast error" role="alert">{{ mutationError() }}</div>
+      }
+
       <header class="page-heading">
         <div>
           <h1>Billing</h1>
           <p>Review platform revenue and subscription invoices by currency.</p>
         </div>
         <div class="heading-actions">
-          <span class="read-only">Read only</span
-          ><button
+          @if (!canManageBilling()) {
+            <span class="read-only">Read only</span>
+          }
+          <button
             type="button"
             (click)="refresh()"
-            [disabled]="summaryLoading() || invoiceLoading()"
+            [disabled]="summaryLoading() || invoiceLoading() || mutationLoading()"
           >
             Refresh
           </button>
@@ -66,7 +82,7 @@ import { PlatformBillingApiService } from '../../services/platform-billing-api.s
         [statusOptions]="filterOptions().statuses"
         [optionsLoading]="filterOptionsLoading()"
         [optionsError]="filterOptionsError()"
-        [disabled]="invoiceLoading()"
+        [disabled]="invoiceLoading() || mutationLoading()"
         (searchChange)="onSearchChange($event)"
         (tenantChange)="onTenantChange($event)"
         (statusChange)="onStatusChange($event)"
@@ -134,8 +150,13 @@ import { PlatformBillingApiService } from '../../services/platform-billing-api.s
             [loading]="detailLoading()"
             [error]="detailError()"
             [notFound]="detailNotFound()"
+            [canIssueAction]="canShowIssue()"
+            [canMarkPaidAction]="canShowMarkPaid()"
+            [mutationBusy]="mutationLoading()"
             (dismiss)="closeDetail()"
             (retryLoad)="loadInvoiceDetail()"
+            (issueRequested)="openIssueConfirmation()"
+            (markPaidRequested)="openMarkPaidConfirmation()"
           />
           @if (!detailNotFound()) {
             <app-platform-billing-payment-history
@@ -146,6 +167,20 @@ import { PlatformBillingApiService } from '../../services/platform-billing-api.s
             />
           }
         </aside>
+      }
+
+      @if (confirmationMode(); as mode) {
+        <app-platform-billing-mutation-confirmation
+          [mode]="mode"
+          [invoiceNumber]="confirmationInvoiceNumber()"
+          [tenantName]="confirmationTenantName()"
+          [displayStatus]="confirmationDisplayStatus()"
+          [balanceDue]="confirmationBalanceDue()"
+          [currencyCode]="confirmationCurrencyCode()"
+          [loading]="mutationLoading()"
+          (confirmed)="onMutationConfirmed($event)"
+          (cancelled)="closeConfirmation()"
+        />
       }
     </section>
   `,
@@ -161,6 +196,27 @@ import { PlatformBillingApiService } from '../../services/platform-billing-api.s
       display: grid;
       gap: 1.25rem;
       position: relative;
+    }
+    .toast {
+      border-radius: 12px;
+      box-shadow: 0 10px 24px rgba(16, 24, 40, 0.12);
+      font-size: 0.88rem;
+      font-weight: 600;
+      padding: 0.85rem 1rem;
+      position: fixed;
+      right: 1.6rem;
+      top: 5.5rem;
+      z-index: 40;
+    }
+    .toast.success {
+      background: #ecfdf3;
+      border: 1px solid #abefc6;
+      color: #027a48;
+    }
+    .toast.error {
+      background: #fef3f2;
+      border: 1px solid #fecdca;
+      color: #b42318;
     }
     .page-heading {
       align-items: flex-start;
@@ -300,10 +356,16 @@ import { PlatformBillingApiService } from '../../services/platform-billing-api.s
         top: 0;
         width: 100vw;
       }
+      .toast {
+        left: 1rem;
+        right: 1rem;
+      }
     }
   `,
 })
 export class PlatformBillingPage implements OnDestroy {
+  private readonly accessControl = inject(AccessControlService);
+
   readonly summary = signal<PlatformBillingSummary | null>(null);
   readonly invoices = signal<PlatformBillingInvoiceList | null>(null);
   readonly filterOptions = signal<PlatformBillingFilterOptions>({ tenants: [], statuses: [] });
@@ -336,13 +398,50 @@ export class PlatformBillingPage implements OnDestroy {
   readonly paymentsError = signal<string | null>(null);
   readonly detailNotFound = signal(false);
 
+  readonly confirmationMode = signal<PlatformBillingMutationMode | null>(null);
+  readonly mutationLoading = signal(false);
+  readonly successMessage = signal<string | null>(null);
+  readonly mutationError = signal<string | null>(null);
+  readonly manageBlocked = signal(false);
+
+  readonly canManageBilling = computed(
+    () =>
+      !this.manageBlocked() && this.accessControl.hasPermission(platformPermissions.billingManage),
+  );
+
+  readonly canShowIssue = computed(() => {
+    const detail = this.invoiceDetail();
+    return this.canManageBilling() && !!detail && !this.detailNotFound() && detail.invoice.canIssue;
+  });
+
+  readonly canShowMarkPaid = computed(() => {
+    const detail = this.invoiceDetail();
+    return (
+      this.canManageBilling() && !!detail && !this.detailNotFound() && detail.invoice.canMarkPaid
+    );
+  });
+
+  readonly confirmationInvoiceNumber = computed(
+    () => this.invoiceDetail()?.invoice.invoiceNumber ?? '',
+  );
+  readonly confirmationTenantName = computed(() => this.invoiceDetail()?.invoice.tenantName ?? '');
+  readonly confirmationDisplayStatus = computed(
+    () => this.invoiceDetail()?.invoice.displayStatus ?? '',
+  );
+  readonly confirmationBalanceDue = computed(() => this.invoiceDetail()?.invoice.balanceDue ?? 0);
+  readonly confirmationCurrencyCode = computed(
+    () => this.invoiceDetail()?.invoice.currencyCode ?? '',
+  );
+
   private readonly subscriptions = new Subscription();
   private summaryRequestId = 0;
   private invoiceRequestId = 0;
   private detailRequestId = 0;
   private paymentsRequestId = 0;
+  private mutationRequestId = 0;
   private hasLoadedSummary = false;
   private lastFocusedElement: HTMLElement | null = null;
+  private mutationTriggerElement: HTMLElement | null = null;
 
   constructor(
     private readonly api: PlatformBillingApiService,
@@ -358,7 +457,14 @@ export class PlatformBillingPage implements OnDestroy {
 
   @HostListener('document:keydown.escape')
   onEscape(): void {
-    if (this.detailOpen()) {
+    if (this.confirmationMode()) {
+      if (!this.mutationLoading()) {
+        this.closeConfirmation();
+      }
+      return;
+    }
+
+    if (this.detailOpen() && !this.mutationLoading()) {
       this.closeDetail();
     }
   }
@@ -459,6 +565,7 @@ export class PlatformBillingPage implements OnDestroy {
 
   onViewInvoice(invoiceId: string): void {
     this.lastFocusedElement = document.activeElement as HTMLElement | null;
+    this.closeConfirmation();
     this.selectedInvoiceId.set(invoiceId);
     this.detailOpen.set(true);
     this.invoiceDetail.set(null);
@@ -466,13 +573,20 @@ export class PlatformBillingPage implements OnDestroy {
     this.detailError.set(null);
     this.paymentsError.set(null);
     this.detailNotFound.set(false);
+    this.mutationError.set(null);
     this.loadInvoiceDetail();
     this.loadInvoicePayments();
   }
 
   closeDetail(): void {
+    if (this.mutationLoading()) {
+      return;
+    }
+
+    this.mutationRequestId += 1;
     this.detailRequestId += 1;
     this.paymentsRequestId += 1;
+    this.closeConfirmation();
     this.detailOpen.set(false);
     this.selectedInvoiceId.set(null);
     this.invoiceDetail.set(null);
@@ -544,6 +658,100 @@ export class PlatformBillingPage implements OnDestroy {
           }
           this.paymentsError.set(this.apiError.toSafeMessage(error));
           this.paymentsLoading.set(false);
+        },
+      }),
+    );
+  }
+
+  openIssueConfirmation(): void {
+    if (!this.canShowIssue() || this.mutationLoading()) {
+      return;
+    }
+    this.mutationTriggerElement = document.activeElement as HTMLElement | null;
+    this.mutationError.set(null);
+    this.confirmationMode.set('ISSUE');
+  }
+
+  openMarkPaidConfirmation(): void {
+    if (!this.canShowMarkPaid() || this.mutationLoading()) {
+      return;
+    }
+    this.mutationTriggerElement = document.activeElement as HTMLElement | null;
+    this.mutationError.set(null);
+    this.confirmationMode.set('MARK_PAID');
+  }
+
+  closeConfirmation(): void {
+    if (this.mutationLoading()) {
+      return;
+    }
+    this.confirmationMode.set(null);
+    queueMicrotask(() => this.mutationTriggerElement?.focus());
+    this.mutationTriggerElement = null;
+  }
+
+  onMutationConfirmed(mode: PlatformBillingMutationMode): void {
+    if (this.mutationLoading()) {
+      return;
+    }
+
+    const detail = this.invoiceDetail();
+    const invoiceId = this.selectedInvoiceId();
+    if (!detail || !invoiceId || this.confirmationMode() !== mode) {
+      return;
+    }
+
+    if (mode === 'ISSUE' && (!this.canShowIssue() || !detail.invoice.canIssue)) {
+      return;
+    }
+    if (mode === 'MARK_PAID' && (!this.canShowMarkPaid() || !detail.invoice.canMarkPaid)) {
+      return;
+    }
+
+    const requestId = ++this.mutationRequestId;
+    const expectedUpdatedAt = detail.invoice.updatedAt;
+    this.mutationLoading.set(true);
+    this.mutationError.set(null);
+    this.successMessage.set(null);
+
+    const request$ =
+      mode === 'ISSUE'
+        ? this.api.issueInvoice(invoiceId, { expectedUpdatedAt })
+        : this.api.markInvoicePaid(invoiceId, { expectedUpdatedAt });
+
+    this.subscriptions.add(
+      request$.subscribe({
+        next: () => {
+          if (requestId !== this.mutationRequestId) {
+            return;
+          }
+
+          this.mutationLoading.set(false);
+          this.confirmationMode.set(null);
+          this.mutationTriggerElement = null;
+          this.successMessage.set(
+            mode === 'ISSUE'
+              ? 'Invoice issued successfully.'
+              : 'Invoice marked as paid successfully.',
+          );
+
+          if (!this.detailOpen() || this.selectedInvoiceId() !== invoiceId) {
+            return;
+          }
+
+          this.reloadBillingData();
+          this.loadInvoiceDetail();
+          if (mode === 'MARK_PAID') {
+            this.loadInvoicePayments();
+          }
+        },
+        error: (error) => {
+          if (requestId !== this.mutationRequestId) {
+            return;
+          }
+
+          this.mutationLoading.set(false);
+          this.handleMutationError(error, mode, invoiceId);
         },
       }),
     );
@@ -653,6 +861,70 @@ export class PlatformBillingPage implements OnDestroy {
     return query;
   }
 
+  private handleMutationError(
+    error: unknown,
+    mode: PlatformBillingMutationMode,
+    invoiceId: string,
+  ): void {
+    const code = billingErrorCode(error);
+
+    if (code === 'platform_billing.invoice_not_found' || isInvoiceNotFound(error)) {
+      this.confirmationMode.set(null);
+      this.mutationTriggerElement = null;
+      this.invoiceDetail.set(null);
+      this.detailNotFound.set(true);
+      this.detailError.set(this.apiError.toSafeMessage(error));
+      this.mutationError.set('The selected invoice could not be found.');
+      this.reloadBillingData();
+      return;
+    }
+
+    if (code === 'platform_billing.invalid_transition') {
+      this.confirmationMode.set(null);
+      this.mutationTriggerElement = null;
+      this.mutationError.set(
+        'This invoice can no longer use that action. The latest invoice details have been reloaded.',
+      );
+      this.refreshAfterConflict(invoiceId, mode);
+      return;
+    }
+
+    if (code === 'platform_billing.concurrency_conflict') {
+      this.confirmationMode.set(null);
+      this.mutationTriggerElement = null;
+      this.mutationError.set(
+        'This invoice was updated elsewhere. Review the refreshed details before trying again.',
+      );
+      this.refreshAfterConflict(invoiceId, mode);
+      return;
+    }
+
+    if (code === 'platform_billing.access_denied') {
+      this.confirmationMode.set(null);
+      this.mutationTriggerElement = null;
+      this.manageBlocked.set(true);
+      this.mutationError.set('You do not have permission to manage billing invoices.');
+      return;
+    }
+
+    if (code === 'platform_billing.validation_failed') {
+      this.mutationError.set(this.apiError.toSafeMessage(error));
+      return;
+    }
+
+    this.mutationError.set(this.apiError.toSafeMessage(error));
+  }
+
+  private refreshAfterConflict(invoiceId: string, mode: PlatformBillingMutationMode): void {
+    this.reloadBillingData();
+    if (this.detailOpen() && this.selectedInvoiceId() === invoiceId) {
+      this.loadInvoiceDetail();
+      if (mode === 'MARK_PAID') {
+        this.loadInvoicePayments();
+      }
+    }
+  }
+
   private reloadBillingData(): void {
     if (this.hasInvalidDateRange()) {
       this.invoiceLoading.set(false);
@@ -692,4 +964,13 @@ function isInvoiceNotFound(error: unknown): boolean {
   }
 
   return error.error?.errorCode === 'platform_billing.invoice_not_found';
+}
+
+function billingErrorCode(error: unknown): string | null {
+  if (!(error instanceof HttpErrorResponse)) {
+    return null;
+  }
+
+  const code = error.error?.errorCode;
+  return typeof code === 'string' ? code : null;
 }

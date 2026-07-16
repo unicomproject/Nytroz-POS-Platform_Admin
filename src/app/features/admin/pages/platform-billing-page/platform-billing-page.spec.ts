@@ -3,11 +3,13 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of, Subject, throwError } from 'rxjs';
 
 import { platformPermissions } from '../../../../core/config/permission-keys';
+import { AccessControlService } from '../../../../core/services/access-control.service';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import {
   PlatformBillingFilterOptions,
   PlatformBillingInvoiceDetail,
   PlatformBillingInvoiceList,
+  PlatformBillingInvoiceListItem,
   PlatformBillingPaymentTransaction,
   PlatformBillingSummary,
 } from '../../models/platform-billing.model';
@@ -24,6 +26,11 @@ describe('PlatformBillingPage', () => {
     getInvoicePayments: ReturnType<typeof vi.fn>;
     issueInvoice: ReturnType<typeof vi.fn>;
     markInvoicePaid: ReturnType<typeof vi.fn>;
+  };
+  let accessControl: { hasPermission: ReturnType<typeof vi.fn> };
+  let apiError: {
+    toSafeMessage: ReturnType<typeof vi.fn>;
+    toApiError: ReturnType<typeof vi.fn>;
   };
 
   const filterOptions: PlatformBillingFilterOptions = {
@@ -45,33 +52,49 @@ describe('PlatformBillingPage', () => {
     generatedAt: '2026-07-16T00:00:00Z',
   };
 
+  const pendingInvoice: PlatformBillingInvoiceListItem = {
+    id: 'invoice-1',
+    invoiceNumber: 'INV-001',
+    tenantId: 'tenant-1',
+    tenantCode: 'TEN-1',
+    tenantName: 'Nytroz Shop',
+    subscriptionId: 'subscription-1',
+    subscriptionStatus: 'active',
+    planId: 'plan-1',
+    planCode: 'PRO',
+    planName: 'Pro',
+    currencyCode: 'LKR',
+    totalAmount: 1250,
+    paidAmount: 1000,
+    balanceDue: 250,
+    storedStatus: 'PENDING',
+    displayStatus: 'PENDING',
+    issuedAt: '2026-07-01T00:00:00Z',
+    dueAt: '2026-07-31T00:00:00Z',
+    paidAt: null,
+    createdAt: '2026-07-01T00:00:00Z',
+    updatedAt: '2026-07-01T12:00:00Z',
+    canIssue: false,
+    canMarkPaid: true,
+  };
+
+  const draftInvoice: PlatformBillingInvoiceListItem = {
+    ...pendingInvoice,
+    id: 'invoice-draft',
+    invoiceNumber: 'INV-DRAFT',
+    storedStatus: 'DRAFT',
+    displayStatus: 'DRAFT',
+    issuedAt: null,
+    paidAmount: 0,
+    balanceDue: 1250,
+    canIssue: true,
+    canMarkPaid: false,
+    updatedAt: '2026-07-01T08:00:00Z',
+  };
+
   const invoiceList: PlatformBillingInvoiceList = {
     items: [
-      {
-        id: 'invoice-1',
-        invoiceNumber: 'INV-001',
-        tenantId: 'tenant-1',
-        tenantCode: 'TEN-1',
-        tenantName: 'Nytroz Shop',
-        subscriptionId: 'subscription-1',
-        subscriptionStatus: 'active',
-        planId: 'plan-1',
-        planCode: 'PRO',
-        planName: 'Pro',
-        currencyCode: 'LKR',
-        totalAmount: 1250,
-        paidAmount: 1000,
-        balanceDue: 250,
-        storedStatus: 'PENDING',
-        displayStatus: 'PENDING',
-        issuedAt: '2026-07-01T00:00:00Z',
-        dueAt: '2026-07-31T00:00:00Z',
-        paidAt: null,
-        createdAt: '2026-07-01T00:00:00Z',
-        updatedAt: '2026-07-01T00:00:00Z',
-        canIssue: false,
-        canMarkPaid: true,
-      },
+      pendingInvoice,
       {
         id: 'invoice-2',
         invoiceNumber: 'INV-002',
@@ -105,7 +128,7 @@ describe('PlatformBillingPage', () => {
   };
 
   const invoiceDetail: PlatformBillingInvoiceDetail = {
-    invoice: invoiceList.items[0],
+    invoice: pendingInvoice,
     invoiceType: 'subscription',
     billingCycle: 'monthly',
     billingPeriodStart: '2026-07-01T00:00:00Z',
@@ -128,6 +151,11 @@ describe('PlatformBillingPage', () => {
     payments: [],
   };
 
+  const draftDetail: PlatformBillingInvoiceDetail = {
+    ...invoiceDetail,
+    invoice: draftInvoice,
+  };
+
   const payments: PlatformBillingPaymentTransaction[] = [
     {
       id: 'payment-1',
@@ -143,18 +171,35 @@ describe('PlatformBillingPage', () => {
     },
   ];
 
-  async function createComponent(): Promise<ComponentFixture<PlatformBillingPage>> {
+  function billingHttpError(
+    errorCode: string,
+    status = 409,
+    message = 'Billing error',
+  ): HttpErrorResponse {
+    return new HttpErrorResponse({
+      status,
+      error: {
+        success: false,
+        message,
+        errorCode,
+        errors: [],
+      },
+    });
+  }
+
+  async function createComponent(
+    permissions: string[] = [],
+  ): Promise<ComponentFixture<PlatformBillingPage>> {
+    accessControl.hasPermission.mockImplementation((permission: string) =>
+      permissions.includes(permission),
+    );
+
     await TestBed.configureTestingModule({
       imports: [PlatformBillingPage],
       providers: [
         { provide: PlatformBillingApiService, useValue: api },
-        {
-          provide: ApiErrorService,
-          useValue: {
-            toSafeMessage: () => 'Billing failed safely',
-            toApiError: () => null,
-          },
-        },
+        { provide: AccessControlService, useValue: accessControl },
+        { provide: ApiErrorService, useValue: apiError },
       ],
     }).compileComponents();
 
@@ -170,8 +215,15 @@ describe('PlatformBillingPage', () => {
       getFilterOptions: vi.fn().mockReturnValue(of(filterOptions)),
       getInvoice: vi.fn().mockReturnValue(of(invoiceDetail)),
       getInvoicePayments: vi.fn().mockReturnValue(of(payments)),
-      issueInvoice: vi.fn(),
-      markInvoicePaid: vi.fn(),
+      issueInvoice: vi.fn().mockReturnValue(of(pendingInvoice)),
+      markInvoicePaid: vi.fn().mockReturnValue(of(pendingInvoice)),
+    };
+    accessControl = {
+      hasPermission: vi.fn().mockReturnValue(false),
+    };
+    apiError = {
+      toSafeMessage: vi.fn().mockReturnValue('Billing failed safely'),
+      toApiError: vi.fn().mockReturnValue(null),
     };
   });
 
@@ -607,8 +659,8 @@ describe('PlatformBillingPage', () => {
     expect(fixture.componentInstance.invoiceDetail()?.invoice.id).toBe('invoice-2');
   });
 
-  it('does not call mutation APIs when viewing detail', async () => {
-    const fixture = await createComponent();
+  it('does not call mutation APIs when only viewing detail', async () => {
+    const fixture = await createComponent([platformPermissions.billingManage]);
     fixture.componentInstance.onViewInvoice('invoice-1');
     await fixture.whenStable();
     expect(api.issueInvoice).not.toHaveBeenCalled();
@@ -632,5 +684,260 @@ describe('PlatformBillingPage', () => {
     fixture.componentInstance.onViewInvoice('invoice-1');
     await fixture.whenStable();
     expect(api.getInvoices.mock.calls.length).toBe(invoiceCalls);
+  });
+
+  it('hides mutation actions without manage permission', async () => {
+    const fixture = await createComponent([platformPermissions.billingView]);
+    fixture.componentInstance.onViewInvoice('invoice-1');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Read only');
+    expect(fixture.nativeElement.textContent).toContain('INV-001');
+    expect(fixture.nativeElement.textContent).not.toContain('Issue invoice');
+    expect(fixture.nativeElement.textContent).not.toContain('Mark as paid');
+  });
+
+  it('shows Issue for manage users when canIssue is true', async () => {
+    api.getInvoice.mockReturnValue(of(draftDetail));
+    const fixture = await createComponent([platformPermissions.billingManage]);
+    fixture.componentInstance.onViewInvoice('invoice-draft');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Issue invoice');
+    expect(fixture.nativeElement.textContent).not.toContain('Mark as paid');
+    expect(fixture.nativeElement.textContent).not.toContain('Read only');
+  });
+
+  it('shows Mark Paid for manage users when canMarkPaid is true', async () => {
+    const fixture = await createComponent([platformPermissions.billingManage]);
+    fixture.componentInstance.onViewInvoice('invoice-1');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Mark as paid');
+    expect(fixture.nativeElement.textContent).not.toContain('Issue invoice');
+  });
+
+  it('hides invalid actions when manage is present but eligibility is false', async () => {
+    api.getInvoice.mockReturnValue(
+      of({
+        ...invoiceDetail,
+        invoice: { ...pendingInvoice, canIssue: false, canMarkPaid: false, displayStatus: 'PAID' },
+      }),
+    );
+    const fixture = await createComponent([platformPermissions.billingManage]);
+    fixture.componentInstance.onViewInvoice('invoice-1');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).not.toContain('Issue invoice');
+    expect(fixture.nativeElement.textContent).not.toContain('Mark as paid');
+  });
+
+  it('issues an invoice with expectedUpdatedAt and refreshes data once', async () => {
+    const issuedInvoice = {
+      ...draftInvoice,
+      storedStatus: 'PENDING' as const,
+      displayStatus: 'PENDING' as const,
+      canIssue: false,
+      canMarkPaid: true,
+      updatedAt: '2026-07-01T09:00:00Z',
+    };
+    const issuedDetail = { ...draftDetail, invoice: issuedInvoice };
+    api.getInvoice.mockReturnValueOnce(of(draftDetail)).mockReturnValue(of(issuedDetail));
+    api.issueInvoice.mockReturnValue(of(issuedInvoice));
+
+    const fixture = await createComponent([platformPermissions.billingManage]);
+    fixture.componentInstance.onSearchChange('INV');
+    fixture.componentInstance.onViewInvoice('invoice-draft');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const summaryCallsBefore = api.getSummary.mock.calls.length;
+    const invoiceCallsBefore = api.getInvoices.mock.calls.length;
+
+    fixture.componentInstance.openIssueConfirmation();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Issue invoice?');
+    expect(fixture.nativeElement.textContent).toContain('Draft to Pending');
+
+    fixture.componentInstance.onMutationConfirmed('ISSUE');
+    fixture.componentInstance.onMutationConfirmed('ISSUE');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(api.issueInvoice).toHaveBeenCalledTimes(1);
+    expect(api.issueInvoice).toHaveBeenCalledWith('invoice-draft', {
+      expectedUpdatedAt: '2026-07-01T08:00:00Z',
+    });
+    expect(fixture.componentInstance.successMessage()).toBe('Invoice issued successfully.');
+    expect(fixture.componentInstance.confirmationMode()).toBeNull();
+    expect(api.getSummary.mock.calls.length).toBeGreaterThan(summaryCallsBefore);
+    expect(api.getInvoices.mock.calls.length).toBeGreaterThan(invoiceCallsBefore);
+    expect(api.getInvoice.mock.calls.length).toBeGreaterThan(1);
+    expect(fixture.componentInstance.searchTerm()).toBe('INV');
+    expect(fixture.nativeElement.textContent).not.toContain('payment transaction created');
+  });
+
+  it('marks an invoice paid without paidAt and refreshes payment history', async () => {
+    const paidInvoice = {
+      ...pendingInvoice,
+      storedStatus: 'PAID' as const,
+      displayStatus: 'PAID' as const,
+      paidAmount: 1250,
+      balanceDue: 0,
+      canMarkPaid: false,
+      paidAt: '2026-07-16T00:00:00Z',
+      updatedAt: '2026-07-16T00:00:00Z',
+    };
+    const paidDetail = { ...invoiceDetail, invoice: paidInvoice };
+    api.getInvoice.mockReturnValueOnce(of(invoiceDetail)).mockReturnValue(of(paidDetail));
+    api.getInvoicePayments.mockReturnValueOnce(of(payments)).mockReturnValue(of([]));
+    api.markInvoicePaid.mockReturnValue(of(paidInvoice));
+
+    const fixture = await createComponent([platformPermissions.billingManage]);
+    fixture.componentInstance.onViewInvoice('invoice-1');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    fixture.componentInstance.openMarkPaidConfirmation();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Mark invoice as paid?');
+    expect(fixture.nativeElement.textContent).toContain(
+      'may not create a payment-history transaction',
+    );
+
+    fixture.componentInstance.onMutationConfirmed('MARK_PAID');
+    fixture.componentInstance.onMutationConfirmed('MARK_PAID');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(api.markInvoicePaid).toHaveBeenCalledTimes(1);
+    expect(api.markInvoicePaid).toHaveBeenCalledWith('invoice-1', {
+      expectedUpdatedAt: '2026-07-01T12:00:00Z',
+    });
+    expect(fixture.componentInstance.successMessage()).toBe('Invoice marked as paid successfully.');
+    expect(api.getInvoicePayments.mock.calls.length).toBeGreaterThan(1);
+    expect(fixture.nativeElement.textContent).toContain(
+      'No payment history is available for this invoice.',
+    );
+    expect(fixture.nativeElement.textContent).not.toContain('payment transaction created');
+  });
+
+  it('handles invalid_transition with distinct UX and reload', async () => {
+    api.markInvoicePaid.mockReturnValue(
+      throwError(() =>
+        billingHttpError('platform_billing.invalid_transition', 409, 'Invalid transition'),
+      ),
+    );
+    const fixture = await createComponent([platformPermissions.billingManage]);
+    fixture.componentInstance.onViewInvoice('invoice-1');
+    await fixture.whenStable();
+
+    const summaryCallsBefore = api.getSummary.mock.calls.length;
+    fixture.componentInstance.openMarkPaidConfirmation();
+    fixture.componentInstance.onMutationConfirmed('MARK_PAID');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.mutationError()).toContain('can no longer use that action');
+    expect(fixture.componentInstance.confirmationMode()).toBeNull();
+    expect(fixture.componentInstance.detailOpen()).toBe(true);
+    expect(api.getSummary.mock.calls.length).toBeGreaterThan(summaryCallsBefore);
+    expect(api.getInvoice.mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it('handles concurrency_conflict with distinct UX and reload', async () => {
+    api.issueInvoice.mockReturnValue(
+      throwError(() =>
+        billingHttpError('platform_billing.concurrency_conflict', 409, 'Concurrency conflict'),
+      ),
+    );
+    api.getInvoice.mockReturnValue(of(draftDetail));
+    const fixture = await createComponent([platformPermissions.billingManage]);
+    fixture.componentInstance.onViewInvoice('invoice-draft');
+    await fixture.whenStable();
+
+    fixture.componentInstance.openIssueConfirmation();
+    fixture.componentInstance.onMutationConfirmed('ISSUE');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.mutationError()).toContain('updated elsewhere');
+    expect(fixture.componentInstance.confirmationMode()).toBeNull();
+    expect(fixture.componentInstance.detailOpen()).toBe(true);
+  });
+
+  it('handles access_denied by hiding mutation actions', async () => {
+    api.markInvoicePaid.mockReturnValue(
+      throwError(() => billingHttpError('platform_billing.access_denied', 403, 'Denied')),
+    );
+    const fixture = await createComponent([platformPermissions.billingManage]);
+    fixture.componentInstance.onViewInvoice('invoice-1');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    fixture.componentInstance.openMarkPaidConfirmation();
+    fixture.componentInstance.onMutationConfirmed('MARK_PAID');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.mutationError()).toContain('do not have permission');
+    expect(fixture.componentInstance.canManageBilling()).toBe(false);
+    expect(fixture.nativeElement.textContent).not.toContain('Mark as paid');
+    expect(fixture.nativeElement.textContent).toContain('Read only');
+  });
+
+  it('keeps loaded detail on generic mutation errors', async () => {
+    api.markInvoicePaid.mockReturnValue(throwError(() => new Error('network')));
+    const fixture = await createComponent([platformPermissions.billingManage]);
+    fixture.componentInstance.onViewInvoice('invoice-1');
+    await fixture.whenStable();
+
+    fixture.componentInstance.openMarkPaidConfirmation();
+    fixture.componentInstance.onMutationConfirmed('MARK_PAID');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.invoiceDetail()).toEqual(invoiceDetail);
+    expect(fixture.componentInstance.detailOpen()).toBe(true);
+    expect(fixture.componentInstance.mutationError()).toBe('Billing failed safely');
+  });
+
+  it('Escape closes confirmation before the detail drawer', async () => {
+    const fixture = await createComponent([platformPermissions.billingManage]);
+    fixture.componentInstance.onViewInvoice('invoice-1');
+    await fixture.whenStable();
+    fixture.componentInstance.openMarkPaidConfirmation();
+    fixture.detectChanges();
+
+    fixture.componentInstance.onEscape();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.confirmationMode()).toBeNull();
+    expect(fixture.componentInstance.detailOpen()).toBe(true);
+  });
+
+  it('shows loading and blocks duplicate POSTs while mutation is in flight', async () => {
+    const pending$ = new Subject<typeof pendingInvoice>();
+    api.markInvoicePaid.mockReturnValue(pending$.asObservable());
+    const fixture = await createComponent([platformPermissions.billingManage]);
+    fixture.componentInstance.onViewInvoice('invoice-1');
+    await fixture.whenStable();
+
+    fixture.componentInstance.openMarkPaidConfirmation();
+    fixture.componentInstance.onMutationConfirmed('MARK_PAID');
+    fixture.componentInstance.onMutationConfirmed('MARK_PAID');
+    fixture.detectChanges();
+
+    expect(api.markInvoicePaid).toHaveBeenCalledTimes(1);
+    expect(fixture.componentInstance.mutationLoading()).toBe(true);
+    expect(fixture.nativeElement.textContent).toContain('Marking paid…');
+
+    pending$.next(pendingInvoice);
+    pending$.complete();
+    await fixture.whenStable();
   });
 });
