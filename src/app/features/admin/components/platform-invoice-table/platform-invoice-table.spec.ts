@@ -230,15 +230,34 @@ describe('PlatformInvoiceTable', () => {
     expect(buttons[1].disabled).toBe(true);
   });
 
-  it('renders no mutation or row action controls', async () => {
+  it('renders a View action for each invoice', async () => {
+    const fixture = await createComponent(list([invoice('PENDING', 1), invoice('PAID', 2)]));
+    const viewButtons = Array.from(
+      fixture.nativeElement.querySelectorAll('.view-button') as NodeListOf<HTMLButtonElement>,
+    );
+    expect(viewButtons).toHaveLength(2);
+    expect(viewButtons[0].getAttribute('aria-label')).toBe('View invoice INV-001');
+    expect(viewButtons[1].getAttribute('aria-label')).toBe('View invoice INV-002');
+  });
+
+  it('emits the selected invoice id from View', async () => {
+    const fixture = await createComponent();
+    const emitted: string[] = [];
+    fixture.componentInstance.viewInvoice.subscribe((id) => emitted.push(id));
+    const viewButton = fixture.nativeElement.querySelector('.view-button') as HTMLButtonElement;
+    viewButton.click();
+    expect(emitted).toEqual(['invoice-1']);
+  });
+
+  it('renders no mutation controls', async () => {
     const fixture = await createComponent();
     const buttonLabels = Array.from(
       fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>,
     ).map((button) => button.textContent?.trim());
+    expect(buttonLabels).toContain('View');
     expect(buttonLabels).not.toContain('Issue');
     expect(buttonLabels).not.toContain('Mark paid');
-    expect(fixture.nativeElement.textContent).not.toContain('Actions');
-    expect(fixture.nativeElement.querySelector('tbody button')).toBeNull();
+    expect(fixture.nativeElement.textContent).not.toContain('Mark Paid');
   });
 
   it('handles an empty invoice list', async () => {
