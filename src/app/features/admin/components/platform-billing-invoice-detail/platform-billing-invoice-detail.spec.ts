@@ -75,6 +75,9 @@ describe('PlatformBillingInvoiceDetailPanel', () => {
       loading?: boolean;
       error?: string | null;
       notFound?: boolean;
+      canIssueAction?: boolean;
+      canMarkPaidAction?: boolean;
+      mutationBusy?: boolean;
     } = {},
   ): Promise<ComponentFixture<PlatformBillingInvoiceDetailPanel>> {
     await TestBed.configureTestingModule({
@@ -86,6 +89,9 @@ describe('PlatformBillingInvoiceDetailPanel', () => {
     fixture.componentRef.setInput('loading', inputs.loading ?? false);
     fixture.componentRef.setInput('error', inputs.error ?? null);
     fixture.componentRef.setInput('notFound', inputs.notFound ?? false);
+    fixture.componentRef.setInput('canIssueAction', inputs.canIssueAction ?? false);
+    fixture.componentRef.setInput('canMarkPaidAction', inputs.canMarkPaidAction ?? false);
+    fixture.componentRef.setInput('mutationBusy', inputs.mutationBusy ?? false);
     fixture.detectChanges();
     return fixture;
   }
@@ -177,14 +183,64 @@ describe('PlatformBillingInvoiceDetailPanel', () => {
     expect(text).not.toContain('LKR');
   });
 
-  it('renders no mutation controls', async () => {
+  it('renders no mutation controls by default', async () => {
     const fixture = await createComponent({ detail: detail() });
     const labels = Array.from(
       fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>,
     ).map((button) => button.textContent?.trim());
-    expect(labels).not.toContain('Issue');
-    expect(labels).not.toContain('Mark paid');
-    expect(fixture.nativeElement.textContent).not.toContain('Mark Paid');
+    expect(labels).not.toContain('Issue invoice');
+    expect(labels).not.toContain('Mark as paid');
+    expect(fixture.nativeElement.textContent).not.toContain('Mark as paid');
+  });
+
+  it('shows Issue when canIssueAction is enabled', async () => {
+    const fixture = await createComponent({
+      detail: detail({ invoice: invoice('DRAFT', { canIssue: true }) }),
+      canIssueAction: true,
+    });
+    expect(fixture.nativeElement.textContent).toContain('Issue invoice');
+    expect(fixture.nativeElement.textContent).not.toContain('Mark as paid');
+  });
+
+  it('shows Mark Paid when canMarkPaidAction is enabled', async () => {
+    const fixture = await createComponent({
+      detail: detail({ invoice: invoice('PENDING', { canMarkPaid: true }) }),
+      canMarkPaidAction: true,
+    });
+    expect(fixture.nativeElement.textContent).toContain('Mark as paid');
+    expect(fixture.nativeElement.textContent).not.toContain('Issue invoice');
+  });
+
+  it('emits issue and mark-paid requests', async () => {
+    const fixture = await createComponent({
+      detail: detail({ invoice: invoice('DRAFT', { canIssue: true, canMarkPaid: true }) }),
+      canIssueAction: true,
+      canMarkPaidAction: true,
+    });
+    const issued: string[] = [];
+    const marked: string[] = [];
+    fixture.componentInstance.issueRequested.subscribe(() => issued.push('issue'));
+    fixture.componentInstance.markPaidRequested.subscribe(() => marked.push('mark'));
+    fixture.componentInstance.onIssue();
+    fixture.componentInstance.onMarkPaid();
+    expect(issued).toEqual(['issue']);
+    expect(marked).toEqual(['mark']);
+  });
+
+  it('disables mutation actions while busy', async () => {
+    const fixture = await createComponent({
+      detail: detail({ invoice: invoice('PENDING', { canMarkPaid: true }) }),
+      canMarkPaidAction: true,
+      mutationBusy: true,
+    });
+    const button = Array.from(
+      fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>,
+    ).find((entry) => entry.textContent?.includes('Mark as paid'));
+    expect(button?.disabled).toBe(true);
+    const marked: string[] = [];
+    fixture.componentInstance.markPaidRequested.subscribe(() => marked.push('mark'));
+    fixture.componentInstance.onMarkPaid();
+    expect(marked).toEqual([]);
   });
 
   it('emits close action', async () => {
