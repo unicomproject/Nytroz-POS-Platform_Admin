@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of, Subject, throwError } from 'rxjs';
 
@@ -5,7 +6,9 @@ import { platformPermissions } from '../../../../core/config/permission-keys';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import {
   PlatformBillingFilterOptions,
+  PlatformBillingInvoiceDetail,
   PlatformBillingInvoiceList,
+  PlatformBillingPaymentTransaction,
   PlatformBillingSummary,
 } from '../../models/platform-billing.model';
 import { adminRoutes } from '../../routes/admin.routes';
@@ -17,6 +20,10 @@ describe('PlatformBillingPage', () => {
     getSummary: ReturnType<typeof vi.fn>;
     getInvoices: ReturnType<typeof vi.fn>;
     getFilterOptions: ReturnType<typeof vi.fn>;
+    getInvoice: ReturnType<typeof vi.fn>;
+    getInvoicePayments: ReturnType<typeof vi.fn>;
+    issueInvoice: ReturnType<typeof vi.fn>;
+    markInvoicePaid: ReturnType<typeof vi.fn>;
   };
 
   const filterOptions: PlatformBillingFilterOptions = {
@@ -65,19 +72,89 @@ describe('PlatformBillingPage', () => {
         canIssue: false,
         canMarkPaid: true,
       },
+      {
+        id: 'invoice-2',
+        invoiceNumber: 'INV-002',
+        tenantId: 'tenant-2',
+        tenantCode: 'TEN-2',
+        tenantName: 'Metro Retail',
+        subscriptionId: 'subscription-2',
+        subscriptionStatus: 'active',
+        planId: 'plan-2',
+        planCode: 'BASIC',
+        planName: 'Basic',
+        currencyCode: 'USD',
+        totalAmount: 40,
+        paidAmount: 0,
+        balanceDue: 40,
+        storedStatus: 'PENDING',
+        displayStatus: 'PENDING',
+        issuedAt: '2026-07-02T00:00:00Z',
+        dueAt: '2026-07-30T00:00:00Z',
+        paidAt: null,
+        createdAt: '2026-07-02T00:00:00Z',
+        updatedAt: '2026-07-02T00:00:00Z',
+        canIssue: false,
+        canMarkPaid: true,
+      },
     ],
     pageNumber: 1,
     pageSize: 10,
-    totalCount: 1,
+    totalCount: 2,
     totalPages: 1,
   };
+
+  const invoiceDetail: PlatformBillingInvoiceDetail = {
+    invoice: invoiceList.items[0],
+    invoiceType: 'subscription',
+    billingCycle: 'monthly',
+    billingPeriodStart: '2026-07-01T00:00:00Z',
+    billingPeriodEnd: '2026-07-31T00:00:00Z',
+    subtotalAmount: 1000,
+    discountAmount: 0,
+    taxAmount: 250,
+    lines: [
+      {
+        id: 'line-1',
+        lineNumber: '1',
+        description: 'Pro plan',
+        quantity: 1,
+        unitPrice: 1000,
+        discountAmount: 0,
+        taxAmount: 250,
+        lineTotal: 1250,
+      },
+    ],
+    payments: [],
+  };
+
+  const payments: PlatformBillingPaymentTransaction[] = [
+    {
+      id: 'payment-1',
+      providerName: 'Stripe',
+      providerTransactionId: 'txn_123',
+      status: 'succeeded',
+      currencyCode: 'LKR',
+      amount: 1000,
+      providerFee: 30,
+      netAmount: 970,
+      paidAt: '2026-07-05T00:00:00Z',
+      createdAt: '2026-07-05T00:00:00Z',
+    },
+  ];
 
   async function createComponent(): Promise<ComponentFixture<PlatformBillingPage>> {
     await TestBed.configureTestingModule({
       imports: [PlatformBillingPage],
       providers: [
         { provide: PlatformBillingApiService, useValue: api },
-        { provide: ApiErrorService, useValue: { toSafeMessage: () => 'Billing failed safely' } },
+        {
+          provide: ApiErrorService,
+          useValue: {
+            toSafeMessage: () => 'Billing failed safely',
+            toApiError: () => null,
+          },
+        },
       ],
     }).compileComponents();
 
@@ -91,6 +168,10 @@ describe('PlatformBillingPage', () => {
       getSummary: vi.fn().mockReturnValue(of(summary)),
       getInvoices: vi.fn().mockReturnValue(of(invoiceList)),
       getFilterOptions: vi.fn().mockReturnValue(of(filterOptions)),
+      getInvoice: vi.fn().mockReturnValue(of(invoiceDetail)),
+      getInvoicePayments: vi.fn().mockReturnValue(of(payments)),
+      issueInvoice: vi.fn(),
+      markInvoicePaid: vi.fn(),
     };
   });
 
@@ -362,5 +443,194 @@ describe('PlatformBillingPage', () => {
     const component = await (route?.loadComponent as () => Promise<unknown>)();
     expect(component).toBe(PlatformBillingPage);
     expect(route?.data?.['requiredPermission']).toBe(platformPermissions.billingView);
+  });
+
+  it('selecting View opens the detail panel and loads detail plus payments', async () => {
+    const fixture = await createComponent();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    fixture.componentInstance.onViewInvoice('invoice-1');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.detailOpen()).toBe(true);
+    expect(api.getInvoice).toHaveBeenCalledWith('invoice-1');
+    expect(api.getInvoicePayments).toHaveBeenCalledWith('invoice-1');
+    expect(fixture.nativeElement.querySelector('[role="dialog"]')).toBeTruthy();
+    expect(fixture.nativeElement.textContent).toContain('INV-001');
+    expect(fixture.nativeElement.textContent).toContain('Stripe');
+  });
+
+  it('shows detail and payment loading states independently', async () => {
+    api.getInvoice.mockReturnValue(new Subject().asObservable());
+    api.getInvoicePayments.mockReturnValue(new Subject().asObservable());
+    const fixture = await createComponent();
+    fixture.componentInstance.onViewInvoice('invoice-1');
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.detailLoading()).toBe(true);
+    expect(fixture.componentInstance.paymentsLoading()).toBe(true);
+    expect(
+      fixture.nativeElement.querySelector('[aria-label="Loading invoice detail"]'),
+    ).toBeTruthy();
+    expect(
+      fixture.nativeElement.querySelector('[aria-label="Loading payment history"]'),
+    ).toBeTruthy();
+  });
+
+  it('shows invoice-not-found state', async () => {
+    api.getInvoice.mockReturnValue(
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 404,
+            error: {
+              success: false,
+              message: 'Invoice was not found.',
+              errorCode: 'platform_billing.invoice_not_found',
+              errors: [],
+            },
+          }),
+      ),
+    );
+    const fixture = await createComponent();
+    fixture.componentInstance.onViewInvoice('missing');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.detailNotFound()).toBe(true);
+    expect(fixture.nativeElement.textContent).toContain('Invoice not found');
+  });
+
+  it('retries detail and payment requests independently', async () => {
+    api.getInvoice
+      .mockReturnValueOnce(throwError(() => new Error('network')))
+      .mockReturnValueOnce(of(invoiceDetail));
+    api.getInvoicePayments
+      .mockReturnValueOnce(throwError(() => new Error('network')))
+      .mockReturnValueOnce(of(payments));
+
+    const fixture = await createComponent();
+    fixture.componentInstance.onViewInvoice('invoice-1');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    fixture.componentInstance.loadInvoiceDetail();
+    fixture.componentInstance.loadInvoicePayments();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(api.getInvoice).toHaveBeenCalledTimes(2);
+    expect(api.getInvoicePayments).toHaveBeenCalledTimes(2);
+    expect(fixture.componentInstance.invoiceDetail()).toEqual(invoiceDetail);
+    expect(fixture.componentInstance.payments()).toEqual(payments);
+  });
+
+  it('keeps loaded invoice detail when payment history fails', async () => {
+    api.getInvoicePayments.mockReturnValue(throwError(() => new Error('network')));
+    const fixture = await createComponent();
+    fixture.componentInstance.onViewInvoice('invoice-1');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.invoiceDetail()).toEqual(invoiceDetail);
+    expect(fixture.nativeElement.textContent).toContain('INV-001');
+    expect(fixture.nativeElement.textContent).toContain('Payment history could not be loaded');
+  });
+
+  it('shows empty payment history', async () => {
+    api.getInvoicePayments.mockReturnValue(of([]));
+    const fixture = await createComponent();
+    fixture.componentInstance.onViewInvoice('invoice-1');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain(
+      'No payment history is available for this invoice.',
+    );
+  });
+
+  it('closing clears selected detail state', async () => {
+    const fixture = await createComponent();
+    fixture.componentInstance.onViewInvoice('invoice-1');
+    await fixture.whenStable();
+    fixture.componentInstance.closeDetail();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.detailOpen()).toBe(false);
+    expect(fixture.componentInstance.selectedInvoiceId()).toBeNull();
+    expect(fixture.componentInstance.invoiceDetail()).toBeNull();
+    expect(fixture.componentInstance.payments()).toEqual([]);
+    expect(fixture.nativeElement.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it('selecting another invoice does not keep previous invoice data', async () => {
+    const secondDetail: PlatformBillingInvoiceDetail = {
+      ...invoiceDetail,
+      invoice: invoiceList.items[1],
+      lines: [],
+    };
+    api.getInvoice.mockReturnValueOnce(of(invoiceDetail)).mockReturnValueOnce(of(secondDetail));
+    api.getInvoicePayments.mockReturnValue(of([]));
+
+    const fixture = await createComponent();
+    fixture.componentInstance.onViewInvoice('invoice-1');
+    await fixture.whenStable();
+    fixture.componentInstance.onViewInvoice('invoice-2');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.selectedInvoiceId()).toBe('invoice-2');
+    expect(fixture.componentInstance.invoiceDetail()?.invoice.invoiceNumber).toBe('INV-002');
+    expect(fixture.nativeElement.querySelector('#invoice-detail-title')?.textContent?.trim()).toBe(
+      'INV-002',
+    );
+  });
+
+  it('ignores stale detail responses', async () => {
+    const slowDetail$ = new Subject<PlatformBillingInvoiceDetail>();
+    const secondDetail: PlatformBillingInvoiceDetail = {
+      ...invoiceDetail,
+      invoice: invoiceList.items[1],
+    };
+    api.getInvoice.mockReturnValueOnce(slowDetail$).mockReturnValueOnce(of(secondDetail));
+    api.getInvoicePayments.mockReturnValue(of([]));
+
+    const fixture = await createComponent();
+    fixture.componentInstance.onViewInvoice('invoice-1');
+    fixture.componentInstance.onViewInvoice('invoice-2');
+    await fixture.whenStable();
+    slowDetail$.next(invoiceDetail);
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.invoiceDetail()?.invoice.id).toBe('invoice-2');
+  });
+
+  it('does not call mutation APIs when viewing detail', async () => {
+    const fixture = await createComponent();
+    fixture.componentInstance.onViewInvoice('invoice-1');
+    await fixture.whenStable();
+    expect(api.issueInvoice).not.toHaveBeenCalled();
+    expect(api.markInvoicePaid).not.toHaveBeenCalled();
+  });
+
+  it('Escape closes the detail drawer', async () => {
+    const fixture = await createComponent();
+    fixture.componentInstance.onViewInvoice('invoice-1');
+    await fixture.whenStable();
+    fixture.detectChanges();
+    fixture.componentInstance.onEscape();
+    fixture.detectChanges();
+    expect(fixture.componentInstance.detailOpen()).toBe(false);
+  });
+
+  it('opening detail does not reload the invoice list', async () => {
+    const fixture = await createComponent();
+    await fixture.whenStable();
+    const invoiceCalls = api.getInvoices.mock.calls.length;
+    fixture.componentInstance.onViewInvoice('invoice-1');
+    await fixture.whenStable();
+    expect(api.getInvoices.mock.calls.length).toBe(invoiceCalls);
   });
 });

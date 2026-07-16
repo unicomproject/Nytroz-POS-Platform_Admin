@@ -1,4 +1,5 @@
-import { Component, OnDestroy, signal } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
+import { Component, HostListener, OnDestroy, signal } from '@angular/core';
 import { Subscription } from 'rxjs';
 
 import { ApiErrorService } from '../../../../core/services/api-error.service';
@@ -7,13 +8,17 @@ import {
   PlatformBillingFilterValues,
   PlatformBillingFilters,
 } from '../../components/platform-billing-filters/platform-billing-filters';
+import { PlatformBillingInvoiceDetailPanel } from '../../components/platform-billing-invoice-detail/platform-billing-invoice-detail';
+import { PlatformBillingPaymentHistory } from '../../components/platform-billing-payment-history/platform-billing-payment-history';
 import { PlatformBillingSummaryCards } from '../../components/platform-billing-summary-cards/platform-billing-summary-cards';
 import { PlatformInvoiceTable } from '../../components/platform-invoice-table/platform-invoice-table';
 import {
   PlatformBillingDateField,
   PlatformBillingDisplayStatus,
   PlatformBillingFilterOptions,
+  PlatformBillingInvoiceDetail,
   PlatformBillingInvoiceList,
+  PlatformBillingPaymentTransaction,
   PlatformBillingQuery,
   PlatformBillingSortDirection,
   PlatformBillingSortField,
@@ -24,7 +29,13 @@ import { PlatformBillingApiService } from '../../services/platform-billing-api.s
 @Component({
   selector: 'app-platform-billing-page',
   standalone: true,
-  imports: [PlatformBillingFilters, PlatformBillingSummaryCards, PlatformInvoiceTable],
+  imports: [
+    PlatformBillingFilters,
+    PlatformBillingSummaryCards,
+    PlatformInvoiceTable,
+    PlatformBillingInvoiceDetailPanel,
+    PlatformBillingPaymentHistory,
+  ],
   template: `
     <section class="billing-page">
       <header class="page-heading">
@@ -105,9 +116,37 @@ import { PlatformBillingApiService } from '../../services/platform-billing-api.s
             (pageChange)="onPageChange($event)"
             (pageSizeChange)="onPageSizeChange($event)"
             (sortChange)="onSortChange($event)"
+            (viewInvoice)="onViewInvoice($event)"
           />
         }
       </section>
+
+      @if (detailOpen()) {
+        <div class="detail-backdrop" (click)="closeDetail()"></div>
+        <aside
+          class="detail-panel"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="invoice-detail-title"
+        >
+          <app-platform-billing-invoice-detail
+            [detail]="invoiceDetail()"
+            [loading]="detailLoading()"
+            [error]="detailError()"
+            [notFound]="detailNotFound()"
+            (dismiss)="closeDetail()"
+            (retryLoad)="loadInvoiceDetail()"
+          />
+          @if (!detailNotFound()) {
+            <app-platform-billing-payment-history
+              [payments]="payments()"
+              [loading]="paymentsLoading()"
+              [error]="paymentsError()"
+              (retryLoad)="loadInvoicePayments()"
+            />
+          }
+        </aside>
+      }
     </section>
   `,
   styles: `
@@ -121,6 +160,7 @@ import { PlatformBillingApiService } from '../../services/platform-billing-api.s
     .billing-page {
       display: grid;
       gap: 1.25rem;
+      position: relative;
     }
     .page-heading {
       align-items: flex-start;
@@ -216,6 +256,28 @@ import { PlatformBillingApiService } from '../../services/platform-billing-api.s
     .error-panel span {
       font-size: 0.8rem;
     }
+    .detail-backdrop {
+      background: rgba(16, 24, 40, 0.45);
+      inset: 0;
+      position: fixed;
+      z-index: 20;
+    }
+    .detail-panel {
+      background: #fff;
+      border: 1px solid #e5eaf2;
+      border-radius: 14px;
+      box-shadow: 0 18px 48px rgba(16, 24, 40, 0.18);
+      display: grid;
+      gap: 1.25rem;
+      max-height: calc(100vh - 2rem);
+      overflow: auto;
+      padding: 1.15rem;
+      position: fixed;
+      right: 1rem;
+      top: 1rem;
+      width: min(44rem, calc(100vw - 2rem));
+      z-index: 21;
+    }
     @keyframes pulse {
       50% {
         opacity: 0.45;
@@ -229,6 +291,14 @@ import { PlatformBillingApiService } from '../../services/platform-billing-api.s
       .error-panel {
         align-items: flex-start;
         flex-direction: column;
+      }
+      .detail-panel {
+        border-radius: 0;
+        inset: 0;
+        max-height: none;
+        right: 0;
+        top: 0;
+        width: 100vw;
       }
     }
   `,
@@ -256,10 +326,23 @@ export class PlatformBillingPage implements OnDestroy {
   readonly pageNumber = signal(1);
   readonly pageSize = signal(10);
 
+  readonly detailOpen = signal(false);
+  readonly selectedInvoiceId = signal<string | null>(null);
+  readonly invoiceDetail = signal<PlatformBillingInvoiceDetail | null>(null);
+  readonly payments = signal<PlatformBillingPaymentTransaction[]>([]);
+  readonly detailLoading = signal(false);
+  readonly paymentsLoading = signal(false);
+  readonly detailError = signal<string | null>(null);
+  readonly paymentsError = signal<string | null>(null);
+  readonly detailNotFound = signal(false);
+
   private readonly subscriptions = new Subscription();
   private summaryRequestId = 0;
   private invoiceRequestId = 0;
+  private detailRequestId = 0;
+  private paymentsRequestId = 0;
   private hasLoadedSummary = false;
+  private lastFocusedElement: HTMLElement | null = null;
 
   constructor(
     private readonly api: PlatformBillingApiService,
@@ -271,6 +354,13 @@ export class PlatformBillingPage implements OnDestroy {
 
   ngOnDestroy(): void {
     this.subscriptions.unsubscribe();
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    if (this.detailOpen()) {
+      this.closeDetail();
+    }
   }
 
   refresh(): void {
@@ -362,6 +452,98 @@ export class PlatformBillingPage implements OnDestroy {
           }
           this.invoiceError.set(this.apiError.toSafeMessage(error));
           this.invoiceLoading.set(false);
+        },
+      }),
+    );
+  }
+
+  onViewInvoice(invoiceId: string): void {
+    this.lastFocusedElement = document.activeElement as HTMLElement | null;
+    this.selectedInvoiceId.set(invoiceId);
+    this.detailOpen.set(true);
+    this.invoiceDetail.set(null);
+    this.payments.set([]);
+    this.detailError.set(null);
+    this.paymentsError.set(null);
+    this.detailNotFound.set(false);
+    this.loadInvoiceDetail();
+    this.loadInvoicePayments();
+  }
+
+  closeDetail(): void {
+    this.detailRequestId += 1;
+    this.paymentsRequestId += 1;
+    this.detailOpen.set(false);
+    this.selectedInvoiceId.set(null);
+    this.invoiceDetail.set(null);
+    this.payments.set([]);
+    this.detailLoading.set(false);
+    this.paymentsLoading.set(false);
+    this.detailError.set(null);
+    this.paymentsError.set(null);
+    this.detailNotFound.set(false);
+    queueMicrotask(() => this.lastFocusedElement?.focus());
+    this.lastFocusedElement = null;
+  }
+
+  loadInvoiceDetail(): void {
+    const invoiceId = this.selectedInvoiceId();
+    if (!invoiceId) {
+      return;
+    }
+
+    const requestId = ++this.detailRequestId;
+    this.detailLoading.set(true);
+    this.detailError.set(null);
+    this.detailNotFound.set(false);
+
+    this.subscriptions.add(
+      this.api.getInvoice(invoiceId).subscribe({
+        next: (detail) => {
+          if (requestId !== this.detailRequestId || this.selectedInvoiceId() !== invoiceId) {
+            return;
+          }
+          this.invoiceDetail.set(detail);
+          this.detailLoading.set(false);
+        },
+        error: (error) => {
+          if (requestId !== this.detailRequestId || this.selectedInvoiceId() !== invoiceId) {
+            return;
+          }
+          this.invoiceDetail.set(null);
+          this.detailNotFound.set(isInvoiceNotFound(error));
+          this.detailError.set(this.apiError.toSafeMessage(error));
+          this.detailLoading.set(false);
+        },
+      }),
+    );
+  }
+
+  loadInvoicePayments(): void {
+    const invoiceId = this.selectedInvoiceId();
+    if (!invoiceId) {
+      return;
+    }
+
+    const requestId = ++this.paymentsRequestId;
+    this.paymentsLoading.set(true);
+    this.paymentsError.set(null);
+
+    this.subscriptions.add(
+      this.api.getInvoicePayments(invoiceId).subscribe({
+        next: (payments) => {
+          if (requestId !== this.paymentsRequestId || this.selectedInvoiceId() !== invoiceId) {
+            return;
+          }
+          this.payments.set(payments);
+          this.paymentsLoading.set(false);
+        },
+        error: (error) => {
+          if (requestId !== this.paymentsRequestId || this.selectedInvoiceId() !== invoiceId) {
+            return;
+          }
+          this.paymentsError.set(this.apiError.toSafeMessage(error));
+          this.paymentsLoading.set(false);
         },
       }),
     );
@@ -498,4 +680,16 @@ function toIsoDateBoundary(dateValue: string, boundary: 'start' | 'end'): string
 
   const suffix = boundary === 'start' ? 'T00:00:00.000' : 'T23:59:59.999';
   return new Date(`${dateValue}${suffix}`).toISOString();
+}
+
+function isInvoiceNotFound(error: unknown): boolean {
+  if (!(error instanceof HttpErrorResponse)) {
+    return false;
+  }
+
+  if (error.status === 404) {
+    return true;
+  }
+
+  return error.error?.errorCode === 'platform_billing.invoice_not_found';
 }

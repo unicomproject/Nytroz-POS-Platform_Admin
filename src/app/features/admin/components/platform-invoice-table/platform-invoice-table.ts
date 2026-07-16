@@ -112,6 +112,17 @@ interface InvoiceTableColumn {
                     {{ invoice.issuedAt ? (invoice.issuedAt | date: 'mediumDate') : 'Not issued' }}
                   </td>
                   <td>{{ invoice.dueAt ? (invoice.dueAt | date: 'mediumDate') : 'Not set' }}</td>
+                  <td>
+                    <button
+                      type="button"
+                      class="view-button"
+                      [attr.aria-label]="'View invoice ' + invoice.invoiceNumber"
+                      [disabled]="loading"
+                      (click)="viewInvoice.emit(invoice.id)"
+                    >
+                      View
+                    </button>
+                  </td>
                 </tr>
               }
             </tbody>
@@ -198,8 +209,21 @@ interface InvoiceTableColumn {
     }
     table {
       border-collapse: collapse;
-      min-width: 1050px;
+      min-width: 1140px;
       width: 100%;
+    }
+    .view-button {
+      background: #fff;
+      border: 1px solid #d0d5dd;
+      border-radius: 7px;
+      color: #175cd3;
+      cursor: pointer;
+      font-weight: 700;
+      padding: 0.45rem 0.7rem;
+    }
+    .view-button:disabled {
+      cursor: not-allowed;
+      opacity: 0.45;
     }
     th {
       background: #f8fafc;
@@ -359,6 +383,7 @@ export class PlatformInvoiceTable {
     sortBy: PlatformBillingSortField;
     sortDirection: PlatformBillingSortDirection;
   }>();
+  @Output() readonly viewInvoice = new EventEmitter<string>();
 
   readonly pageSizeOptions = [10, 20, 50];
   readonly skeletonRows = [1, 2, 3, 4, 5];
@@ -372,6 +397,7 @@ export class PlatformInvoiceTable {
     { label: 'Status', sortBy: 'status' },
     { label: 'Issued', sortBy: 'issuedAt' },
     { label: 'Due', sortBy: 'dueAt' },
+    { label: 'Actions' },
   ];
 
   get canGoPrevious(): boolean {
