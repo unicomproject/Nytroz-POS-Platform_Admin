@@ -95,7 +95,8 @@ export const adminRoutes: Routes = [
   },
   {
     path: 'billing',
-    loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
+    loadComponent: () =>
+      import('../pages/platform-billing-page/platform-billing-page').then((m) => m.PlatformBillingPage),
     data: { title: 'Billing', requiredPermission: platformPermissions.billingView }
   },
   {
