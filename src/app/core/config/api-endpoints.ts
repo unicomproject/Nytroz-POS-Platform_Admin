@@ -2,7 +2,7 @@ export const apiEndpoints = {
   auth: {
     login: '/auth/platform-login',
     logout: '/auth/platform-logout',
-    refresh: '/auth/platform-refresh'
+    refresh: '/auth/platform-refresh',
   },
   platform: {
     dashboard: '/platform-admin/dashboard',
@@ -17,8 +17,19 @@ export const apiEndpoints = {
     subscriptionPlans: '/platform/subscription-plans',
     features: '/features',
     auditLogs: '/platform-admin/audit-logs',
+    billing: {
+      summary: '/platform-admin/billing/summary',
+      invoices: '/platform-admin/billing/invoices',
+      invoice: (invoiceId: string) => `/platform-admin/billing/invoices/${invoiceId}`,
+      invoicePayments: (invoiceId: string) =>
+        `/platform-admin/billing/invoices/${invoiceId}/payments`,
+      filterOptions: '/platform-admin/billing/filter-options',
+      issueInvoice: (invoiceId: string) => `/platform-admin/billing/invoices/${invoiceId}/issue`,
+      markInvoicePaid: (invoiceId: string) =>
+        `/platform-admin/billing/invoices/${invoiceId}/mark-paid`,
+    },
     users: '/platform-admin/users',
-    settings: '/platform-admin/settings'
+    settings: '/platform-admin/settings',
   },
   tenant: {
     users: '/users',
@@ -28,8 +39,8 @@ export const apiEndpoints = {
     tills: '/tills',
     products: '/products',
     categories: '/categories',
-    reports: '/reports'
-  }
+    reports: '/reports',
+  },
 } as const;
 
 export const tenantScopedApiSegments = [
@@ -40,5 +51,5 @@ export const tenantScopedApiSegments = [
   '/tills',
   '/products',
   '/categories',
-  '/reports'
+  '/reports',
 ];
