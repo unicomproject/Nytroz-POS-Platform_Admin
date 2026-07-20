@@ -324,7 +324,9 @@ export class Sidebar {
         (section): MenuSectionConfig => ({
           ...section,
           items: section.items.filter((item) =>
-            this.accessControl.canAccess(item.requiredPermission, item.requiredFeature)
+            [item.requiredPermission, ...(item.alternatePermissions ?? [])].some(
+              (permission) => !permission || this.accessControl.hasPermission(permission)
+            ) && this.accessControl.hasFeature(item.requiredFeature)
           )
         })
       )

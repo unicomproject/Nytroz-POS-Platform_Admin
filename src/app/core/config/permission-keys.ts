@@ -1,13 +1,7 @@
 /**
- * Typed permission codes for Platform Admin route/menu/action guards that exist in this Angular app.
- *
- * This is NOT the full assignable catalogue. Role create/edit loads permissions from
- * GET /api/v1/platform-admin/permission-catalog (36 active business codes). The five
- * `platform.return_policy_templates.*` codes are backend-enforced and assignable in the
- * role UI, but have no Angular routes yet (return-policy templates remain BACKEND_ONLY).
- *
- * Do not treat `Object.values(platformPermissions).length` as the platform permission total.
- */
+ * Typed permission codes for Platform Admin route/menu/action guards.
+ * Role create/edit loads the full assignable catalogue from
+ * GET /api/v1/platform-admin/permission-catalog (36 business codes). */
 export const platformPermissions = {
   dashboardView: 'platform.dashboard.view',
   tenantsView: 'platform.tenants.view',
@@ -39,11 +33,7 @@ export const platformPermissions = {
   rolesCreate: 'platform.roles.create',
   rolesUpdate: 'platform.roles.update',
   rolePermissionsView: 'platform.roles.permissions.view',
-  rolePermissionsUpdate: 'platform.roles.permissions.update'
-} as const;
-
-/** Backend-only Platform Admin codes (seeded + catalogue + API authz; no Angular surface yet). */
-export const platformBackendOnlyPermissions = {
+  rolePermissionsUpdate: 'platform.roles.permissions.update',
   returnPolicyTemplatesView: 'platform.return_policy_templates.view',
   returnPolicyTemplatesCreate: 'platform.return_policy_templates.create',
   returnPolicyTemplatesUpdate: 'platform.return_policy_templates.update',
@@ -72,11 +62,5 @@ export const reportPermissions = {
   reportExport: 'reports.export'
 } as const;
 
-/** Guarded Angular Platform Admin surface codes (tests/fixtures). Not the full backend catalogue. */
+/** Platform Admin permission codes used by guards and test fixtures. */
 export const allPlatformPermissionCodes = Object.values(platformPermissions);
-
-/** Full known Platform Admin business codes = guarded UI surface + backend-only return-policy set. */
-export const allKnownPlatformBusinessPermissionCodes = [
-  ...allPlatformPermissionCodes,
-  ...Object.values(platformBackendOnlyPermissions)
-] as const;

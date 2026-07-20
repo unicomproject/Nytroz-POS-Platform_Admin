@@ -80,6 +80,42 @@ export const adminRoutes: Routes = [
     data: { title: 'Modules and Features', requiredPermission: platformPermissions.modulesView }
   },
   {
+    path: 'return-policy-templates/create',
+    loadComponent: () =>
+      import('../pages/platform-create-return-policy-template-page/platform-create-return-policy-template-page').then(
+        (m) => m.PlatformCreateReturnPolicyTemplatePage
+      ),
+    data: {
+      title: 'Create Return Policy Template',
+      requiredPermission: platformPermissions.returnPolicyTemplatesCreate,
+      alternatePermissions: [platformPermissions.returnPolicyTemplatesManage]
+    }
+  },
+  {
+    path: 'return-policy-templates/:templateId',
+    loadComponent: () =>
+      import('../pages/platform-return-policy-template-detail-page/platform-return-policy-template-detail-page').then(
+        (m) => m.PlatformReturnPolicyTemplateDetailPage
+      ),
+    data: {
+      title: 'Return Policy Template Detail',
+      requiredPermission: platformPermissions.returnPolicyTemplatesView,
+      alternatePermissions: [platformPermissions.returnPolicyTemplatesManage]
+    }
+  },
+  {
+    path: 'return-policy-templates',
+    loadComponent: () =>
+      import('../pages/platform-return-policy-templates-page/platform-return-policy-templates-page').then(
+        (m) => m.PlatformReturnPolicyTemplatesPage
+      ),
+    data: {
+      title: 'Return Policy Templates',
+      requiredPermission: platformPermissions.returnPolicyTemplatesView,
+      alternatePermissions: [platformPermissions.returnPolicyTemplatesManage]
+    }
+  },
+  {
     path: 'roles-permissions',
     loadComponent: () =>
       import('../pages/platform-permission-catalog-page/platform-permission-catalog-page').then(

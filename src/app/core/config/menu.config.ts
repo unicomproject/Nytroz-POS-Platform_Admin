@@ -5,6 +5,7 @@ export interface MenuItemConfig {
   path: string;
   requiresTenant: boolean;
   requiredPermission?: string;
+  alternatePermissions?: string[];
   requiredFeature?: string;
   icon: PlatformMenuIcon;
   hasSubmenu?: boolean;
@@ -63,6 +64,14 @@ export const platformMenuConfig: MenuSectionConfig[] = [
         requiresTenant: false,
         icon: 'roles',
         requiredPermission: platformPermissions.modulesView
+      },
+      {
+        label: 'Return Policy Templates',
+        path: '/admin/return-policy-templates',
+        requiresTenant: false,
+        icon: 'products',
+        requiredPermission: platformPermissions.returnPolicyTemplatesView,
+        alternatePermissions: [platformPermissions.returnPolicyTemplatesManage]
       },
       {
         label: 'Outlets',

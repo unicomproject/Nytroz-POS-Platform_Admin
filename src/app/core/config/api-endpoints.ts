@@ -30,6 +30,8 @@ export const apiEndpoints = {
     },
     users: '/platform-admin/users',
     settings: '/platform-admin/settings',
+    returnPolicyTemplates: '/platform/return-policy-templates',
+    returnPolicyTemplate: (templateId: string) => `/platform/return-policy-templates/${templateId}`,
   },
   tenant: {
     users: '/users',
