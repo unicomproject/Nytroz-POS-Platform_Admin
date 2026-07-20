@@ -316,12 +316,21 @@ export function createTenantCreateOptionsApiDto(
     ],
     billingStatuses: [{ value: 'pending', label: 'Pending' }],
     paymentMethods: [{ value: 'manual', label: 'Manual' }],
-    countryCodes: [{ code: 'LK', name: 'Sri Lanka' }],
+    countryCodes: [
+      { code: 'LK', name: 'Sri Lanka' },
+      { code: 'GB', name: 'United Kingdom' }
+    ],
     currencies: [{ value: 'LKR', label: 'LKR - Sri Lankan Rupee' }],
     timezones: [{ value: 'Asia/Colombo', label: 'Asia/Colombo' }],
-    locales: [{ value: 'en-LK', label: 'English (Sri Lanka)' }],
+    locales: [
+      { value: 'en-LK', label: 'English (Sri Lanka)' },
+      { value: 'en-GB', label: 'English (United Kingdom)' }
+    ],
     businessTypes: [{ value: 'retail', label: 'Retail' }],
-    operatingModes: [{ value: 'unified_epos', label: 'Unified EPOS' }],
+    operatingModes: [
+      { value: 'unified_epos', label: 'Unified EPOS' },
+      { value: 'pos_only', label: 'POS Only' }
+    ],
     subscriptionStatuses: [{ value: 'trial', label: 'Trial' }, { value: 'active', label: 'Active' }],
     billingCycles: [{ value: 'monthly', label: 'Monthly' }],
     ...overrides

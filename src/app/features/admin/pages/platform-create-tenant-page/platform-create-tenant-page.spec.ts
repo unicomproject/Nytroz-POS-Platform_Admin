@@ -193,9 +193,56 @@ describe('PlatformCreateTenantPage', () => {
       expect.objectContaining({
         countryCode: 'LK',
         baseCurrency: 'LKR',
+        defaultLocale: 'en-LK',
+        operatingMode: 'unified_epos',
         address: expect.objectContaining({ countryCode: 'LK' })
       })
     );
+  });
+
+  it('posts non-default locale, operatingMode and businessType from wizard state', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    fillValidWizard(component);
+    component.businessInfoForm.patchValue({
+      defaultLocale: 'en-GB',
+      operatingMode: 'pos_only',
+      businessType: 'retail',
+      countryCode: 'GB',
+      addressCountryCode: 'GB'
+    });
+    component.currentStep.set('review-create');
+
+    component.createTenant();
+    fixture.detectChanges();
+
+    expect(api.createTenant).toHaveBeenCalledWith(
+      expect.objectContaining({
+        defaultLocale: 'en-GB',
+        operatingMode: 'pos_only',
+        businessType: 'retail',
+        countryCode: 'GB'
+      })
+    );
+  });
+
+  it('retains wizard locale and operatingMode when navigating between steps', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    fillValidWizard(component);
+    component.businessInfoForm.patchValue({
+      defaultLocale: 'en-GB',
+      operatingMode: 'pos_only',
+      businessType: 'retail'
+    });
+
+    component.nextStep();
+    component.goBack();
+    fixture.detectChanges();
+
+    expect(component.businessInfoForm.controls.defaultLocale.value).toBe('en-GB');
+    expect(component.businessInfoForm.controls.operatingMode.value).toBe('pos_only');
+    expect(component.businessInfoForm.controls.businessType.value).toBe('retail');
   });
 
   it('shows visible country validation error for invalid country code', () => {

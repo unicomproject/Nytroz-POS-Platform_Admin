@@ -1,3 +1,7 @@
+/**
+ * Typed permission codes for Platform Admin route/menu/action guards.
+ * Role create/edit loads the full assignable catalogue from
+ * GET /api/v1/platform-admin/permission-catalog (36 business codes). */
 export const platformPermissions = {
   dashboardView: 'platform.dashboard.view',
   tenantsView: 'platform.tenants.view',
@@ -29,7 +33,12 @@ export const platformPermissions = {
   rolesCreate: 'platform.roles.create',
   rolesUpdate: 'platform.roles.update',
   rolePermissionsView: 'platform.roles.permissions.view',
-  rolePermissionsUpdate: 'platform.roles.permissions.update'
+  rolePermissionsUpdate: 'platform.roles.permissions.update',
+  returnPolicyTemplatesView: 'platform.return_policy_templates.view',
+  returnPolicyTemplatesCreate: 'platform.return_policy_templates.create',
+  returnPolicyTemplatesUpdate: 'platform.return_policy_templates.update',
+  returnPolicyTemplatesDelete: 'platform.return_policy_templates.delete',
+  returnPolicyTemplatesManage: 'platform.return_policy_templates.manage'
 } as const;
 
 export const tenantPermissions = {
@@ -53,5 +62,5 @@ export const reportPermissions = {
   reportExport: 'reports.export'
 } as const;
 
-/** All platform permission codes used by Platform Admin (for tests and super-admin fixtures). */
+/** Platform Admin permission codes used by guards and test fixtures. */
 export const allPlatformPermissionCodes = Object.values(platformPermissions);

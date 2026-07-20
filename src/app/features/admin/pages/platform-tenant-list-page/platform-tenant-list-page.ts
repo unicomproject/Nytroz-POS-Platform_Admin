@@ -2,7 +2,7 @@ import { DatePipe } from '@angular/common';
 import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
 
 import { ApiErrorService } from '../../../../core/services/api-error.service';
@@ -662,6 +662,7 @@ export class PlatformTenantListPage {
   private readonly api = inject(PlatformTenantApiService);
   private readonly apiError = inject(ApiErrorService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly route = inject(ActivatedRoute);
   readonly tenantSearch = inject(PlatformTenantSearchService);
 
   readonly summary = signal<PlatformTenantSummary | null>(null);
@@ -671,11 +672,22 @@ export class PlatformTenantListPage {
   readonly errorMessage = signal<string | null>(null);
 
   readonly statusFilter = signal('');
+  readonly billingStatusFilter = signal('');
   readonly planFilter = signal('');
   readonly pageNumber = signal(1);
   readonly pageSize = signal(10);
 
   constructor() {
+    const params = this.route.snapshot.queryParamMap;
+    const status = params.get('status');
+    const billingStatus = params.get('billingStatus');
+    if (status) {
+      this.statusFilter.set(status);
+    }
+    if (billingStatus) {
+      this.billingStatusFilter.set(billingStatus);
+    }
+
     this.tenantSearch.searchChanged$
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => {
@@ -748,6 +760,7 @@ export class PlatformTenantListPage {
   resetFilters(): void {
     this.tenantSearch.searchTerm.set('');
     this.statusFilter.set('');
+    this.billingStatusFilter.set('');
     this.planFilter.set('');
     this.pageNumber.set(1);
     this.loadPage();
@@ -827,6 +840,7 @@ export class PlatformTenantListPage {
       pageSize: this.pageSize(),
       search: this.tenantSearch.searchTerm(),
       status: this.statusFilter(),
+      billingStatus: this.billingStatusFilter(),
       planId: this.planFilter(),
       sortBy: 'createdOn',
       sortDirection: 'desc'
