@@ -61,6 +61,41 @@ function createWizardState(overrides: Partial<TenantCreateWizardState> = {}): Te
   };
 }
 
+describe('mapCreateTenantRequest wizard field persistence', () => {
+  it('includes defaultLocale, operatingMode, businessType and countryCode with backend contract names', () => {
+    const request = mapCreateTenantRequest(
+      createWizardState({
+        businessInfo: {
+          code: 'TEN-GB',
+          name: 'UK Tenant',
+          legalName: '',
+          registrationNumber: '',
+          taxNumber: '',
+          baseCurrency: 'GBP',
+          defaultTimezone: 'Europe/London',
+          defaultLocale: 'en-GB',
+          operatingMode: 'pos_only',
+          businessType: 'retail',
+          countryCode: 'GB',
+          addressLine1: '10 Downing Street',
+          addressCity: 'London',
+          addressCountryCode: 'GB'
+        }
+      })
+    );
+
+    expect(request).toEqual(
+      expect.objectContaining({
+        defaultLocale: 'en-GB',
+        operatingMode: 'pos_only',
+        businessType: 'retail',
+        countryCode: 'GB',
+        address: expect.objectContaining({ countryCode: 'GB' })
+      })
+    );
+  });
+});
+
 describe('mapCreateTenantRequest billing mapping', () => {
   it('maps billing status pending for tenant create payload', () => {
     const request = mapCreateTenantRequest(createWizardState());
