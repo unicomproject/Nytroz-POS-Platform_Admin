@@ -1,5 +1,6 @@
 import { DatePipe } from '@angular/common';
 import { Component, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import { PlatformDashboard, PlatformTrendPoint, TenantStatusItem } from '../../models/platform-dashboard.model';
@@ -8,7 +9,7 @@ import { PlatformDashboardApiService } from '../../services/platform-dashboard-a
 @Component({
   selector: 'app-platform-dashboard-page',
   standalone: true,
-  imports: [DatePipe],
+  imports: [DatePipe, RouterLink],
   template: `
     <section class="dashboard-page">
       <header class="page-heading">
@@ -75,12 +76,18 @@ import { PlatformDashboardApiService } from '../../services/platform-dashboard-a
             <div class="attention-heading"><i>!</i><div><h2>Attention Needed Today</h2><p>Items that need your immediate attention</p></div></div>
             <div class="attention-list">
               @for (item of data.attention; track item.type) {
-                <div class="attention-row" [class.warning]="item.severity === 'warning'" [class.info]="item.severity === 'info'">
+                <a
+                  class="attention-row"
+                  [class.warning]="item.severity === 'warning'"
+                  [class.info]="item.severity === 'info'"
+                  [routerLink]="attentionLink(item.type)"
+                  [queryParams]="attentionQueryParams(item.type)"
+                >
                   <i>{{ attentionIcon(item.type) }}</i><div><strong>{{ item.title }}</strong><span>{{ item.description }}</span></div><b>{{ item.count }}</b><em>&gt;</em>
-                </div>
+                </a>
               }
             </div>
-            <a>View all alerts <span>-></span></a>
+            <a routerLink="/admin/tenants">View all tenants <span>-></span></a>
           </article>
         </section>
 
@@ -160,7 +167,7 @@ import { PlatformDashboardApiService } from '../../services/platform-dashboard-a
     .attention-heading { align-items: center; display: flex; gap: 0.75rem; }
     .attention-heading > i { align-items: center; background: #fff0f0; border-radius: 10px; color: #ef4444; display: flex; font-style: normal; font-weight: 900; height: 2.7rem; justify-content: center; width: 2.7rem; }
     .attention-list { border: 1px solid #e6ebf3; border-radius: 10px; margin-top: 1rem; overflow: hidden; }
-    .attention-row { align-items: center; display: grid; gap: 0.65rem; grid-template-columns: auto minmax(0, 1fr) auto auto; min-height: 4.15rem; padding: 0.7rem; }
+    .attention-row { align-items: center; color: inherit; display: grid; gap: 0.65rem; grid-template-columns: auto minmax(0, 1fr) auto auto; min-height: 4.15rem; padding: 0.7rem; text-decoration: none; }
     .attention-row + .attention-row { border-top: 1px solid #e6ebf3; }
     .attention-row > i { align-items: center; background: #fff0f0; border-radius: 9px; color: #ef4444; display: flex; font-size: 0.65rem; font-style: normal; font-weight: 900; height: 2rem; justify-content: center; width: 2rem; }
     .attention-row.warning > i { background: #fff4e8; color: #f97316; } .attention-row.info > i { background: #eeeaff; color: #7047eb; }
@@ -168,7 +175,7 @@ import { PlatformDashboardApiService } from '../../services/platform-dashboard-a
     .attention-row strong { font-size: 0.78rem; } .attention-row span { color: #667085; font-size: 0.68rem; }
     .attention-row > b { align-items: center; background: #fff0f0; border-radius: 50%; color: #ef4444; display: flex; font-size: 0.72rem; height: 1.8rem; justify-content: center; width: 1.8rem; }
     .attention-row > em { color: #8290a7; font-size: 1.4rem; font-style: normal; }
-    .attention-panel > a { color: #0b5cff; display: inline-block; font-size: 0.75rem; font-weight: 800; margin-top: 0.75rem; }
+    .attention-panel > a:not(.attention-row) { color: #0b5cff; display: inline-block; font-size: 0.75rem; font-weight: 800; margin-top: 0.75rem; text-decoration: none; }
     .activity-row { align-items: center; border-bottom: 1px solid #edf0f5; display: grid; gap: 0.7rem; grid-template-columns: auto 1fr auto; min-height: 2.75rem; }
     .activity-row i { align-items: center; background: #eaf2ff; border-radius: 50%; color: #0b5cff; display: flex; font-style: normal; height: 1.7rem; justify-content: center; width: 1.7rem; }
     .activity-row span, .activity-row time { font-size: 0.75rem; } .activity-row time { color: #667085; }
@@ -226,7 +233,32 @@ export class PlatformDashboardPage {
   }
 
   attentionIcon(type: string): string {
-    return ({ payment_failures: 'PF', expiring_subscriptions: 'EX', suspended_tenants: 'ST', setup_pending: 'SP', support_tickets: 'TK' } as Record<string, string>)[type] ?? '!';
+    return ({
+      payment_failures: 'PF',
+      expiring_subscriptions: 'EX',
+      suspended_tenants: 'ST',
+      setup_pending: 'SP',
+      past_due_subscriptions: 'PD',
+      pending_billing: 'PB',
+      support_tickets: 'TK'
+    } as Record<string, string>)[type] ?? '!';
+  }
+
+  attentionLink(type: string): string {
+    return type === 'pending_billing' ? '/admin/billing' : '/admin/tenants';
+  }
+
+  attentionQueryParams(type: string): Record<string, string> | null {
+    switch (type) {
+      case 'suspended_tenants':
+        return { status: 'suspended' };
+      case 'setup_pending':
+        return { status: 'setup_pending' };
+      case 'past_due_subscriptions':
+        return { billingStatus: 'PAST_DUE' };
+      default:
+        return null;
+    }
   }
 
   chartPoints(trend: PlatformTrendPoint[], key: 'tenants' | 'subscriptions' | 'mrr'): string {
