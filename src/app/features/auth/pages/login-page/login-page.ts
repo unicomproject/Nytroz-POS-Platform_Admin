@@ -156,9 +156,8 @@ import { AuthApiService } from '../../services/auth-api.service';
             </div>
 
             <div class="form-options">
-              <!-- TODO: Link this when the platform password-reset API and route are implemented. -->
-              <span class="unavailable-link" aria-disabled="true" title="Password reset is not available yet">
-                Forgot Password?
+              <span class="unavailable-link" aria-disabled="true">
+                Ask a Platform Admin to send a password reset.
               </span>
             </div>
 

@@ -90,4 +90,10 @@ describe('LoginPage', () => {
     expect(component.errorMessage()).toBe('Safe backend error');
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('Safe backend error');
   });
+
+  it('shows admin-assisted password reset guidance instead of self-service forgot password', () => {
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain(
+      'Ask a Platform Admin to send a password reset.'
+    );
+  });
 });

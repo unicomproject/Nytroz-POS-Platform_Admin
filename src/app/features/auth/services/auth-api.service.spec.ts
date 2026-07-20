@@ -162,4 +162,54 @@ describe('AuthApiService', () => {
 
     expect(loggedOut).toBe(true);
   });
+
+  it('validates a password reset token through the platform auth endpoint', () => {
+    let isValid = false;
+
+    service.validatePasswordResetToken('reset-token').subscribe((response) => {
+      isValid = response.isValid;
+    });
+
+    const request = httpTesting.expectOne('/api/v1/auth/platform-password-reset/validate');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({ token: 'reset-token' });
+
+    request.flush({
+      success: true,
+      message: 'ok',
+      data: {
+        isValid: true,
+        status: 'PENDING',
+        expiresAt: '2026-07-21T00:00:00Z'
+      }
+    });
+
+    expect(isValid).toBe(true);
+  });
+
+  it('completes a password reset through the platform auth endpoint', () => {
+    let completed = false;
+
+    service
+      .completePasswordReset({
+        token: 'reset-token',
+        newPassword: 'NewPass123',
+        confirmPassword: 'NewPass123'
+      })
+      .subscribe((response) => {
+        completed = response;
+      });
+
+    const request = httpTesting.expectOne('/api/v1/auth/platform-password-reset/complete');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({
+      token: 'reset-token',
+      newPassword: 'NewPass123',
+      confirmPassword: 'NewPass123'
+    });
+
+    request.flush({ success: true, message: 'ok', data: true });
+
+    expect(completed).toBe(true);
+  });
 });

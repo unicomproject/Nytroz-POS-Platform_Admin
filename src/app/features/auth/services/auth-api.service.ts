@@ -8,6 +8,10 @@ import { ApiResponse } from '../../../core/models/api-response.model';
 import { AuthSession } from '../../../core/models/auth-session.model';
 import { CurrentUser } from '../../../core/models/current-user.model';
 import { LoginRequest } from '../models/login-request.model';
+import {
+  CompletePlatformPasswordResetRequest,
+  PlatformPasswordResetValidation
+} from '../models/password-reset.model';
 
 interface PlatformLoginResponse {
   accessToken: string;
@@ -53,6 +57,24 @@ export class AuthApiService {
         `${appSettings.apiBaseUrl}${apiEndpoints.auth.logout}`,
         {},
         { withCredentials: true }
+      )
+      .pipe(map((response) => response.data === true));
+  }
+
+  validatePasswordResetToken(token: string): Observable<PlatformPasswordResetValidation> {
+    return this.http
+      .post<ApiResponse<PlatformPasswordResetValidation>>(
+        `${appSettings.apiBaseUrl}${apiEndpoints.auth.passwordResetValidate}`,
+        { token }
+      )
+      .pipe(map((response) => response.data));
+  }
+
+  completePasswordReset(request: CompletePlatformPasswordResetRequest): Observable<boolean> {
+    return this.http
+      .post<ApiResponse<boolean>>(
+        `${appSettings.apiBaseUrl}${apiEndpoints.auth.passwordResetComplete}`,
+        request
       )
       .pipe(map((response) => response.data === true));
   }
