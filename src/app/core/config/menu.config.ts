@@ -74,20 +74,6 @@ export const platformMenuConfig: MenuSectionConfig[] = [
         alternatePermissions: [platformPermissions.returnPolicyTemplatesManage]
       },
       {
-        label: 'Outlets',
-        path: '/admin/outlets',
-        requiresTenant: false,
-        icon: 'outlets',
-        requiredPermission: platformPermissions.tenantsView
-      },
-      {
-        label: 'Tills & Devices',
-        path: '/admin/tills-devices',
-        requiresTenant: false,
-        icon: 'tills',
-        requiredPermission: platformPermissions.tenantsView
-      },
-      {
         label: 'Users',
         path: '/admin/platform-users',
         requiresTenant: false,
@@ -103,13 +89,6 @@ export const platformMenuConfig: MenuSectionConfig[] = [
         requiredPermission: platformPermissions.permissionsView
       },
       {
-        label: 'Products',
-        path: '/admin/products',
-        requiresTenant: false,
-        icon: 'products',
-        requiredPermission: platformPermissions.tenantsView
-      },
-      {
         label: 'Billing',
         path: '/admin/billing',
         requiresTenant: false,
@@ -118,26 +97,11 @@ export const platformMenuConfig: MenuSectionConfig[] = [
         requiredPermission: platformPermissions.billingView
       },
       {
-        label: 'Reports',
-        path: '/admin/reports',
-        requiresTenant: false,
-        icon: 'reports',
-        hasSubmenu: true,
-        requiredPermission: platformPermissions.dashboardView
-      },
-      {
         label: 'Platform Login Audit',
         path: '/admin/audit-logs',
         requiresTenant: false,
         icon: 'audit',
         requiredPermission: platformPermissions.auditView
-      },
-      {
-        label: 'Alerts Center',
-        path: '/admin/alerts',
-        requiresTenant: false,
-        icon: 'alerts',
-        requiredPermission: platformPermissions.dashboardView
       },
       {
         label: 'System Settings',

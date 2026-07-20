@@ -1,7 +1,6 @@
 import { Routes } from '@angular/router';
 
-import { platformPermissions, tenantPermissions } from '../../../core/config/permission-keys';
-import { tenantContextGuard } from '../../../core/guards/tenant-context.guard';
+import { platformPermissions } from '../../../core/config/permission-keys';
 
 export const adminRoutes: Routes = [
   {
@@ -26,26 +25,6 @@ export const adminRoutes: Routes = [
     loadComponent: () =>
       import('../pages/platform-tenant-detail-page/platform-tenant-detail-page').then((m) => m.PlatformTenantDetailPage),
     data: { title: 'Tenant Detail', requiredPermission: platformPermissions.tenantsView }
-  },
-  {
-    path: 'outlets',
-    loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
-    data: { title: 'Outlets', requiredPermission: platformPermissions.tenantsView }
-  },
-  {
-    path: 'tills-devices',
-    loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
-    data: { title: 'Tills & Devices', requiredPermission: platformPermissions.tenantsView }
-  },
-  {
-    path: 'products',
-    loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
-    data: { title: 'Products', requiredPermission: platformPermissions.tenantsView }
-  },
-  {
-    path: 'alerts',
-    loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
-    data: { title: 'Alerts Center', requiredPermission: platformPermissions.dashboardView }
   },
   {
     path: 'subscriptions/create',
@@ -136,11 +115,6 @@ export const adminRoutes: Routes = [
     data: { title: 'Billing', requiredPermission: platformPermissions.billingView }
   },
   {
-    path: 'reports',
-    loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
-    data: { title: 'Platform Reports', requiredPermission: platformPermissions.dashboardView }
-  },
-  {
     path: 'settings',
     pathMatch: 'full',
     redirectTo: 'settings/system'
@@ -162,41 +136,15 @@ export const adminRoutes: Routes = [
     data: { title: 'Platform Login Audit', requiredPermission: platformPermissions.auditView }
   },
   {
-    path: 'tenant/:tenantId/outlets',
-    canActivate: [tenantContextGuard],
-    loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
-    data: { title: 'Outlets', requiresTenant: true, requiredPermission: tenantPermissions.outletManage }
-  },
-  {
-    path: 'tenant/:tenantId/tills',
-    canActivate: [tenantContextGuard],
-    loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
-    data: { title: 'Tills', requiresTenant: true, requiredPermission: tenantPermissions.tillManage }
-  },
-  {
-    path: 'tenant/:tenantId/users',
-    canActivate: [tenantContextGuard],
-    loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
-    data: { title: 'Tenant Users', requiresTenant: true, requiredPermission: tenantPermissions.userManage }
-  },
-  {
-    path: 'tenant/:tenantId/roles-permissions',
-    canActivate: [tenantContextGuard],
-    loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
-    data: { title: 'Roles and Permissions', requiresTenant: true, requiredPermission: tenantPermissions.roleManage }
-  },
-  {
-    path: 'tenant/:tenantId/settings',
-    canActivate: [tenantContextGuard],
-    loadComponent: () => import('../pages/admin-section-page/admin-section-page').then((m) => m.AdminSectionPage),
-    data: { title: 'Tenant Settings', requiresTenant: true, requiredPermission: tenantPermissions.userManage }
-  },
-  {
     path: 'permission-denied',
     loadComponent: () => import('../../../shared/components/permission-denied/permission-denied').then((m) => m.PermissionDenied)
   },
   {
     path: 'feature-not-enabled',
     loadComponent: () => import('../../../shared/components/feature-not-enabled/feature-not-enabled').then((m) => m.FeatureNotEnabled)
+  },
+  {
+    path: '**',
+    redirectTo: 'dashboard'
   }
 ];
