@@ -89,6 +89,7 @@ describe('PlatformCreateTenantPage', () => {
 
   function fillBilling(component: PlatformCreateTenantPage): void {
     component.billingSubscriptionForm.patchValue({
+      subscriptionType: 'PAID',
       billingStatus: 'pending',
       billingCycle: 'monthly',
       subscriptionStatus: 'trial',
@@ -367,6 +368,7 @@ describe('PlatformCreateTenantPage', () => {
     const component = fixture.componentInstance;
     component.currentStep.set('billing-subscription');
     component.billingSubscriptionForm.patchValue({
+      subscriptionType: '',
       billingStatus: '',
       billingCycle: '',
       subscriptionStatus: ''
@@ -377,6 +379,20 @@ describe('PlatformCreateTenantPage', () => {
 
     expect(component.currentStep()).toBe('billing-subscription');
     expect(component.billingSubscriptionForm.invalid).toBe(true);
+  });
+
+  it('blocks create when subscription type is missing', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    fillValidWizard(component);
+    component.billingSubscriptionForm.patchValue({ subscriptionType: '' });
+    component.currentStep.set('review-create');
+
+    component.createTenant();
+    fixture.detectChanges();
+
+    expect(api.createTenant).not.toHaveBeenCalled();
+    expect(component.canCreateTenant()).toBe(false);
   });
 
   it('sends expected POST payload shape on create', () => {
@@ -407,6 +423,7 @@ describe('PlatformCreateTenantPage', () => {
           sendInvite: true
         }),
         subscription: expect.objectContaining({
+          subscriptionType: 'PAID',
           billingCycle: 'monthly',
           subscriptionStatus: 'trial',
           paymentMethod: 'manual',
@@ -414,6 +431,61 @@ describe('PlatformCreateTenantPage', () => {
         }),
         billingStatus: 'pending',
         address: expect.objectContaining({ countryCode: 'LK' })
+      })
+    );
+  });
+
+  it('sends TRIAL subscriptionType for trial wizard create', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    fillValidWizard(component);
+    component.billingSubscriptionForm.patchValue({ subscriptionType: 'TRIAL' });
+    component.currentStep.set('review-create');
+
+    component.createTenant();
+
+    expect(api.createTenant).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subscription: expect.objectContaining({ subscriptionType: 'TRIAL', billingCycle: 'monthly' })
+      })
+    );
+  });
+
+  it('sends DEMO subscriptionType without billingCycle demo', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    fillValidWizard(component);
+    component.billingSubscriptionForm.patchValue({
+      subscriptionType: 'DEMO',
+      billingCycle: 'yearly'
+    });
+    component.currentStep.set('review-create');
+
+    component.createTenant();
+
+    expect(api.createTenant).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subscription: expect.objectContaining({
+          subscriptionType: 'DEMO',
+          billingCycle: 'yearly'
+        })
+      })
+    );
+    expect(api.createTenant.mock.calls[0][0].subscription.billingCycle).not.toBe('demo');
+  });
+
+  it('serializes annual billing cycle as yearly on create', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    fillValidWizard(component);
+    component.billingSubscriptionForm.patchValue({ billingCycle: 'annual' });
+    component.currentStep.set('review-create');
+
+    component.createTenant();
+
+    expect(api.createTenant).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subscription: expect.objectContaining({ billingCycle: 'yearly' })
       })
     );
   });

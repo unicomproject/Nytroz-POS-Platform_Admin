@@ -93,8 +93,7 @@ type StatusTab = SubscriptionPlanStatusTab;
           <select [ngModel]="billingCycleFilter()" (ngModelChange)="onBillingCycleChange($event)">
             <option value="">All</option>
             <option value="monthly">Monthly</option>
-            <option value="annual">Annual</option>
-            <option value="both">Both</option>
+            <option value="yearly">Annual</option>
           </select>
         </label>
         <label class="filter-field">
@@ -792,7 +791,7 @@ export class PlatformSubscriptionPlansPage implements OnInit {
       search: this.searchTerm(),
       planType: this.planTypeFilter(),
       status: this.statusFilter() ? subscriptionPlanStatusFilterToApiValue(this.statusFilter()) : undefined,
-      billingCycle: this.billingCycleFilter(),
+      billingCycle: this.billingCycleFilter() || undefined,
       currencyCode: this.currencyFilter(),
       sortBy: 'updatedAt',
       sortDirection: 'desc'

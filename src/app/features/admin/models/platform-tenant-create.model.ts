@@ -109,6 +109,8 @@ export interface TenantCreateTenantAdminForm {
 }
 
 export interface TenantCreateBillingSubscriptionForm {
+  /** Authoritative create-mode classification: PAID | TRIAL | DEMO. */
+  subscriptionType: string;
   billingStatus: string;
   billingCycle: string;
   subscriptionStatus: string;
@@ -164,6 +166,8 @@ export interface CreatePlatformTenantAdminRequest {
 }
 
 export interface CreatePlatformTenantSubscriptionDetailsRequest {
+  /** Required for wizard create: PAID | TRIAL | DEMO. */
+  subscriptionType?: string;
   billingCycle?: string;
   subscriptionStatus?: string;
   autoRenew?: boolean;

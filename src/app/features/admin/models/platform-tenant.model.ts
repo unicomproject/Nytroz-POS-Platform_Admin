@@ -6,7 +6,12 @@ export interface PlatformTenantListItem {
   ownerName: string | null;
   planName: string | null;
   region: string | null;
+  /**
+   * @deprecated Prefer lifecycleStatus. Retained for temporary compatibility.
+   */
   status: string;
+  /** Authoritative tenant lifecycle from tenants.status. */
+  lifecycleStatus: string;
   userCount: number;
   outletCount: number;
   createdOn: string;
@@ -25,8 +30,14 @@ export interface PlatformTenantSummary {
   totalTenants: number;
   activeTenants: number;
   suspendedTenants: number;
+  /**
+   * @deprecated Do not use for Pending Activation KPI.
+   * Pending activation is exposed via pendingActivationTenants.
+   */
   inactiveTenants: number;
   trialTenants: number;
+  /** Count of tenants in PENDING_ACTIVATION only; null when unavailable. */
+  pendingActivationTenants: number | null;
 }
 
 export interface PlatformTenantPlanFilterOption {
@@ -63,6 +74,7 @@ export interface PlatformTenantSubscriptionDetail {
 
 export interface PlatformTenantDetail extends PlatformTenantListItem {
   code: string;
+  /** Billing concern only — never display as tenant lifecycle. */
   billingStatus: string;
   operatingMode: string;
   baseCurrency: string;

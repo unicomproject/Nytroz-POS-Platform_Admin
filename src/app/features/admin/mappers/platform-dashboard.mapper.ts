@@ -10,6 +10,8 @@ export interface PlatformDashboardApiDto {
   activeTenants: number;
   suspendedTenants: number;
   trialTenants: number;
+  /** Optional; when absent, Pending Activation comes from attention items. */
+  pendingActivationTenants?: number | null;
   totalSubscriptions: number;
   activeSubscriptions: number;
   pendingBillingCount: number;
@@ -41,9 +43,14 @@ export function mapPlatformDashboard(dto: PlatformDashboardApiDto | null | undef
   const data = dto ?? emptyDashboardDto();
   const attention = (data.attentionItems ?? []).map(mapAttentionItem);
   const itemsRequiringAttention = attention.reduce((sum, item) => sum + item.count, 0);
+  const pendingActivationTenants = resolvePendingActivationCount(data, attention);
   const inactiveTenants = Math.max(
     0,
-    data.totalTenants - data.activeTenants - data.suspendedTenants - data.trialTenants
+    data.totalTenants
+      - data.activeTenants
+      - data.suspendedTenants
+      - data.trialTenants
+      - (pendingActivationTenants ?? 0)
   );
   const subscriptionHealthPercent =
     data.totalSubscriptions > 0
@@ -81,6 +88,11 @@ export function mapPlatformDashboard(dto: PlatformDashboardApiDto | null | undef
         { status: 'Active', count: data.activeTenants },
         { status: 'Trial', count: data.trialTenants },
         { status: 'Suspended', count: data.suspendedTenants },
+        {
+          status: 'Pending Activation',
+          count: pendingActivationTenants ?? 0,
+          unavailable: pendingActivationTenants == null
+        },
         { status: 'Inactive', count: inactiveTenants }
       ])
     }
@@ -105,11 +117,28 @@ function mapRecentTenantActivity(tenant: PlatformDashboardRecentTenantApiDto): P
   };
 }
 
-function buildTenantStatusSnapshot(total: number, rows: { status: string; count: number }[]): TenantStatusItem[] {
+function resolvePendingActivationCount(
+  data: PlatformDashboardApiDto,
+  attention: PlatformAttentionItem[]
+): number | null {
+  if (data.pendingActivationTenants != null) {
+    return Number(data.pendingActivationTenants);
+  }
+
+  const fromAttention = attention.find(
+    (item) => item.type === 'pending_activation' || item.type === 'setup_pending'
+  );
+  return fromAttention ? fromAttention.count : null;
+}
+
+function buildTenantStatusSnapshot(
+  total: number,
+  rows: { status: string; count: number; unavailable?: boolean }[]
+): TenantStatusItem[] {
   return rows.map((row) => ({
     status: row.status,
-    count: row.count,
-    percentage: total > 0 ? Math.round((row.count / total) * 1000) / 10 : 0
+    count: row.unavailable ? 0 : row.count,
+    percentage: total > 0 && !row.unavailable ? Math.round((row.count / total) * 1000) / 10 : 0
   }));
 }
 
@@ -119,6 +148,7 @@ function emptyDashboardDto(): PlatformDashboardApiDto {
     activeTenants: 0,
     suspendedTenants: 0,
     trialTenants: 0,
+    pendingActivationTenants: null,
     totalSubscriptions: 0,
     activeSubscriptions: 0,
     pendingBillingCount: 0,

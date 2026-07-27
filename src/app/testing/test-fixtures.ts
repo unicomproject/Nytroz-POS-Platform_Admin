@@ -171,7 +171,7 @@ export function createTenantFilterOptionsApiDto(
   overrides: Partial<PlatformTenantFilterOptionsApiDto> = {}
 ): PlatformTenantFilterOptionsApiDto {
   return {
-    statuses: ['active', 'suspended', 'trial', 'draft'],
+    statuses: ['draft', 'pending_payment', 'pending_activation', 'active', 'suspended', 'cancelled'],
     billingStatuses: ['current', 'pending'],
     operatingModes: ['retail'],
     plans: [
@@ -332,7 +332,12 @@ export function createTenantCreateOptionsApiDto(
       { value: 'pos_only', label: 'POS Only' }
     ],
     subscriptionStatuses: [{ value: 'trial', label: 'Trial' }, { value: 'active', label: 'Active' }],
-    billingCycles: [{ value: 'monthly', label: 'Monthly' }],
+    billingCycles: [
+      { value: 'monthly', label: 'Monthly' },
+      { value: 'yearly', label: 'Yearly' },
+      { value: 'annual', label: 'Annual' },
+      { value: 'demo', label: 'Demo' }
+    ],
     ...overrides
   };
 }

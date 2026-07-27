@@ -47,6 +47,58 @@ describe('mapPlatformDashboard attention mapping', () => {
     expect(dashboard.attention.find((item) => item.type === 'suspended_tenants')?.count).toBe(0);
     expect(dashboard.kpis.itemsRequiringAttention).toBe(5);
     expect(dashboard.tenantStatusSnapshot.items.find((item) => item.status === 'Suspended')?.count).toBe(1);
+    expect(dashboard.tenantStatusSnapshot.items.find((item) => item.status === 'Pending Activation')?.count).toBe(0);
+  });
+
+  it('uses pendingActivationTenants for Pending Activation and keeps it out of Inactive', () => {
+    const dashboard = mapPlatformDashboard({
+      totalTenants: 10,
+      activeTenants: 4,
+      suspendedTenants: 1,
+      trialTenants: 2,
+      pendingActivationTenants: 3,
+      totalSubscriptions: 10,
+      activeSubscriptions: 4,
+      pendingBillingCount: 0,
+      totalOutlets: 0,
+      totalTills: 0,
+      totalUsers: 0,
+      recentTenants: [],
+      attentionItems: [],
+      generatedAt: '2026-07-20T00:00:00Z'
+    });
+
+    expect(dashboard.tenantStatusSnapshot.items.find((item) => item.status === 'Pending Activation')?.count).toBe(3);
+    expect(dashboard.tenantStatusSnapshot.items.find((item) => item.status === 'Inactive')?.count).toBe(0);
+  });
+
+  it('reads Pending Activation from setup_pending attention when summary field is absent', () => {
+    const dashboard = mapPlatformDashboard({
+      totalTenants: 5,
+      activeTenants: 2,
+      suspendedTenants: 0,
+      trialTenants: 0,
+      totalSubscriptions: 5,
+      activeSubscriptions: 2,
+      pendingBillingCount: 0,
+      totalOutlets: 0,
+      totalTills: 0,
+      totalUsers: 0,
+      recentTenants: [],
+      attentionItems: [
+        {
+          type: 'setup_pending',
+          title: 'Pending Activation',
+          description: 'Tenants in PENDING_ACTIVATION awaiting Super Admin activation.',
+          count: 2,
+          severity: 'warning'
+        }
+      ],
+      generatedAt: '2026-07-20T00:00:00Z'
+    });
+
+    expect(dashboard.tenantStatusSnapshot.items.find((item) => item.status === 'Pending Activation')?.count).toBe(2);
+    expect(dashboard.tenantStatusSnapshot.items.find((item) => item.status === 'Inactive')?.count).toBe(1);
   });
 
   it('renders zero attention counts instead of dropping them', () => {

@@ -253,7 +253,8 @@ export class PlatformDashboardPage {
       case 'suspended_tenants':
         return { status: 'suspended' };
       case 'setup_pending':
-        return { status: 'setup_pending' };
+      case 'pending_activation':
+        return { status: 'pending_activation' };
       case 'past_due_subscriptions':
         return { billingStatus: 'PAST_DUE' };
       default:

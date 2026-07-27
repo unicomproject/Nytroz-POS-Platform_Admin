@@ -3,6 +3,7 @@ import { AbstractControl, FormBuilder, FormsModule, ReactiveFormsModule, Validat
 import { Router } from '@angular/router';
 
 import { ApiErrorService } from '../../../../core/services/api-error.service';
+import { TENANT_SUBSCRIPTION_TYPE_OPTIONS } from '../../constants/tenant-subscription-type.constants';
 import { mapCreateTenantRequest } from '../../mappers/platform-tenant-create.mapper';
 import {
   TenantCreateAddonOption,
@@ -12,6 +13,7 @@ import {
   TenantCreateWizardState
 } from '../../models/platform-tenant-create.model';
 import { PlatformTenantApiService } from '../../services/platform-tenant-api.service';
+import { normalizeBillingCycleForApi } from '../../utils/billing-cycle.util';
 import {
   controlIssueMessage,
   controlValidationMessage,
@@ -253,6 +255,20 @@ type WizardStep =
             @case ('billing-subscription') {
               <header class="step-header"><h2>Billing & Subscription</h2></header>
               <form [formGroup]="billingSubscriptionForm" class="grid two">
+                <fieldset class="full subscription-type-fieldset">
+                  <legend>Subscription Type *</legend>
+                  <div class="subscription-type-options" role="radiogroup" aria-label="Subscription type">
+                    @for (item of subscriptionTypeOptions; track item.value) {
+                      <label class="subscription-type-option" [class.selected]="billingSubscriptionForm.controls.subscriptionType.value === item.value">
+                        <input type="radio" formControlName="subscriptionType" [value]="item.value" />
+                        <span>{{ item.label }}</span>
+                      </label>
+                    }
+                  </div>
+                  @if (fieldMessage(billingSubscriptionForm.controls.subscriptionType, 'Subscription type')) {
+                    <small class="error">{{ fieldMessage(billingSubscriptionForm.controls.subscriptionType, 'Subscription type') }}</small>
+                  }
+                </fieldset>
                 <label>
                   <span>Billing Status *</span>
                   <select formControlName="billingStatus">
@@ -273,6 +289,9 @@ type WizardStep =
                       <option [value]="item.value">{{ item.label }}</option>
                     }
                   </select>
+                  @if (fieldMessage(billingSubscriptionForm.controls.billingCycle, 'Billing cycle')) {
+                    <small class="error">{{ fieldMessage(billingSubscriptionForm.controls.billingCycle, 'Billing cycle') }}</small>
+                  }
                 </label>
                 <label>
                   <span>Subscription Status *</span>
@@ -318,6 +337,8 @@ type WizardStep =
                 <div><dt>Features</dt><dd>{{ selectedFeatureIds().length }}</dd></div>
                 <div><dt>Admin Email</dt><dd>{{ tenantAdminForm.controls.email.value || '—' }}</dd></div>
                 <div><dt>Billing Status</dt><dd>{{ billingSubscriptionForm.controls.billingStatus.value || '—' }}</dd></div>
+                <div><dt>Subscription Type</dt><dd>{{ billingSubscriptionForm.controls.subscriptionType.value || '—' }}</dd></div>
+                <div><dt>Billing Cycle</dt><dd>{{ billingSubscriptionForm.controls.billingCycle.value || '—' }}</dd></div>
                 <div><dt>Subscription Status</dt><dd>{{ billingSubscriptionForm.controls.subscriptionStatus.value || '—' }}</dd></div>
               </dl>
             }
@@ -360,6 +381,12 @@ type WizardStep =
     textarea { min-height: 5rem; }
     .checkbox { align-items: center; display: flex; gap: 0.5rem; }
     .checkbox input { min-height: auto; width: auto; }
+    .subscription-type-fieldset { border: 1px solid #eaecf0; border-radius: 12px; margin: 0; padding: 0.75rem 0.9rem 0.9rem; }
+    .subscription-type-fieldset legend { font-size: 0.82rem; font-weight: 600; padding: 0 0.25rem; }
+    .subscription-type-options { display: flex; flex-wrap: wrap; gap: 0.55rem; margin-top: 0.35rem; }
+    .subscription-type-option { align-items: center; border: 1px solid #d0d5dd; border-radius: 10px; cursor: pointer; display: inline-flex; gap: 0.45rem; font-size: 0.88rem; font-weight: 600; min-height: 2.55rem; padding: 0.35rem 0.85rem; }
+    .subscription-type-option.selected { border-color: #0b5cff; box-shadow: 0 0 0 3px rgba(11, 92, 255, 0.12); color: #0b5cff; }
+    .subscription-type-option input { margin: 0; min-height: auto; width: auto; }
     .plan-grid, .addon-grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); }
     .plan-card, .addon-card { border: 1px solid #eaecf0; border-radius: 12px; display: grid; gap: 0.5rem; padding: 0.75rem; }
     .plan-card.selected { border-color: #0b5cff; box-shadow: 0 0 0 3px rgba(11, 92, 255, 0.12); }
@@ -406,6 +433,8 @@ export class PlatformCreateTenantPage implements OnInit {
     { key: 'billing-subscription' as WizardStep, label: 'Billing & Subscription' },
     { key: 'review-create' as WizardStep, label: 'Review & Create' }
   ];
+
+  readonly subscriptionTypeOptions = TENANT_SUBSCRIPTION_TYPE_OPTIONS;
 
   readonly currentStep = signal<WizardStep>('business-info');
   readonly createOptions = signal<TenantCreateOptions>({
@@ -465,6 +494,7 @@ export class PlatformCreateTenantPage implements OnInit {
   });
 
   readonly billingSubscriptionForm = this.fb.nonNullable.group({
+    subscriptionType: ['', Validators.required],
     billingStatus: ['', Validators.required],
     billingCycle: ['', Validators.required],
     subscriptionStatus: ['', Validators.required],
@@ -723,6 +753,7 @@ export class PlatformCreateTenantPage implements OnInit {
     }
 
     if (step === 'billing-subscription') {
+      this.pushControlIssue(issues, this.billingSubscriptionForm.controls.subscriptionType, 'Subscription type');
       this.pushControlIssue(issues, this.billingSubscriptionForm.controls.billingStatus, 'Billing status');
       this.pushControlIssue(issues, this.billingSubscriptionForm.controls.billingCycle, 'Billing cycle');
       this.pushControlIssue(issues, this.billingSubscriptionForm.controls.subscriptionStatus, 'Subscription status');
@@ -745,7 +776,9 @@ export class PlatformCreateTenantPage implements OnInit {
       'address.countryCode': this.businessInfoForm.controls.addressCountryCode,
       baseCurrency: this.businessInfoForm.controls.baseCurrency,
       billingStatus: this.billingSubscriptionForm.controls.billingStatus,
+      'subscription.subscriptionType': this.billingSubscriptionForm.controls.subscriptionType,
       'subscription.subscriptionStatus': this.billingSubscriptionForm.controls.subscriptionStatus,
+      'subscription.billingCycle': this.billingSubscriptionForm.controls.billingCycle,
       'subscription.paymentMethod': this.billingSubscriptionForm.controls.paymentMethod,
       'tenantAdmin.email': this.tenantAdminForm.controls.email
     });
@@ -844,9 +877,10 @@ export class PlatformCreateTenantPage implements OnInit {
     });
 
     this.businessInfoForm.controls.baseCurrency.setValue(plan.baseCurrency || this.businessInfoForm.controls.baseCurrency.value);
-    this.billingSubscriptionForm.controls.billingCycle.setValue(
-      plan.billingCycle || this.billingSubscriptionForm.controls.billingCycle.value
-    );
+    const planBillingCycle = normalizeBillingCycleForApi(plan.billingCycle);
+    if (planBillingCycle) {
+      this.billingSubscriptionForm.controls.billingCycle.setValue(planBillingCycle);
+    }
   }
 
   private syncFeaturesForPlan(): void {
