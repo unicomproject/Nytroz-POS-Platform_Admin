@@ -6,6 +6,7 @@ import {
   PlatformTenantListResponse,
   PlatformTenantSummary
 } from '../models/platform-tenant.model';
+import { resolveTenantLifecycle, tenantLifecycleFilterOptions } from '../utils/tenant-lifecycle.util';
 
 export interface PlatformTenantListItemApiDto {
   id: string;
@@ -13,6 +14,8 @@ export interface PlatformTenantListItemApiDto {
   name: string;
   status: string;
   billingStatus: string;
+  /** Authoritative tenant lifecycle from tenants.status. */
+  lifecycleStatus?: string | null;
   operatingMode: string;
   baseCurrency: string;
   defaultTimezone: string;
@@ -51,7 +54,7 @@ export interface PlatformTenantSummaryApiDto {
   activeTenants: number;
   suspendedTenants: number;
   trialTenants: number;
-  pendingActivationTenants: number;
+  pendingActivationTenants?: number | null;
   pendingBillingCount: number;
   totalOutlets: number;
   totalTills: number;
@@ -102,6 +105,16 @@ export function mapPlatformTenantListResponse(
 }
 
 export function mapPlatformTenantListItem(dto: PlatformTenantListItemApiDto): PlatformTenantListItem {
+  const lifecycle = resolveTenantLifecycle({
+    lifecycleStatus: dto.lifecycleStatus,
+    status: dto.status
+    // billingStatus intentionally omitted — it is a billing concern, not lifecycle,
+    // when lifecycleStatus/status are absent we still prefer status over billingStatus
+    // via resolveTenantLifecycle's ordered fallback (status before billingStatus).
+  });
+
+  const lifecycleValue = lifecycle.value ?? lifecycle.raw ?? dto.status;
+
   return {
     id: String(dto.id),
     code: dto.code,
@@ -110,7 +123,8 @@ export function mapPlatformTenantListItem(dto: PlatformTenantListItemApiDto): Pl
     ownerName: null,
     planName: dto.subscription?.planName ?? null,
     region: null,
-    status: dto.status,
+    status: lifecycleValue,
+    lifecycleStatus: lifecycleValue,
     userCount: dto.userCount,
     outletCount: dto.outletCount,
     createdOn: dto.createdAt,
@@ -124,23 +138,33 @@ export function mapPlatformTenantSummary(dto: PlatformTenantSummaryApiDto | null
     activeTenants: 0,
     suspendedTenants: 0,
     trialTenants: 0,
-    pendingActivationTenants: 0,
+    pendingActivationTenants: null,
     pendingBillingCount: 0,
     totalOutlets: 0,
     totalTills: 0
   };
 
-  const derivedInactive = Math.max(
+  const pendingActivationTenants =
+    data.pendingActivationTenants == null ? null : Number(data.pendingActivationTenants);
+
+  // Keep a non-pending residual for legacy inactiveTenants consumers only.
+  // Pending Activation KPI must use pendingActivationTenants exclusively.
+  const residualInactive = Math.max(
     0,
-    data.totalTenants - data.activeTenants - data.suspendedTenants - data.trialTenants
+    data.totalTenants
+      - data.activeTenants
+      - data.suspendedTenants
+      - data.trialTenants
+      - (pendingActivationTenants ?? 0)
   );
 
   return {
     totalTenants: data.totalTenants,
     activeTenants: data.activeTenants,
     suspendedTenants: data.suspendedTenants,
-    inactiveTenants: Math.max(derivedInactive, data.pendingActivationTenants),
-    trialTenants: data.trialTenants
+    inactiveTenants: residualInactive,
+    trialTenants: data.trialTenants,
+    pendingActivationTenants
   };
 }
 
@@ -156,7 +180,7 @@ export function mapPlatformTenantFilterOptions(
       planCode: plan.planCode
     })),
     regions: [],
-    statuses: data.statuses ?? [],
+    statuses: tenantLifecycleFilterOptions(data.statuses).map((item) => item.value),
     billingStatuses: data.billingStatuses ?? [],
     operatingModes: data.operatingModes ?? []
   };
@@ -166,6 +190,7 @@ export function mapPlatformTenantDetail(dto: PlatformTenantDetailApiDto): Platfo
   return {
     ...mapPlatformTenantListItem(dto),
     code: dto.code,
+    // Billing concern only — separate from lifecycleStatus.
     billingStatus: dto.billingStatus,
     operatingMode: dto.operatingMode,
     baseCurrency: dto.baseCurrency,

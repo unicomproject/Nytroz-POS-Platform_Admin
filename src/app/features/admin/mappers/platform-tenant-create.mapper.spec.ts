@@ -48,6 +48,7 @@ function createWizardState(overrides: Partial<TenantCreateWizardState> = {}): Te
     featureEntitlements: { enabledFeatureIds: ['feature-1'], enabledFeatureCodes: [] },
     tenantAdmin: { firstName: 'Ada', lastName: 'Lovelace', email: 'ada@tenant.com', phone: '' },
     billingSubscription: {
+      subscriptionType: 'PAID',
       billingStatus: 'pending',
       billingCycle: 'monthly',
       subscriptionStatus: 'trial',
@@ -101,15 +102,121 @@ describe('mapCreateTenantRequest billing mapping', () => {
     const request = mapCreateTenantRequest(createWizardState());
 
     expect(request.billingStatus).toBe('pending');
+    expect(request.subscription?.subscriptionType).toBe('PAID');
     expect(request.subscription?.subscriptionStatus).toBe('trial');
     expect(request.subscription?.billingCycle).toBe('monthly');
     expect(request.subscription?.paymentMethod).toBe('manual');
+  });
+
+  it('sends explicit PAID subscriptionType', () => {
+    const request = mapCreateTenantRequest(
+      createWizardState({
+        billingSubscription: {
+          subscriptionType: 'PAID',
+          billingStatus: 'pending',
+          billingCycle: 'monthly',
+          subscriptionStatus: 'active',
+          createDraftInvoice: true,
+          autoRenew: true,
+          invoiceEmail: '',
+          paymentMethod: 'manual',
+          notes: ''
+        }
+      })
+    );
+
+    expect(request.subscription?.subscriptionType).toBe('PAID');
+  });
+
+  it('sends explicit TRIAL subscriptionType', () => {
+    const request = mapCreateTenantRequest(
+      createWizardState({
+        billingSubscription: {
+          subscriptionType: 'TRIAL',
+          billingStatus: 'pending',
+          billingCycle: 'monthly',
+          subscriptionStatus: 'trial',
+          createDraftInvoice: false,
+          autoRenew: false,
+          invoiceEmail: '',
+          paymentMethod: 'manual',
+          notes: ''
+        }
+      })
+    );
+
+    expect(request.subscription?.subscriptionType).toBe('TRIAL');
+    expect(request.subscription?.billingCycle).toBe('monthly');
+  });
+
+  it('sends explicit DEMO subscriptionType without billingCycle demo', () => {
+    const request = mapCreateTenantRequest(
+      createWizardState({
+        billingSubscription: {
+          subscriptionType: 'DEMO',
+          billingStatus: 'waived',
+          billingCycle: 'yearly',
+          subscriptionStatus: 'active',
+          createDraftInvoice: false,
+          autoRenew: false,
+          invoiceEmail: '',
+          paymentMethod: 'manual',
+          notes: ''
+        }
+      })
+    );
+
+    expect(request.subscription?.subscriptionType).toBe('DEMO');
+    expect(request.subscription?.billingCycle).toBe('yearly');
+    expect(request.subscription?.billingCycle).not.toBe('demo');
+  });
+
+  it('does not derive subscriptionType from billingCycle', () => {
+    const request = mapCreateTenantRequest(
+      createWizardState({
+        billingSubscription: {
+          subscriptionType: '',
+          billingStatus: 'pending',
+          billingCycle: 'demo',
+          subscriptionStatus: 'trial',
+          createDraftInvoice: false,
+          autoRenew: true,
+          invoiceEmail: '',
+          paymentMethod: 'manual',
+          notes: ''
+        }
+      })
+    );
+
+    expect(request.subscription?.subscriptionType).toBeUndefined();
+    expect(request.subscription?.billingCycle).toBeUndefined();
+  });
+
+  it('serializes annual billing cycle as yearly', () => {
+    const request = mapCreateTenantRequest(
+      createWizardState({
+        billingSubscription: {
+          subscriptionType: 'PAID',
+          billingStatus: 'pending',
+          billingCycle: 'annual',
+          subscriptionStatus: 'active',
+          createDraftInvoice: true,
+          autoRenew: true,
+          invoiceEmail: '',
+          paymentMethod: 'manual',
+          notes: ''
+        }
+      })
+    );
+
+    expect(request.subscription?.billingCycle).toBe('yearly');
   });
 
   it('does not send subscriptionStatus as billingStatus', () => {
     const request = mapCreateTenantRequest(
       createWizardState({
         billingSubscription: {
+          subscriptionType: 'TRIAL',
           billingStatus: 'pending',
           billingCycle: 'monthly',
           subscriptionStatus: 'trial',
@@ -130,6 +237,7 @@ describe('mapCreateTenantRequest billing mapping', () => {
     const request = mapCreateTenantRequest(
       createWizardState({
         billingSubscription: {
+          subscriptionType: 'TRIAL',
           billingStatus: 'pending',
           billingCycle: 'monthly',
           subscriptionStatus: 'trial',
@@ -145,5 +253,32 @@ describe('mapCreateTenantRequest billing mapping', () => {
     expect(request.billingStatus).toBe('pending');
     expect(request.subscription?.subscriptionStatus).toBe('trial');
     expect(request.subscription?.paymentMethod).toBe('manual');
+  });
+});
+
+describe('mapCreateOptions billing cycles', () => {
+  it('keeps only monthly/yearly and normalizes annual to yearly', () => {
+    const result = mapCreateOptions({
+      plans: [],
+      addons: [],
+      catalogModules: [],
+      billingStatuses: [],
+      paymentMethods: [],
+      countryCodes: [],
+      currencies: [],
+      timezones: [],
+      locales: [],
+      businessTypes: [],
+      operatingModes: [],
+      subscriptionStatuses: [],
+      billingCycles: [
+        { value: 'monthly', label: 'Monthly' },
+        { value: 'annual', label: 'Annual' },
+        { value: 'demo', label: 'Demo' },
+        { value: 'both', label: 'Both' }
+      ]
+    });
+
+    expect(result.billingCycles.map((item) => item.value)).toEqual(['monthly', 'yearly']);
   });
 });

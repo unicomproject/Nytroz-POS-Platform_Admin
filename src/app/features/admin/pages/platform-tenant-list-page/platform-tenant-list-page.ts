@@ -6,6 +6,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
 
 import { ApiErrorService } from '../../../../core/services/api-error.service';
+import { TENANT_LIFECYCLE_FILTER_OPTIONS } from '../../constants/tenant-lifecycle-status.constants';
 import {
   PlatformTenantFilterOptions,
   PlatformTenantListQuery,
@@ -14,6 +15,7 @@ import {
 } from '../../models/platform-tenant.model';
 import { PlatformTenantApiService } from '../../services/platform-tenant-api.service';
 import { PlatformTenantSearchService } from '../../services/platform-tenant-search.service';
+import { tenantLifecycleBadgeClass, tenantLifecycleLabel } from '../../utils/tenant-lifecycle.util';
 
 @Component({
   selector: 'app-platform-tenant-list-page',
@@ -73,12 +75,12 @@ import { PlatformTenantSearchService } from '../../services/platform-tenant-sear
           </article>
           <article class="kpi-card">
             <span class="kpi-icon red" aria-hidden="true">
-              <svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6" /><path d="M10 10l4 4M14 10l-4 4" /></svg>
+              <svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6" /><path d="M12 9v4M12 17h.01" /></svg>
             </span>
             <div class="kpi-body">
-              <span class="kpi-label">Inactive Tenants</span>
-              <strong class="kpi-value">{{ summaryData.inactiveTenants }}</strong>
-              <small class="kpi-meta">{{ percent(summaryData.inactiveTenants, summaryData.totalTenants) }}</small>
+              <span class="kpi-label">Pending Activation</span>
+              <strong class="kpi-value">{{ pendingActivationLabel(summaryData) }}</strong>
+              <small class="kpi-meta">{{ pendingActivationMeta(summaryData) }}</small>
             </div>
           </article>
           <article class="kpi-card">
@@ -111,8 +113,8 @@ import { PlatformTenantSearchService } from '../../services/platform-tenant-sear
           <span class="field-label">Status</span>
           <select [ngModel]="statusFilter()" (ngModelChange)="onStatusChange($event)">
             <option value="">All Status</option>
-            @for (status of filterOptions().statuses; track status) {
-              <option [value]="status">{{ status }}</option>
+            @for (status of lifecycleFilterOptions; track status.value) {
+              <option [value]="status.value">{{ status.label }}</option>
             }
           </select>
         </label>
@@ -176,7 +178,11 @@ import { PlatformTenantSearchService } from '../../services/platform-tenant-sear
                       </td>
                       <td class="cell-text">{{ tenant.planName || '—' }}</td>
                       <td>
-                        <span class="status-badge" [class]="statusClass(tenant.status)">{{ tenant.status }}</span>
+                        <span
+                          class="status-badge"
+                          [class]="statusClass(tenant)"
+                          [attr.aria-label]="'Lifecycle status: ' + statusLabel(tenant)"
+                        >{{ statusLabel(tenant) }}</span>
                       </td>
                       <td class="cell-num">{{ tenant.userCount }}</td>
                       <td class="cell-num">{{ tenant.outletCount }}</td>
@@ -550,8 +556,11 @@ import { PlatformTenantSearchService } from '../../services/platform-tenant-sear
 
     .status-badge.active { background: #dcfce7; color: #15803d; }
     .status-badge.suspended { background: #ffedd5; color: #c2410c; }
-    .status-badge.trial { background: #dbeafe; color: #1d4ed8; }
-    .status-badge.inactive { background: #e2e8f0; color: #475569; }
+    .status-badge.draft { background: #e2e8f0; color: #475569; }
+    .status-badge.pending_payment { background: #fef3c7; color: #b45309; }
+    .status-badge.pending_activation { background: #dbeafe; color: #1d4ed8; }
+    .status-badge.cancelled { background: #fee2e2; color: #b91c1c; }
+    .status-badge.unknown { background: #f2f4f7; color: #667085; }
 
     .activity {
       align-items: center;
@@ -676,6 +685,7 @@ export class PlatformTenantListPage {
   readonly planFilter = signal('');
   readonly pageNumber = signal(1);
   readonly pageSize = signal(10);
+  readonly lifecycleFilterOptions = TENANT_LIFECYCLE_FILTER_OPTIONS;
 
   constructor() {
     const params = this.route.snapshot.queryParamMap;
@@ -801,6 +811,18 @@ export class PlatformTenantListPage {
     return `${((value / total) * 100).toFixed(1)}% of total`;
   }
 
+  pendingActivationLabel(summary: PlatformTenantSummary): string {
+    return summary.pendingActivationTenants == null ? '—' : String(summary.pendingActivationTenants);
+  }
+
+  pendingActivationMeta(summary: PlatformTenantSummary): string {
+    if (summary.pendingActivationTenants == null) {
+      return 'Unavailable';
+    }
+
+    return this.percent(summary.pendingActivationTenants, summary.totalTenants);
+  }
+
   initials(name: string): string {
     return name.split(' ').filter(Boolean).map((part) => part[0]).join('').slice(0, 2).toUpperCase();
   }
@@ -811,8 +833,18 @@ export class PlatformTenantListPage {
     return palette[code % palette.length];
   }
 
-  statusClass(status: string): string {
-    return status.toLowerCase();
+  statusLabel(tenant: { lifecycleStatus?: string; status?: string }): string {
+    return tenantLifecycleLabel({
+      lifecycleStatus: tenant.lifecycleStatus,
+      status: tenant.status
+    });
+  }
+
+  statusClass(tenant: { lifecycleStatus?: string; status?: string }): string {
+    return tenantLifecycleBadgeClass({
+      lifecycleStatus: tenant.lifecycleStatus,
+      status: tenant.status
+    });
   }
 
   isRecentActivity(value: string): boolean {

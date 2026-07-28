@@ -33,7 +33,7 @@ describe('PlatformSubscriptionPlanApiService', () => {
       search: 'pro',
       status: 'active',
       planType: 'paid',
-      billingCycle: 'both',
+      billingCycle: 'monthly',
       currencyCode: 'LKR',
       sortBy: 'updatedAt',
       sortDirection: 'desc'
@@ -46,9 +46,27 @@ describe('PlatformSubscriptionPlanApiService', () => {
     expect(request.request.params.get('pageNumber')).toBe('1');
     expect(request.request.params.get('search')).toBe('pro');
     expect(request.request.params.get('status')).toBe('active');
+    expect(request.request.params.get('billingCycle')).toBe('monthly');
 
     request.flush({ success: true, message: 'ok', data: createSubscriptionPlanListResponseApiDto() });
     expect(planName).toBe('Test Subscription Plan');
+  });
+
+  it('omits billingCycle when filter is Both/All and maps annual to yearly', () => {
+    service.getSubscriptionPlans({ billingCycle: 'both' }).subscribe();
+    const bothRequest = httpTesting.expectOne((req) => req.url === '/api/v1/platform/subscription-plans');
+    expect(bothRequest.request.params.has('billingCycle')).toBe(false);
+    bothRequest.flush({ success: true, message: 'ok', data: createSubscriptionPlanListResponseApiDto() });
+
+    service.getSubscriptionPlans({ billingCycle: 'annual' }).subscribe();
+    const annualRequest = httpTesting.expectOne((req) => req.url === '/api/v1/platform/subscription-plans');
+    expect(annualRequest.request.params.get('billingCycle')).toBe('yearly');
+    annualRequest.flush({ success: true, message: 'ok', data: createSubscriptionPlanListResponseApiDto() });
+
+    service.getSubscriptionPlans({ billingCycle: 'yearly' }).subscribe();
+    const yearlyRequest = httpTesting.expectOne((req) => req.url === '/api/v1/platform/subscription-plans');
+    expect(yearlyRequest.request.params.get('billingCycle')).toBe('yearly');
+    yearlyRequest.flush({ success: true, message: 'ok', data: createSubscriptionPlanListResponseApiDto() });
   });
 
   it('calls POST /api/v1/platform/subscription-plans for saveDraft', () => {

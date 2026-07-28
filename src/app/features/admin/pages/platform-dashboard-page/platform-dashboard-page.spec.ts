@@ -99,9 +99,42 @@ describe('PlatformDashboardPage', () => {
 
     expect(component.attentionLink('suspended_tenants')).toBe('/admin/tenants');
     expect(component.attentionQueryParams('suspended_tenants')).toEqual({ status: 'suspended' });
+    expect(component.attentionQueryParams('pending_activation')).toEqual({ status: 'pending_activation' });
+    expect(component.attentionQueryParams('setup_pending')).toEqual({ status: 'pending_activation' });
+    expect(component.attentionIcon('pending_activation')).toBe('PA');
     expect(component.attentionQueryParams('past_due_subscriptions')).toEqual({ billingStatus: 'PAST_DUE' });
     expect(component.attentionLink('pending_billing')).toBe('/admin/billing');
     expect(component.attentionQueryParams('pending_billing')).toBeNull();
+  });
+
+  it('renders pending_activation attention with approved label and filter navigation', async () => {
+    api.getDashboard.mockReturnValue(
+      of(
+        createDashboard({
+          attention: [
+            {
+              type: 'pending_activation',
+              title: 'Pending Activation',
+              description: 'Tenants in PENDING_ACTIVATION awaiting Super Admin activation.',
+              count: 2,
+              severity: 'warning'
+            }
+          ],
+          kpis: {
+            ...createDashboard().kpis,
+            itemsRequiringAttention: 2
+          }
+        })
+      )
+    );
+
+    const fixture = await createComponent();
+    const row = (fixture.nativeElement as HTMLElement).querySelector('.attention-row');
+    expect(row?.textContent).toContain('Pending Activation');
+    expect(row?.textContent).toContain('2');
+    expect(row?.getAttribute('href')).toContain('/admin/tenants');
+    expect(row?.getAttribute('href')).toContain('status=pending_activation');
+    expect(row?.textContent).not.toContain('Setup Pending');
   });
 
   it('shows clean empty states when backend data is empty', async () => {

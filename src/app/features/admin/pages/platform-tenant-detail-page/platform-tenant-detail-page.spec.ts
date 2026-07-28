@@ -85,7 +85,12 @@ describe('PlatformTenantDetailPage', () => {
 
   it('shows lifecycle buttons based on backend flags and permissions', async () => {
     api.getTenantById.mockReturnValue(
-      of(createTenantDetail({ canActivate: true, canSuspend: false, status: 'draft' }))
+      of(createTenantDetail({
+        canActivate: true,
+        canSuspend: false,
+        status: 'pending_activation',
+        lifecycleStatus: 'pending_activation'
+      }))
     );
 
     const fixture = await createComponent();
@@ -94,15 +99,74 @@ describe('PlatformTenantDetailPage', () => {
 
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain('Activate Tenant');
+    expect(text).toContain('Pending Activation');
     expect(text).not.toContain('Suspend Tenant');
+  });
+
+  it('does not offer activation for pending_payment tenants', async () => {
+    api.getTenantById.mockReturnValue(
+      of(createTenantDetail({
+        canActivate: true,
+        canSuspend: false,
+        status: 'pending_payment',
+        lifecycleStatus: 'pending_payment'
+      }))
+    );
+
+    const fixture = await createComponent();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).not.toContain('Activate Tenant');
+    expect(text).toContain('Pending Payment');
+  });
+
+  it('does not offer activation for active or cancelled tenants', async () => {
+    api.getTenantById.mockReturnValue(
+      of(createTenantDetail({
+        canActivate: true,
+        canSuspend: false,
+        status: 'active',
+        lifecycleStatus: 'active'
+      }))
+    );
+
+    const fixture = await createComponent();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('Activate Tenant');
+
+    api.getTenantById.mockReturnValue(
+      of(createTenantDetail({
+        canActivate: true,
+        canSuspend: false,
+        status: 'cancelled',
+        lifecycleStatus: 'cancelled'
+      }))
+    );
+    fixture.componentInstance.reload();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('Activate Tenant');
   });
 
   it('refreshes tenant detail after activate action', async () => {
     api.getTenantById.mockReturnValue(
-      of(createTenantDetail({ canActivate: true, canSuspend: false, status: 'draft' }))
+      of(createTenantDetail({
+        canActivate: true,
+        canSuspend: false,
+        status: 'pending_activation',
+        lifecycleStatus: 'pending_activation'
+      }))
     );
     api.activateTenant.mockReturnValue(
-      of(createTenantDetail({ canActivate: false, canSuspend: true, status: 'active' }))
+      of(createTenantDetail({
+        canActivate: false,
+        canSuspend: true,
+        status: 'active',
+        lifecycleStatus: 'active'
+      }))
     );
 
     const fixture = await createComponent();
@@ -118,6 +182,7 @@ describe('PlatformTenantDetailPage', () => {
 
     expect(api.activateTenant).toHaveBeenCalledWith('tenant-1');
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('Tenant activated successfully.');
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Active');
   });
 
   it('shows a safe error state on API failure', async () => {

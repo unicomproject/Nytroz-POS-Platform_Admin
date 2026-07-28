@@ -375,7 +375,13 @@ export function mapSubscriptionPlanListQueryParams(query: SubscriptionPlanListQu
   }
 
   if (query.billingCycle?.trim()) {
-    params['billingCycle'] = query.billingCycle.trim();
+    const normalized = query.billingCycle.trim().toLowerCase();
+    if (normalized === 'monthly') {
+      params['billingCycle'] = 'monthly';
+    } else if (normalized === 'yearly' || normalized === 'annual') {
+      params['billingCycle'] = 'yearly';
+    }
+    // both / all / blank / demo / trial / paid → omit parameter
   }
 
   return params;

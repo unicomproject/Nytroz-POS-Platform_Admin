@@ -8,6 +8,7 @@ import { switchMap } from 'rxjs';
 import { platformPermissions } from '../../../../core/config/permission-keys';
 import { AccessControlService } from '../../../../core/services/access-control.service';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
+import { TenantLifecycleStatuses } from '../../constants/tenant-lifecycle-status.constants';
 import {
   PlatformTenantEntitlementCatalogFeature,
   PlatformTenantEntitlementOptions,
@@ -15,6 +16,7 @@ import {
 } from '../../models/platform-tenant-entitlements.model';
 import { PlatformTenantDetail, UpdatePlatformTenantRequest } from '../../models/platform-tenant.model';
 import { PlatformTenantApiService } from '../../services/platform-tenant-api.service';
+import { tenantLifecycleBadgeClass, tenantLifecycleLabel, resolveTenantLifecycle } from '../../utils/tenant-lifecycle.util';
 
 @Component({
   selector: 'app-platform-tenant-detail-page',
@@ -82,8 +84,12 @@ import { PlatformTenantApiService } from '../../services/platform-tenant-api.ser
       @if (tenant(); as data) {
         <section class="summary-grid">
           <article class="summary-card card">
-            <span class="label">Status</span>
-            <span class="status-badge" [class]="statusClass(data.status)">{{ data.status }}</span>
+            <span class="label">Lifecycle Status</span>
+            <span
+              class="status-badge"
+              [class]="statusClass(data)"
+              [attr.aria-label]="'Lifecycle status: ' + statusLabel(data)"
+            >{{ statusLabel(data) }}</span>
           </article>
           <article class="summary-card card">
             <span class="label">Billing Status</span>
@@ -500,8 +506,11 @@ import { PlatformTenantApiService } from '../../services/platform-tenant-api.ser
 
     .status-badge.active { background: #dcfce7; color: #15803d; }
     .status-badge.suspended { background: #ffedd5; color: #c2410c; }
-    .status-badge.trial { background: #dbeafe; color: #1d4ed8; }
-    .status-badge.inactive, .status-badge.draft { background: #e2e8f0; color: #475569; }
+    .status-badge.draft { background: #e2e8f0; color: #475569; }
+    .status-badge.pending_payment { background: #fef3c7; color: #b45309; }
+    .status-badge.pending_activation { background: #dbeafe; color: #1d4ed8; }
+    .status-badge.cancelled { background: #fee2e2; color: #b91c1c; }
+    .status-badge.unknown { background: #f2f4f7; color: #667085; }
 
     .state-card {
       display: grid;
@@ -911,7 +920,25 @@ export class PlatformTenantDetailPage {
   }
 
   showActivate(tenant: PlatformTenantDetail): boolean {
-    return tenant.canActivate && this.canActivate();
+    if (!tenant.canActivate || !this.canActivate()) {
+      return false;
+    }
+
+    const lifecycle = resolveTenantLifecycle({
+      lifecycleStatus: tenant.lifecycleStatus,
+      status: tenant.status
+    }).value;
+
+    // Backend canActivate is authoritative; still hide clearly non-activatable UI states.
+    if (
+      lifecycle === TenantLifecycleStatuses.PendingPayment
+      || lifecycle === TenantLifecycleStatuses.Active
+      || lifecycle === TenantLifecycleStatuses.Cancelled
+    ) {
+      return false;
+    }
+
+    return true;
   }
 
   showSuspend(tenant: PlatformTenantDetail): boolean {
@@ -998,8 +1025,18 @@ export class PlatformTenantDetailPage {
     });
   }
 
-  statusClass(status: string): string {
-    return status.toLowerCase();
+  statusLabel(tenant: PlatformTenantDetail): string {
+    return tenantLifecycleLabel({
+      lifecycleStatus: tenant.lifecycleStatus,
+      status: tenant.status
+    });
+  }
+
+  statusClass(tenant: PlatformTenantDetail): string {
+    return tenantLifecycleBadgeClass({
+      lifecycleStatus: tenant.lifecycleStatus,
+      status: tenant.status
+    });
   }
 
   private syncFeaturesForPlan(): void {

@@ -4,6 +4,11 @@ import {
   TenantCreateOptions,
   TenantCreateWizardState
 } from '../models/platform-tenant-create.model';
+import { normalizeTenantSubscriptionType } from '../constants/tenant-subscription-type.constants';
+import {
+  isSupportedBillingCycleOption,
+  normalizeBillingCycleForApi
+} from '../utils/billing-cycle.util';
 
 export interface TenantCreateCountryOptionApiDto {
   code: string;
@@ -143,7 +148,13 @@ export function mapCreateOptions(dto: TenantCreateOptionsApiDto | null | undefin
     businessTypes: (data.businessTypes ?? []).map((item) => mapLookupOption(item)),
     operatingModes: (data.operatingModes ?? []).map((item) => mapLookupOption(item)),
     subscriptionStatuses: (data.subscriptionStatuses ?? []).map((item) => mapLookupOption(item)),
-    billingCycles: (data.billingCycles ?? []).map((item) => mapLookupOption(item))
+    billingCycles: (data.billingCycles ?? [])
+      .map((item) => mapLookupOption(item))
+      .filter((item) => isSupportedBillingCycleOption(item.value))
+      .map((item) => ({
+        value: normalizeBillingCycleForApi(item.value)!,
+        label: item.label || (normalizeBillingCycleForApi(item.value) === 'yearly' ? 'Yearly' : 'Monthly')
+      }))
   };
 }
 
@@ -181,7 +192,8 @@ export function mapCreateTenantRequest(state: TenantCreateWizardState): CreatePl
       sendInvite: true
     },
     subscription: {
-      billingCycle: asValue(state.billingSubscription.billingCycle),
+      subscriptionType: normalizeTenantSubscriptionType(state.billingSubscription.subscriptionType) ?? undefined,
+      billingCycle: normalizeBillingCycleForApi(state.billingSubscription.billingCycle) ?? undefined,
       subscriptionStatus: asValue(state.billingSubscription.subscriptionStatus),
       autoRenew: state.billingSubscription.autoRenew,
       createDraftInvoice: state.billingSubscription.createDraftInvoice,
