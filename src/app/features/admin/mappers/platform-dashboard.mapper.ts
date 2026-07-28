@@ -125,10 +125,14 @@ function resolvePendingActivationCount(
     return Number(data.pendingActivationTenants);
   }
 
-  const fromAttention = attention.find(
-    (item) => item.type === 'pending_activation' || item.type === 'setup_pending'
-  );
-  return fromAttention ? fromAttention.count : null;
+  const fromAttention = attention.find((item) => item.type === 'pending_activation');
+  if (fromAttention) {
+    return fromAttention.count;
+  }
+
+  // Deprecated compatibility: older backends emitted setup_pending for this attention row.
+  const legacyAttention = attention.find((item) => item.type === 'setup_pending');
+  return legacyAttention ? legacyAttention.count : null;
 }
 
 function buildTenantStatusSnapshot(

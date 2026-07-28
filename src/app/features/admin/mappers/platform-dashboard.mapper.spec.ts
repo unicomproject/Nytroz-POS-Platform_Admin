@@ -72,7 +72,37 @@ describe('mapPlatformDashboard attention mapping', () => {
     expect(dashboard.tenantStatusSnapshot.items.find((item) => item.status === 'Inactive')?.count).toBe(0);
   });
 
-  it('reads Pending Activation from setup_pending attention when summary field is absent', () => {
+  it('reads Pending Activation from canonical pending_activation attention when summary field is absent', () => {
+    const dashboard = mapPlatformDashboard({
+      totalTenants: 5,
+      activeTenants: 2,
+      suspendedTenants: 0,
+      trialTenants: 0,
+      totalSubscriptions: 5,
+      activeSubscriptions: 2,
+      pendingBillingCount: 0,
+      totalOutlets: 0,
+      totalTills: 0,
+      totalUsers: 0,
+      recentTenants: [],
+      attentionItems: [
+        {
+          type: 'pending_activation',
+          title: 'Pending Activation',
+          description: 'Tenants in PENDING_ACTIVATION awaiting Super Admin activation.',
+          count: 2,
+          severity: 'warning'
+        }
+      ],
+      generatedAt: '2026-07-20T00:00:00Z'
+    });
+
+    expect(dashboard.attention.find((item) => item.type === 'pending_activation')?.title).toBe('Pending Activation');
+    expect(dashboard.tenantStatusSnapshot.items.find((item) => item.status === 'Pending Activation')?.count).toBe(2);
+    expect(dashboard.tenantStatusSnapshot.items.find((item) => item.status === 'Inactive')?.count).toBe(1);
+  });
+
+  it('keeps deprecated setup_pending attention mapping only as compatibility fallback', () => {
     const dashboard = mapPlatformDashboard({
       totalTenants: 5,
       activeTenants: 2,
@@ -99,6 +129,41 @@ describe('mapPlatformDashboard attention mapping', () => {
 
     expect(dashboard.tenantStatusSnapshot.items.find((item) => item.status === 'Pending Activation')?.count).toBe(2);
     expect(dashboard.tenantStatusSnapshot.items.find((item) => item.status === 'Inactive')?.count).toBe(1);
+  });
+
+  it('prefers pending_activation attention over deprecated setup_pending when both exist', () => {
+    const dashboard = mapPlatformDashboard({
+      totalTenants: 6,
+      activeTenants: 2,
+      suspendedTenants: 0,
+      trialTenants: 0,
+      totalSubscriptions: 6,
+      activeSubscriptions: 2,
+      pendingBillingCount: 0,
+      totalOutlets: 0,
+      totalTills: 0,
+      totalUsers: 0,
+      recentTenants: [],
+      attentionItems: [
+        {
+          type: 'setup_pending',
+          title: 'Pending Activation',
+          description: 'legacy',
+          count: 9,
+          severity: 'warning'
+        },
+        {
+          type: 'pending_activation',
+          title: 'Pending Activation',
+          description: 'canonical',
+          count: 1,
+          severity: 'warning'
+        }
+      ],
+      generatedAt: '2026-07-20T00:00:00Z'
+    });
+
+    expect(dashboard.tenantStatusSnapshot.items.find((item) => item.status === 'Pending Activation')?.count).toBe(1);
   });
 
   it('renders zero attention counts instead of dropping them', () => {

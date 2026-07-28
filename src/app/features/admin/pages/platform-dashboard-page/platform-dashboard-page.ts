@@ -237,7 +237,9 @@ export class PlatformDashboardPage {
       payment_failures: 'PF',
       expiring_subscriptions: 'EX',
       suspended_tenants: 'ST',
-      setup_pending: 'SP',
+      pending_activation: 'PA',
+      /** @deprecated Legacy backend attention type — prefer pending_activation. */
+      setup_pending: 'PA',
       past_due_subscriptions: 'PD',
       pending_billing: 'PB',
       support_tickets: 'TK'
@@ -252,8 +254,10 @@ export class PlatformDashboardPage {
     switch (type) {
       case 'suspended_tenants':
         return { status: 'suspended' };
-      case 'setup_pending':
       case 'pending_activation':
+        return { status: 'pending_activation' };
+      // Deprecated compatibility for older backends that still emit setup_pending.
+      case 'setup_pending':
         return { status: 'pending_activation' };
       case 'past_due_subscriptions':
         return { billingStatus: 'PAST_DUE' };
