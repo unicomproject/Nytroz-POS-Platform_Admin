@@ -1,8 +1,9 @@
 import { Routes } from '@angular/router';
 
 import { platformPermissions } from '../../../core/config/permission-keys';
+import { permissionGuard } from '../../../core/guards/permission.guard';
 
-export const adminRoutes: Routes = [
+const adminPageRoutes: Routes = [
   {
     path: 'dashboard',
     loadComponent: () => import('../pages/platform-dashboard-page/platform-dashboard-page').then((m) => m.PlatformDashboardPage),
@@ -148,3 +149,19 @@ export const adminRoutes: Routes = [
     redirectTo: 'dashboard'
   }
 ];
+
+/**
+ * Nested canActivateChild ensures lazy admin pages enforce requiredPermission.
+ * Parent app.routes canActivateChild alone does not reliably receive child route data
+ * for loadChildren route arrays.
+ */
+export const adminRoutes: Routes = [
+  {
+    path: '',
+    canActivateChild: [permissionGuard],
+    children: adminPageRoutes
+  }
+];
+
+/** Flat page routes for tests that assert path/data metadata. */
+export const adminPageRouteEntries = adminPageRoutes;

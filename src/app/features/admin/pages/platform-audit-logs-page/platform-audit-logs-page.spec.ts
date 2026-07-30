@@ -170,7 +170,7 @@ describe('PlatformAuditLogsPage', () => {
   });
 
   it('requires platform.audit.view on the audit logs route', () => {
-    const route = adminRoutes.find((entry) => entry.path === 'audit-logs');
+    const route = (adminRoutes[0]?.children ?? adminRoutes).find((entry) => entry.path === 'audit-logs');
 
     expect(route?.data?.['requiredPermission']).toBe(platformPermissions.auditView);
   });

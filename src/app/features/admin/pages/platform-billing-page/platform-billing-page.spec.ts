@@ -491,7 +491,7 @@ describe('PlatformBillingPage', () => {
   });
 
   it('lazy-loads the billing page and preserves the view permission', async () => {
-    const route = adminRoutes.find((entry) => entry.path === 'billing');
+    const route = (adminRoutes[0]?.children ?? adminRoutes).find((entry) => entry.path === 'billing');
     const component = await (route?.loadComponent as () => Promise<unknown>)();
     expect(component).toBe(PlatformBillingPage);
     expect(route?.data?.['requiredPermission']).toBe(platformPermissions.billingView);

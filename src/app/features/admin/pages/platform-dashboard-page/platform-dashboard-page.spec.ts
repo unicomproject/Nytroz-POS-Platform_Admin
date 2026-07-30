@@ -2,6 +2,8 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 
+import { platformPermissions } from '../../../../core/config/permission-keys';
+import { AccessControlService } from '../../../../core/services/access-control.service';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import { createDashboard } from '../../../../testing/test-fixtures';
 import { PlatformDashboardApiService } from '../../services/platform-dashboard-api.service';
@@ -9,6 +11,7 @@ import { PlatformDashboardPage } from './platform-dashboard-page';
 
 describe('PlatformDashboardPage', () => {
   let api: { getDashboard: ReturnType<typeof vi.fn> };
+  let accessControl: { hasPermission: ReturnType<typeof vi.fn> };
 
   async function createComponent(): Promise<ComponentFixture<PlatformDashboardPage>> {
     await TestBed.configureTestingModule({
@@ -16,7 +19,8 @@ describe('PlatformDashboardPage', () => {
       providers: [
         provideRouter([]),
         { provide: PlatformDashboardApiService, useValue: api },
-        { provide: ApiErrorService, useValue: { toSafeMessage: () => 'Dashboard failed safely' } }
+        { provide: ApiErrorService, useValue: { toSafeMessage: () => 'Dashboard failed safely' } },
+        { provide: AccessControlService, useValue: accessControl }
       ]
     }).compileComponents();
 
@@ -27,6 +31,15 @@ describe('PlatformDashboardPage', () => {
 
   beforeEach(() => {
     api = { getDashboard: vi.fn() };
+    const allowedPermissions = new Set<string>([
+      platformPermissions.tenantsView,
+      platformPermissions.tenantSubscriptionsView,
+      platformPermissions.billingView,
+      platformPermissions.usersView
+    ]);
+    accessControl = {
+      hasPermission: vi.fn((permission?: string) => !!permission && allowedPermissions.has(permission))
+    };
   });
 
   it('shows a loading state while the API request is pending', async () => {
@@ -45,12 +58,16 @@ describe('PlatformDashboardPage', () => {
 
     expect(text).toContain('Total Tenants');
     expect(text).toContain('3');
-    expect(text).toContain('Active Subscriptions');
+    expect(text).toContain('Active Paid Subscriptions');
     expect(text).toContain('2');
-    expect(text).toContain('Not tracked in TM-EPOS MVP');
-    expect(text).toContain('No change yet');
+    expect(text).toContain('LKR');
+    expect(text).toContain('2,500.00');
+    expect(text).toContain('No change');
     expect(text).toContain('Items Requiring Attention');
     expect(text).toContain('Demo Tenant Alpha');
+    expect(text).toContain('Recent Tenants');
+    expect(text).toContain('Platform Footprint');
+    expect(text).toContain('Last updated:');
   });
 
   it('renders each attention label with the matching backend count and does not swap past due vs pending', async () => {
@@ -98,43 +115,37 @@ describe('PlatformDashboardPage', () => {
     const component = fixture.componentInstance;
 
     expect(component.attentionLink('suspended_tenants')).toBe('/admin/tenants');
-    expect(component.attentionQueryParams('suspended_tenants')).toEqual({ status: 'suspended' });
     expect(component.attentionQueryParams('pending_activation')).toEqual({ status: 'pending_activation' });
-    expect(component.attentionQueryParams('setup_pending')).toEqual({ status: 'pending_activation' });
+    expect(component.attentionQueryParams('setup_pending')).toEqual({ statusGroup: 'setup_pending' });
     expect(component.attentionIcon('pending_activation')).toBe('PA');
     expect(component.attentionQueryParams('past_due_subscriptions')).toEqual({ billingStatus: 'PAST_DUE' });
     expect(component.attentionLink('pending_billing')).toBe('/admin/billing');
     expect(component.attentionQueryParams('pending_billing')).toBeNull();
   });
 
-  it('renders pending_activation attention with approved label and filter navigation', async () => {
+  it('renders non-link attention rows when destination permission is missing', async () => {
+    accessControl.hasPermission.mockImplementation((permission: string) => permission !== platformPermissions.tenantsView);
     api.getDashboard.mockReturnValue(
       of(
         createDashboard({
           attention: [
             {
-              type: 'pending_activation',
-              title: 'Pending Activation',
-              description: 'Tenants in PENDING_ACTIVATION awaiting Super Admin activation.',
-              count: 2,
-              severity: 'warning'
+              type: 'suspended_tenants',
+              title: 'Suspended Tenants',
+              description: 'Tenants currently suspended.',
+              count: 1,
+              severity: 'critical'
             }
-          ],
-          kpis: {
-            ...createDashboard().kpis,
-            itemsRequiringAttention: 2
-          }
+          ]
         })
       )
     );
 
     const fixture = await createComponent();
-    const row = (fixture.nativeElement as HTMLElement).querySelector('.attention-row');
-    expect(row?.textContent).toContain('Pending Activation');
-    expect(row?.textContent).toContain('2');
-    expect(row?.getAttribute('href')).toContain('/admin/tenants');
-    expect(row?.getAttribute('href')).toContain('status=pending_activation');
-    expect(row?.textContent).not.toContain('Setup Pending');
+    const row = (fixture.nativeElement as HTMLElement).querySelector('.attention-row.static');
+
+    expect(row).toBeTruthy();
+    expect(row?.getAttribute('href')).toBeNull();
   });
 
   it('shows clean empty states when backend data is empty', async () => {
@@ -142,7 +153,7 @@ describe('PlatformDashboardPage', () => {
       of(
         createDashboard({
           statusOverview: { ...createDashboard().statusOverview, trend: [] },
-          recentActivity: [],
+          recentTenants: [],
           tenantStatusSnapshot: { total: 0, items: [] }
         })
       )
@@ -152,7 +163,7 @@ describe('PlatformDashboardPage', () => {
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
 
     expect(text).toContain('Trend data will appear when platform records exist');
-    expect(text).toContain('No platform activity has been recorded yet');
+    expect(text).toContain('No recent tenants have been recorded yet');
   });
 
   it('shows a safe error state on API failure', async () => {
@@ -165,17 +176,133 @@ describe('PlatformDashboardPage', () => {
     expect(text).toContain('Dashboard failed safely');
   });
 
-  it('formats LKR currency and chart values without requiring screenshot constants', async () => {
+  it('retains dashboard data when refresh fails', async () => {
+    api.getDashboard.mockReturnValueOnce(of(createDashboard())).mockReturnValueOnce(throwError(() => new Error('network failed')));
+
+    const fixture = await createComponent();
+    fixture.componentInstance.refreshDashboard();
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Demo Tenant Alpha');
+    expect(text).toContain('Refresh failed');
+    expect(text).toContain('Dashboard failed safely');
+  });
+
+  it('formats currency and change values without hard-coded LKR maps', async () => {
     api.getDashboard.mockReturnValue(of(createDashboard()));
 
     const fixture = await createComponent();
     const component = fixture.componentInstance;
 
-    expect(component.money(2500)).toContain('2,500');
-    expect(component.mrrLabel(0)).toBe('Not tracked in TM-EPOS MVP');
-    expect(component.change(0)).toBe('No change yet');
+    expect(component.formatMrrGroup({ currencyCode: 'USD', decimalPlaces: 2, amount: 2500 })).toContain('2,500.00');
+    expect(component.change(0, 'ok')).toBe('No change');
+    expect(component.change(null, 'new_no_baseline')).toBe('New — no prior baseline');
+    expect(component.change(null, 'no_history')).toBe('No history yet');
+    expect(component.change(null, null)).toBe('—');
     expect(component.chartPoints([{ date: '2026-06-16', tenants: 1, subscriptions: 2, mrr: 3 }], 'mrr')).toBe(
       '45.0,40.0'
     );
+  });
+
+  it('hides MRR when revenue is hidden by permissions', async () => {
+    api.getDashboard.mockReturnValue(
+      of(
+        createDashboard({
+          revenue: { status: 'HIDDEN', errorCode: null, groups: [] },
+          permissions: {
+            ...createDashboard().permissions,
+            canViewTenantSubscriptions: false
+          },
+          kpis: {
+            ...createDashboard().kpis,
+            activeSubscriptions: null
+          },
+          subscriptionSnapshot: null
+        })
+      )
+    );
+
+    const fixture = await createComponent();
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+
+    expect(text).not.toContain('Monthly Recurring Revenue');
+    expect(text).not.toContain('Active Paid Subscriptions');
+  });
+
+  it('shows safe revenue unavailable state without zero MRR or charts for that section', async () => {
+    api.getDashboard.mockReturnValue(
+      of(
+        createDashboard({
+          revenue: {
+            status: 'UNAVAILABLE',
+            errorCode: 'platform_dashboard.currency_metadata_unavailable',
+            groups: []
+          },
+          sectionErrors: ['platform_dashboard.currency_metadata_unavailable']
+        })
+      )
+    );
+
+    const fixture = await createComponent();
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+
+    expect(text).toContain('Monthly Recurring Revenue');
+    expect(text).toContain('Revenue data is temporarily unavailable.');
+    expect(text).toContain('Some dashboard sections could not be loaded');
+    expect(text).toContain('Total Tenants');
+    expect(text).toContain('Refresh');
+    expect(text).not.toContain('2,500.00');
+    expect(fixture.componentInstance.mrrDisplay({
+      status: 'UNAVAILABLE',
+      errorCode: 'platform_dashboard.currency_metadata_unavailable',
+      groups: []
+    })).toBe('Revenue data is temporarily unavailable.');
+  });
+
+  it('shows safe trends unavailable state without empty success chart', async () => {
+    api.getDashboard.mockReturnValue(
+      of(
+        createDashboard({
+          statusOverview: {
+            ...createDashboard().statusOverview,
+            trendsUnavailable: true,
+            trendsErrorCode: 'platform_dashboard.timezone_unavailable',
+            trend: []
+          },
+          sectionErrors: ['platform_dashboard.timezone_unavailable']
+        })
+      )
+    );
+
+    const fixture = await createComponent();
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+
+    expect(text).toContain('Trend data is temporarily unavailable.');
+    expect(text).toContain('Total Tenants');
+    expect(text).not.toContain('Trend data will appear when platform records exist');
+  });
+
+  it('renders controlled critical health without exposing probe internals', async () => {
+    api.getDashboard.mockReturnValue(
+      of(
+        createDashboard({
+          kpis: {
+            ...createDashboard().kpis,
+            systemHealthStatus: 'CRITICAL',
+            systemHealthLabel: 'Critical'
+          }
+        })
+      )
+    );
+
+    const fixture = await createComponent();
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+
+    expect(text).toContain('System Health');
+    expect(text).toContain('Critical');
+    expect(text).toContain('Total Tenants');
+    expect(text).not.toContain('Exception');
+    expect(text).not.toContain('SecretKey');
   });
 });

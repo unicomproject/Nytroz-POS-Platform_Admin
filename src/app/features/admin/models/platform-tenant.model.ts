@@ -16,6 +16,10 @@ export interface PlatformTenantListItem {
   outletCount: number;
   createdOn: string;
   lastActivityAt: string | null;
+  setupCompletedSteps?: string[] | null;
+  setupMissingSteps?: string[] | null;
+  setupProgressPercent?: number | null;
+  continueSetupPath?: string | null;
 }
 
 export interface PlatformTenantListResponse {
@@ -59,6 +63,7 @@ export interface PlatformTenantListQuery {
   pageSize?: number;
   search?: string;
   status?: string;
+  statusGroup?: string;
   billingStatus?: string;
   planId?: string;
   sortBy?: string;

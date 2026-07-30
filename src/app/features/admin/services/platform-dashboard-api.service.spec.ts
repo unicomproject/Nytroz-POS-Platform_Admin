@@ -2,6 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 
+import { AccessControlService } from '../../../core/services/access-control.service';
 import { createDashboardApiDto } from '../../../testing/test-fixtures';
 import { PlatformDashboardApiService } from './platform-dashboard-api.service';
 
@@ -11,7 +12,14 @@ describe('PlatformDashboardApiService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting()]
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        {
+          provide: AccessControlService,
+          useValue: { hasPermission: () => true }
+        }
+      ]
     });
     service = TestBed.inject(PlatformDashboardApiService);
     httpTesting = TestBed.inject(HttpTestingController);
@@ -25,7 +33,7 @@ describe('PlatformDashboardApiService', () => {
     let totalTenants = 0;
 
     service.getDashboard().subscribe((dashboard) => {
-      totalTenants = dashboard.kpis.totalTenants;
+      totalTenants = dashboard.kpis.totalTenants ?? 0;
     });
 
     const request = httpTesting.expectOne('/api/v1/platform-admin/dashboard');

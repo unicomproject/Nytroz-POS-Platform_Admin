@@ -92,7 +92,7 @@ describe('PlatformReturnPolicyTemplatesPage', () => {
   });
 
   it('registers route guard metadata for view permission', () => {
-    const route = adminRoutes.find((entry) => entry.path === 'return-policy-templates');
+    const route = (adminRoutes[0]?.children ?? adminRoutes).find((entry) => entry.path === 'return-policy-templates');
     expect(route?.data?.['requiredPermission']).toBe(platformPermissions.returnPolicyTemplatesView);
   });
 });

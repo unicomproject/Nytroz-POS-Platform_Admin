@@ -1,10 +1,11 @@
 /**
  * Typed permission codes for Platform Admin route/menu/action guards.
  * Role create/edit loads the full assignable catalogue from
- * GET /api/v1/platform-admin/permission-catalog (36 business codes). */
+ * GET /api/v1/platform-admin/permission-catalog (37 business codes). */
 export const platformPermissions = {
   dashboardView: 'platform.dashboard.view',
   tenantsView: 'platform.tenants.view',
+  tenantSubscriptionsView: 'platform.tenant_subscriptions.view',
   tenantsCreate: 'platform.tenants.create',
   tenantsUpdate: 'platform.tenants.update',
   tenantsActivate: 'platform.tenants.activate',
