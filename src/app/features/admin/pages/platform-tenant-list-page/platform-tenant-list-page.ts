@@ -157,6 +157,7 @@ import { tenantLifecycleBadgeClass, tenantLifecycleLabel } from '../../utils/ten
                     <th>Tenant</th>
                     <th>Plan</th>
                     <th>Status</th>
+                    <th>Setup</th>
                     <th>Users</th>
                     <th>Outlets</th>
                     <th>Created On</th>
@@ -183,6 +184,18 @@ import { tenantLifecycleBadgeClass, tenantLifecycleLabel } from '../../utils/ten
                           [class]="statusClass(tenant)"
                           [attr.aria-label]="'Lifecycle status: ' + statusLabel(tenant)"
                         >{{ statusLabel(tenant) }}</span>
+                      </td>
+                      <td class="cell-text">
+                        @if (tenant.setupProgressPercent != null) {
+                          <div class="setup-cell">
+                            <strong>{{ tenant.setupProgressPercent }}%</strong>
+                            @if (tenant.continueSetupPath) {
+                              <a class="actions-link" [routerLink]="tenant.continueSetupPath" (click)="$event.stopPropagation()">Continue Setup</a>
+                            }
+                          </div>
+                        } @else {
+                          <span class="cell-muted">—</span>
+                        }
                       </td>
                       <td class="cell-num">{{ tenant.userCount }}</td>
                       <td class="cell-num">{{ tenant.outletCount }}</td>
@@ -681,6 +694,7 @@ export class PlatformTenantListPage {
   readonly errorMessage = signal<string | null>(null);
 
   readonly statusFilter = signal('');
+  readonly statusGroupFilter = signal('');
   readonly billingStatusFilter = signal('');
   readonly planFilter = signal('');
   readonly pageNumber = signal(1);
@@ -690,8 +704,11 @@ export class PlatformTenantListPage {
   constructor() {
     const params = this.route.snapshot.queryParamMap;
     const status = params.get('status');
+    const statusGroup = params.get('statusGroup');
     const billingStatus = params.get('billingStatus');
-    if (status) {
+    if (statusGroup) {
+      this.statusGroupFilter.set(statusGroup);
+    } else if (status) {
       this.statusFilter.set(status);
     }
     if (billingStatus) {
@@ -757,6 +774,7 @@ export class PlatformTenantListPage {
 
   onStatusChange(value: string): void {
     this.statusFilter.set(value);
+    this.statusGroupFilter.set('');
     this.pageNumber.set(1);
     this.loadPage();
   }
@@ -770,6 +788,7 @@ export class PlatformTenantListPage {
   resetFilters(): void {
     this.tenantSearch.searchTerm.set('');
     this.statusFilter.set('');
+    this.statusGroupFilter.set('');
     this.billingStatusFilter.set('');
     this.planFilter.set('');
     this.pageNumber.set(1);
@@ -871,7 +890,8 @@ export class PlatformTenantListPage {
       pageNumber: this.pageNumber(),
       pageSize: this.pageSize(),
       search: this.tenantSearch.searchTerm(),
-      status: this.statusFilter(),
+      status: this.statusGroupFilter() ? undefined : this.statusFilter(),
+      statusGroup: this.statusGroupFilter() || undefined,
       billingStatus: this.billingStatusFilter(),
       planId: this.planFilter(),
       sortBy: 'createdOn',

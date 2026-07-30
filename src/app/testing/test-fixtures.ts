@@ -30,6 +30,7 @@ import {
   mapPlatformTenantEntitlementOptions
 } from '../features/admin/mappers/platform-tenant-entitlements.mapper';
 import { PlatformTenantEntitlementOptions } from '../features/admin/models/platform-tenant-entitlements.model';
+import { AccessControlService } from '../core/services/access-control.service';
 import { mapPlatformDashboard } from '../features/admin/mappers/platform-dashboard.mapper';
 import { mapPlatformTenantFilterOptions, mapPlatformTenantListResponse, mapPlatformTenantSummary, mapPlatformTenantDetail } from '../features/admin/mappers/platform-tenant.mapper';
 import { mapSubscriptionPlanListResponse } from '../features/admin/mappers/platform-subscription-plan.mapper';
@@ -54,7 +55,7 @@ export function createAuthSession(overrides: Partial<AuthSession> = {}): AuthSes
     user: {
       id: 'platform-user-1',
       email: 'admin@nytroz.local',
-      fullName: 'Nytroz Platform Admin',
+      fullName: 'OneVerz Platform Admin',
       status: 'active',
       platformPermissions: [...allPlatformPermissionCodes]
     },
@@ -62,28 +63,119 @@ export function createAuthSession(overrides: Partial<AuthSession> = {}): AuthSes
   };
 }
 
+export function createDashboardAccessControlStub(): Pick<AccessControlService, 'hasPermission'> {
+  return {
+    hasPermission: () => true
+  };
+}
+
 export function createDashboardApiDto(overrides: Partial<PlatformDashboardApiDto> = {}): PlatformDashboardApiDto {
   return {
-    totalTenants: 3,
-    activeTenants: 2,
-    suspendedTenants: 0,
-    trialTenants: 1,
-    totalSubscriptions: 3,
-    activeSubscriptions: 2,
-    pendingBillingCount: 1,
-    totalOutlets: 4,
-    totalTills: 6,
-    totalUsers: 8,
-    recentTenants: [createDashboardRecentTenantApiDto()],
-    attentionItems: [createDashboardAttentionItemApiDto()],
     generatedAt: '2026-06-16T00:00:00Z',
+    tenantSummary: {
+      status: 'SUCCESS',
+      errorCode: null,
+      data: {
+        totalTenants: 3,
+        activeTenants: 2,
+        setupPendingTenants: 0,
+        suspendedTenants: 0,
+        inactiveTenants: 1,
+        lifecycle: [
+          { bucket: 'Active', count: 2 },
+          { bucket: 'Setup Pending', count: 0 },
+          { bucket: 'Suspended', count: 0 },
+          { bucket: 'Inactive', count: 1 }
+        ]
+      }
+    },
+    subscriptionSummary: {
+      status: 'SUCCESS',
+      errorCode: null,
+      data: {
+        totalSubscriptions: 3,
+        trialSubscriptions: 1,
+        activeSubscriptions: 2,
+        pastDueSubscriptions: 0,
+        cancelledSubscriptions: 0,
+        expiredSubscriptions: 0
+      }
+    },
+    revenueSummary: {
+      status: 'SUCCESS',
+      errorCode: null,
+      data: {
+        mrrByCurrency: [{ currencyCode: 'LKR', decimalPlaces: 2, amount: 2500 }],
+        calculatedAt: '2026-06-16T00:00:00Z'
+      }
+    },
+    trends: {
+      status: 'SUCCESS',
+      errorCode: null,
+      data: {
+        timezone: 'Asia/Colombo',
+        tenantGrowth: {
+          metric: 'tenants',
+          changePercent: 0,
+          changeStatus: 'ok',
+          points: [{ date: '2026-06-16', value: 3 }]
+        },
+        subscriptionTrend: {
+          metric: 'subscriptions',
+          changePercent: 0,
+          changeStatus: 'ok',
+          points: [{ date: '2026-06-16', value: 2 }]
+        },
+        mrrTrends: [
+          {
+            metric: 'mrr',
+            currencyCode: 'LKR',
+            changePercent: 0,
+            changeStatus: 'ok',
+            points: [{ date: '2026-06-16', value: 2500 }]
+          }
+        ]
+      }
+    },
+    attentionSummary: {
+      status: 'SUCCESS',
+      errorCode: null,
+      data: {
+        items: [createDashboardAttentionItemApiDto()],
+        totalCount: 1
+      }
+    },
+    platformFootprint: {
+      status: 'SUCCESS',
+      errorCode: null,
+      data: {
+        totalOutlets: 4,
+        totalTills: 6,
+        totalTenantUsers: 8,
+        totalPlatformUsers: 2
+      }
+    },
+    systemHealth: {
+      status: 'SUCCESS',
+      errorCode: null,
+      data: {
+        overallStatus: 'HEALTHY',
+        checkedAt: '2026-06-16T00:00:00Z',
+        dependencies: []
+      }
+    },
+    recentTenants: {
+      status: 'SUCCESS',
+      errorCode: null,
+      data: [createDashboardRecentTenantApiDto()]
+    },
     ...overrides
   };
 }
 
 export function createDashboard(overrides: Partial<PlatformDashboard> = {}): PlatformDashboard {
   return {
-    ...mapPlatformDashboard(createDashboardApiDto()),
+    ...mapPlatformDashboard(createDashboardApiDto(), createDashboardAccessControlStub() as AccessControlService),
     ...overrides
   };
 }

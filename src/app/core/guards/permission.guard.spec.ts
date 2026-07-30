@@ -54,4 +54,21 @@ describe('permissionGuard', () => {
 
     expect(result).toBe(true);
   });
+
+  it('allows routes that do not declare a required permission', () => {
+    const router = { createUrlTree: vi.fn((commands: string[]) => ({ commands })) };
+
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: AccessControlService, useValue: { hasPermission: vi.fn(() => false) } },
+        { provide: Router, useValue: router }
+      ]
+    });
+
+    const route = { data: {} };
+    const result = TestBed.runInInjectionContext(() => permissionGuard(route as never, {} as never));
+
+    expect(result).toBe(true);
+    expect(router.createUrlTree).not.toHaveBeenCalled();
+  });
 });

@@ -1,7 +1,14 @@
 import { adminRoutes } from './admin.routes';
 
 describe('adminRoutes', () => {
-  const paths = adminRoutes.map((route) => route.path).filter(Boolean);
+  const pageRoutes = adminRoutes[0]?.children ?? [];
+  const paths = pageRoutes.map((route) => route.path).filter(Boolean);
+
+  it('wraps admin pages with canActivateChild permission enforcement', () => {
+    expect(adminRoutes).toHaveLength(1);
+    expect(adminRoutes[0]?.canActivateChild?.length).toBeGreaterThan(0);
+    expect(pageRoutes.length).toBeGreaterThan(0);
+  });
 
   it('does not register platform stub routes', () => {
     expect(paths).not.toContain('outlets');
@@ -16,7 +23,7 @@ describe('adminRoutes', () => {
   });
 
   it('redirects unknown admin paths to dashboard', () => {
-    const wildcard = adminRoutes.find((route) => route.path === '**');
+    const wildcard = pageRoutes.find((route) => route.path === '**');
     expect(wildcard?.redirectTo).toBe('dashboard');
   });
 });

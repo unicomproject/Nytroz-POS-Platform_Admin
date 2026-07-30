@@ -32,6 +32,10 @@ export interface PlatformTenantListItemApiDto {
   enabledFeatureCodes?: string[];
   createdAt: string;
   updatedAt?: string | null;
+  setupCompletedSteps?: string[] | null;
+  setupMissingSteps?: string[] | null;
+  setupProgressPercent?: number | null;
+  continueSetupPath?: string | null;
 }
 
 export interface PlatformTenantSubscriptionSummaryApiDto {
@@ -128,7 +132,11 @@ export function mapPlatformTenantListItem(dto: PlatformTenantListItemApiDto): Pl
     userCount: dto.userCount,
     outletCount: dto.outletCount,
     createdOn: dto.createdAt,
-    lastActivityAt: dto.updatedAt ?? null
+    lastActivityAt: dto.updatedAt ?? null,
+    setupCompletedSteps: dto.setupCompletedSteps ?? null,
+    setupMissingSteps: dto.setupMissingSteps ?? null,
+    setupProgressPercent: dto.setupProgressPercent ?? null,
+    continueSetupPath: dto.continueSetupPath ?? null
   };
 }
 

@@ -35,7 +35,7 @@ describe('PlatformSystemSettingsPage', () => {
   };
 
   const loadedSettings: PlatformSettings = {
-    platformDisplayName: 'SCS-TIX',
+    platformDisplayName: 'OneVerz',
     supportEmail: 'support@example.com',
     defaultCountryCode: 'LK',
     defaultCurrencyCode: 'LKR',
@@ -107,7 +107,7 @@ describe('PlatformSystemSettingsPage', () => {
     expect(tenantApi.getCreateOptions).toHaveBeenCalled();
     expect(root.textContent).toContain('General Platform Settings');
     expect(root.textContent).toContain('Configuration Summary');
-    expect((fixture.componentInstance.form.controls.platformDisplayName.value)).toBe('SCS-TIX');
+    expect((fixture.componentInstance.form.controls.platformDisplayName.value)).toBe('OneVerz');
     expect(root.textContent).toContain('Sri Lanka (LK)');
   });
 
@@ -179,7 +179,7 @@ describe('PlatformSystemSettingsPage', () => {
     fixture.componentInstance.resetChanges();
     fixture.detectChanges();
 
-    expect(fixture.componentInstance.form.controls.platformDisplayName.value).toBe('SCS-TIX');
+    expect(fixture.componentInstance.form.controls.platformDisplayName.value).toBe('OneVerz');
   });
 
   it('renders read-only mode without update permission', async () => {
@@ -209,7 +209,7 @@ describe('PlatformSystemSettingsPage', () => {
 
     const root = fixture.nativeElement as HTMLElement;
     expect(root.textContent).toContain('General Platform Settings');
-    expect(root.textContent).toContain('SCS-TIX');
+    expect(root.textContent).toContain('OneVerz');
     expect(root.textContent).toContain('Lookup options could not be loaded.');
   });
 });

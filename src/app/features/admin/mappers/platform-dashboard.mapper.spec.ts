@@ -1,198 +1,141 @@
 import { describe, expect, it } from 'vitest';
 
+import { createDashboardAccessControlStub, createDashboardApiDto } from '../../../testing/test-fixtures';
+import { AccessControlService } from '../../../core/services/access-control.service';
 import { mapPlatformDashboard } from './platform-dashboard.mapper';
 
-describe('mapPlatformDashboard attention mapping', () => {
+describe('mapPlatformDashboard', () => {
+  const access = createDashboardAccessControlStub() as AccessControlService;
+
   it('keeps backend attention titles and counts without swapping past due and pending billing', () => {
-    const dashboard = mapPlatformDashboard({
-      totalTenants: 4,
-      activeTenants: 2,
-      suspendedTenants: 1,
-      trialTenants: 1,
-      totalSubscriptions: 4,
-      activeSubscriptions: 1,
-      pendingBillingCount: 3,
-      totalOutlets: 0,
-      totalTills: 0,
-      totalUsers: 0,
-      recentTenants: [],
-      attentionItems: [
-        {
-          type: 'past_due_subscriptions',
-          title: 'Past Due Subscriptions',
-          description: 'Tenant subscriptions with PAST_DUE status.',
-          count: 2,
-          severity: 'critical'
+    const dashboard = mapPlatformDashboard(
+      createDashboardApiDto({
+        attentionSummary: {
+          status: 'SUCCESS',
+          data: {
+            items: [
+              {
+                type: 'past_due_subscriptions',
+                title: 'Past Due Subscriptions',
+                description: 'Tenant subscriptions with PAST_DUE status.',
+                count: 2,
+                severity: 'critical'
+              },
+              {
+                type: 'pending_billing',
+                title: 'Pending Billing',
+                description: 'Issued invoices that are PENDING with a balance due.',
+                count: 3,
+                severity: 'warning'
+              },
+              {
+                type: 'suspended_tenants',
+                title: 'Suspended Tenants',
+                description: 'Tenants currently suspended.',
+                count: 0,
+                severity: 'critical'
+              }
+            ],
+            totalCount: 5
+          }
         },
-        {
-          type: 'pending_billing',
-          title: 'Pending Billing',
-          description: 'Issued invoices that are PENDING with a balance due.',
-          count: 3,
-          severity: 'warning'
-        },
-        {
-          type: 'suspended_tenants',
-          title: 'Suspended Tenants',
-          description: 'Tenants currently suspended.',
-          count: 0,
-          severity: 'critical'
+        tenantSummary: {
+          status: 'SUCCESS',
+          data: {
+            totalTenants: 4,
+            activeTenants: 2,
+            setupPendingTenants: 0,
+            suspendedTenants: 1,
+            inactiveTenants: 1,
+            lifecycle: [
+              { bucket: 'Active', count: 2 },
+              { bucket: 'Suspended', count: 1 },
+              { bucket: 'Inactive', count: 1 }
+            ]
+          }
         }
-      ],
-      generatedAt: '2026-07-20T00:00:00Z'
-    });
+      }),
+      access
+    );
 
     expect(dashboard.attention.find((item) => item.type === 'past_due_subscriptions')?.count).toBe(2);
     expect(dashboard.attention.find((item) => item.type === 'pending_billing')?.count).toBe(3);
     expect(dashboard.attention.find((item) => item.type === 'suspended_tenants')?.count).toBe(0);
     expect(dashboard.kpis.itemsRequiringAttention).toBe(5);
     expect(dashboard.tenantStatusSnapshot.items.find((item) => item.status === 'Suspended')?.count).toBe(1);
-    expect(dashboard.tenantStatusSnapshot.items.find((item) => item.status === 'Pending Activation')?.count).toBe(0);
-  });
-
-  it('uses pendingActivationTenants for Pending Activation and keeps it out of Inactive', () => {
-    const dashboard = mapPlatformDashboard({
-      totalTenants: 10,
-      activeTenants: 4,
-      suspendedTenants: 1,
-      trialTenants: 2,
-      pendingActivationTenants: 3,
-      totalSubscriptions: 10,
-      activeSubscriptions: 4,
-      pendingBillingCount: 0,
-      totalOutlets: 0,
-      totalTills: 0,
-      totalUsers: 0,
-      recentTenants: [],
-      attentionItems: [],
-      generatedAt: '2026-07-20T00:00:00Z'
-    });
-
-    expect(dashboard.tenantStatusSnapshot.items.find((item) => item.status === 'Pending Activation')?.count).toBe(3);
-    expect(dashboard.tenantStatusSnapshot.items.find((item) => item.status === 'Inactive')?.count).toBe(0);
-  });
-
-  it('reads Pending Activation from canonical pending_activation attention when summary field is absent', () => {
-    const dashboard = mapPlatformDashboard({
-      totalTenants: 5,
-      activeTenants: 2,
-      suspendedTenants: 0,
-      trialTenants: 0,
-      totalSubscriptions: 5,
-      activeSubscriptions: 2,
-      pendingBillingCount: 0,
-      totalOutlets: 0,
-      totalTills: 0,
-      totalUsers: 0,
-      recentTenants: [],
-      attentionItems: [
-        {
-          type: 'pending_activation',
-          title: 'Pending Activation',
-          description: 'Tenants in PENDING_ACTIVATION awaiting Super Admin activation.',
-          count: 2,
-          severity: 'warning'
-        }
-      ],
-      generatedAt: '2026-07-20T00:00:00Z'
-    });
-
-    expect(dashboard.attention.find((item) => item.type === 'pending_activation')?.title).toBe('Pending Activation');
-    expect(dashboard.tenantStatusSnapshot.items.find((item) => item.status === 'Pending Activation')?.count).toBe(2);
-    expect(dashboard.tenantStatusSnapshot.items.find((item) => item.status === 'Inactive')?.count).toBe(1);
-  });
-
-  it('keeps deprecated setup_pending attention mapping only as compatibility fallback', () => {
-    const dashboard = mapPlatformDashboard({
-      totalTenants: 5,
-      activeTenants: 2,
-      suspendedTenants: 0,
-      trialTenants: 0,
-      totalSubscriptions: 5,
-      activeSubscriptions: 2,
-      pendingBillingCount: 0,
-      totalOutlets: 0,
-      totalTills: 0,
-      totalUsers: 0,
-      recentTenants: [],
-      attentionItems: [
-        {
-          type: 'setup_pending',
-          title: 'Pending Activation',
-          description: 'Tenants in PENDING_ACTIVATION awaiting Super Admin activation.',
-          count: 2,
-          severity: 'warning'
-        }
-      ],
-      generatedAt: '2026-07-20T00:00:00Z'
-    });
-
-    expect(dashboard.tenantStatusSnapshot.items.find((item) => item.status === 'Pending Activation')?.count).toBe(2);
-    expect(dashboard.tenantStatusSnapshot.items.find((item) => item.status === 'Inactive')?.count).toBe(1);
-  });
-
-  it('prefers pending_activation attention over deprecated setup_pending when both exist', () => {
-    const dashboard = mapPlatformDashboard({
-      totalTenants: 6,
-      activeTenants: 2,
-      suspendedTenants: 0,
-      trialTenants: 0,
-      totalSubscriptions: 6,
-      activeSubscriptions: 2,
-      pendingBillingCount: 0,
-      totalOutlets: 0,
-      totalTills: 0,
-      totalUsers: 0,
-      recentTenants: [],
-      attentionItems: [
-        {
-          type: 'setup_pending',
-          title: 'Pending Activation',
-          description: 'legacy',
-          count: 9,
-          severity: 'warning'
-        },
-        {
-          type: 'pending_activation',
-          title: 'Pending Activation',
-          description: 'canonical',
-          count: 1,
-          severity: 'warning'
-        }
-      ],
-      generatedAt: '2026-07-20T00:00:00Z'
-    });
-
-    expect(dashboard.tenantStatusSnapshot.items.find((item) => item.status === 'Pending Activation')?.count).toBe(1);
+    expect(dashboard.revenue.groups[0]?.amount).toBe(2500);
+    expect(dashboard.kpis.systemHealthLabel).toBe('Healthy');
   });
 
   it('renders zero attention counts instead of dropping them', () => {
-    const dashboard = mapPlatformDashboard({
-      totalTenants: 0,
-      activeTenants: 0,
-      suspendedTenants: 0,
-      trialTenants: 0,
-      totalSubscriptions: 0,
-      activeSubscriptions: 0,
-      pendingBillingCount: 0,
-      totalOutlets: 0,
-      totalTills: 0,
-      totalUsers: 0,
-      recentTenants: [],
-      attentionItems: [
-        {
-          type: 'pending_billing',
-          title: 'Pending Billing',
-          description: 'Issued invoices that are PENDING with a balance due.',
-          count: 0,
-          severity: 'warning'
+    const dashboard = mapPlatformDashboard(
+      createDashboardApiDto({
+        attentionSummary: {
+          status: 'SUCCESS',
+          data: {
+            items: [
+              {
+                type: 'pending_billing',
+                title: 'Pending Billing',
+                description: 'Issued invoices that are PENDING with a balance due.',
+                count: 0,
+                severity: 'warning'
+              }
+            ],
+            totalCount: 0
+          }
+        },
+        tenantSummary: {
+          status: 'SUCCESS',
+          data: {
+            totalTenants: 0,
+            activeTenants: 0,
+            setupPendingTenants: 0,
+            suspendedTenants: 0,
+            inactiveTenants: 0,
+            lifecycle: []
+          }
+        },
+        subscriptionSummary: {
+          status: 'SUCCESS',
+          data: {
+            totalSubscriptions: 0,
+            trialSubscriptions: 0,
+            activeSubscriptions: 0,
+            pastDueSubscriptions: 0,
+            cancelledSubscriptions: 0,
+            expiredSubscriptions: 0
+          }
         }
-      ],
-      generatedAt: '2026-07-20T00:00:00Z'
-    });
+      }),
+      access
+    );
 
     expect(dashboard.attention[0]?.count).toBe(0);
     expect(dashboard.kpis.itemsRequiringAttention).toBe(0);
-    expect(dashboard.kpis.systemHealth).toBe('Healthy');
+    expect(dashboard.kpis.systemHealthLabel).toBe('Healthy');
+  });
+
+  it('collects unavailable section error codes', () => {
+    const dashboard = mapPlatformDashboard(
+      createDashboardApiDto({
+        trends: {
+          status: 'UNAVAILABLE',
+          errorCode: 'platform_dashboard.timezone_unavailable',
+          data: null
+        },
+        revenueSummary: {
+          status: 'UNAVAILABLE',
+          errorCode: 'platform_dashboard.currency_metadata_unavailable',
+          data: null
+        }
+      }),
+      access
+    );
+
+    expect(dashboard.sectionErrors).toContain('platform_dashboard.timezone_unavailable');
+    expect(dashboard.sectionErrors).toContain('platform_dashboard.currency_metadata_unavailable');
+    expect(dashboard.statusOverview.trendsUnavailable).toBe(true);
+    expect(dashboard.revenue.status).toBe('UNAVAILABLE');
   });
 });

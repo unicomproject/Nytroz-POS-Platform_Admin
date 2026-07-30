@@ -9,6 +9,12 @@ function isRoutePermissionGranted(
   alternatePermissions?: string[]
 ): boolean {
   const candidates = [requiredPermission, ...(alternatePermissions ?? [])].filter(Boolean) as string[];
+
+  // Routes without an explicit permission requirement are publicly reachable within auth (e.g. permission-denied).
+  if (candidates.length === 0) {
+    return true;
+  }
+
   return candidates.some((permission) => accessControl.hasPermission(permission));
 }
 

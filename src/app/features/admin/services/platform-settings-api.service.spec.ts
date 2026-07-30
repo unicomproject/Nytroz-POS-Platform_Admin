@@ -34,7 +34,7 @@ describe('PlatformSettingsApiService', () => {
       success: true,
       message: 'ok',
       data: {
-        platformDisplayName: 'SCS-TIX',
+        platformDisplayName: 'OneVerz',
         supportEmail: 'support@example.com',
         defaultCountryCode: 'LK',
         defaultCurrencyCode: 'LKR',
@@ -45,7 +45,7 @@ describe('PlatformSettingsApiService', () => {
       }
     });
 
-    expect(displayName).toBe('SCS-TIX');
+    expect(displayName).toBe('OneVerz');
   });
 
   it('updates settings through the platform settings API', () => {

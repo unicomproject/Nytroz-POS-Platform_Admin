@@ -4,8 +4,8 @@ import { allPlatformPermissionCodes, platformPermissions } from './permission-ke
 
 describe('platform permission keys', () => {
   it('includes return-policy template codes in the guarded catalogue', () => {
-    expect(allPlatformPermissionCodes).toHaveLength(36);
-    expect(new Set(allPlatformPermissionCodes).size).toBe(36);
+    expect(allPlatformPermissionCodes).toHaveLength(37);
+    expect(new Set(allPlatformPermissionCodes).size).toBe(37);
     expect(allPlatformPermissionCodes).toContain(platformPermissions.returnPolicyTemplatesView);
     expect(allPlatformPermissionCodes).toContain(platformPermissions.returnPolicyTemplatesManage);
   });

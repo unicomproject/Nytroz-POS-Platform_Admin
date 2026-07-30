@@ -82,6 +82,41 @@ import { tenantLifecycleBadgeClass, tenantLifecycleLabel, resolveTenantLifecycle
       }
 
       @if (tenant(); as data) {
+        @if (data.setupProgressPercent != null) {
+          <article class="card setup-checklist-card">
+            <header class="setup-header">
+              <h2>Setup Progress</h2>
+              <strong>{{ data.setupProgressPercent }}%</strong>
+            </header>
+            <p>Mandatory onboarding checklist. Outlets and tills remain optional.</p>
+            <div class="setup-columns">
+              <div>
+                <h3>Completed</h3>
+                @if (data.setupCompletedSteps?.length) {
+                  <ul>
+                    @for (step of data.setupCompletedSteps; track step) {
+                      <li>{{ formatSetupStep(step) }}</li>
+                    }
+                  </ul>
+                } @else {
+                  <span>No mandatory steps completed yet.</span>
+                }
+              </div>
+              <div>
+                <h3>Missing</h3>
+                @if (data.setupMissingSteps?.length) {
+                  <ul>
+                    @for (step of data.setupMissingSteps; track step) {
+                      <li>{{ formatSetupStep(step) }}</li>
+                    }
+                  </ul>
+                } @else {
+                  <span>All mandatory steps complete.</span>
+                }
+              </div>
+            </div>
+          </article>
+        }
         <section class="summary-grid">
           <article class="summary-card card">
             <span class="label">Lifecycle Status</span>
@@ -1037,6 +1072,16 @@ export class PlatformTenantDetailPage {
       lifecycleStatus: tenant.lifecycleStatus,
       status: tenant.status
     });
+  }
+
+  formatSetupStep(step: string): string {
+    return ({
+      business_profile: 'Business profile',
+      subscription_plan: 'Subscription plan',
+      entitlements: 'Feature entitlements',
+      billing_condition: 'Billing condition',
+      tenant_admin: 'Tenant admin user'
+    } as Record<string, string>)[step] ?? step;
   }
 
   private syncFeaturesForPlan(): void {
