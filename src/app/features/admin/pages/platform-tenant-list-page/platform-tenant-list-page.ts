@@ -1,10 +1,12 @@
 import { DatePipe } from '@angular/common';
-import { Component, DestroyRef, inject, signal } from '@angular/core';
+import { Component, computed, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
 
+import { platformPermissions } from '../../../../core/config/permission-keys';
+import { AccessControlService } from '../../../../core/services/access-control.service';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import { TENANT_LIFECYCLE_FILTER_OPTIONS } from '../../constants/tenant-lifecycle-status.constants';
 import {
@@ -118,15 +120,17 @@ import { tenantLifecycleBadgeClass, tenantLifecycleLabel } from '../../utils/ten
             }
           </select>
         </label>
-        <label class="filter-field">
-          <span class="field-label">Plan</span>
-          <select [ngModel]="planFilter()" (ngModelChange)="onPlanChange($event)">
-            <option value="">All Plans</option>
-            @for (plan of filterOptions().plans; track plan.id) {
-              <option [value]="plan.id">{{ plan.name }}</option>
-            }
-          </select>
-        </label>
+        @if (hasSubscriptionViewPermission()) {
+          <label class="filter-field">
+            <span class="field-label">Plan</span>
+            <select [ngModel]="planFilter()" (ngModelChange)="onPlanChange($event)">
+              <option value="">All Plans</option>
+              @for (plan of filterOptions().plans; track plan.id) {
+                <option [value]="plan.id">{{ plan.name }}</option>
+              }
+            </select>
+          </label>
+        }
         <div class="filter-actions">
           <button type="button" class="btn outline" disabled title="More Filters is not available in TM-EPOS MVP">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4" /></svg>
@@ -155,7 +159,9 @@ import { tenantLifecycleBadgeClass, tenantLifecycleLabel } from '../../utils/ten
                 <thead>
                   <tr>
                     <th>Tenant</th>
-                    <th>Plan</th>
+                    @if (hasSubscriptionViewPermission()) {
+                      <th>Plan</th>
+                    }
                     <th>Status</th>
                     <th>Setup</th>
                     <th>Users</th>
@@ -177,7 +183,9 @@ import { tenantLifecycleBadgeClass, tenantLifecycleLabel } from '../../utils/ten
                           </span>
                         </div>
                       </td>
-                      <td class="cell-text">{{ tenant.planName || '—' }}</td>
+                      @if (hasSubscriptionViewPermission()) {
+                        <td class="cell-text">{{ tenant.planName || '—' }}</td>
+                      }
                       <td>
                         <span
                           class="status-badge"
@@ -683,9 +691,14 @@ import { tenantLifecycleBadgeClass, tenantLifecycleLabel } from '../../utils/ten
 export class PlatformTenantListPage {
   private readonly api = inject(PlatformTenantApiService);
   private readonly apiError = inject(ApiErrorService);
+  private readonly accessControl = inject(AccessControlService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly route = inject(ActivatedRoute);
   readonly tenantSearch = inject(PlatformTenantSearchService);
+
+  readonly hasSubscriptionViewPermission = computed(() =>
+    this.accessControl.hasPermission(platformPermissions.tenantSubscriptionsView)
+  );
 
   readonly summary = signal<PlatformTenantSummary | null>(null);
   readonly tenantList = signal<PlatformTenantListResponse | null>(null);

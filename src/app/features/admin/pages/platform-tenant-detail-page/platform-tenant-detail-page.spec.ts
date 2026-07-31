@@ -13,9 +13,11 @@ describe('PlatformTenantDetailPage', () => {
   let api: {
     getTenantById: ReturnType<typeof vi.fn>;
     activateTenant: ReturnType<typeof vi.fn>;
+    reactivateTenant: ReturnType<typeof vi.fn>;
     suspendTenant: ReturnType<typeof vi.fn>;
     getEntitlementOptions: ReturnType<typeof vi.fn>;
     updateEntitlements: ReturnType<typeof vi.fn>;
+    getTenantAuditLogs: ReturnType<typeof vi.fn>;
   };
   let accessControl: { hasPermission: ReturnType<typeof vi.fn> };
 
@@ -46,17 +48,22 @@ describe('PlatformTenantDetailPage', () => {
     api = {
       getTenantById: vi.fn(),
       activateTenant: vi.fn(),
+      reactivateTenant: vi.fn(),
       suspendTenant: vi.fn(),
       getEntitlementOptions: vi.fn(),
-      updateEntitlements: vi.fn()
+      updateEntitlements: vi.fn(),
+      getTenantAuditLogs: vi.fn().mockReturnValue(of({ items: [], pageNumber: 1, pageSize: 10, totalCount: 0, totalPages: 0 }))
     };
     accessControl = {
       hasPermission: vi.fn((permission: string) =>
         [
           platformPermissions.tenantsActivate,
           platformPermissions.tenantsSuspend,
-          platformPermissions.tenantsEntitlementsUpdate
-        ].includes(permission as typeof platformPermissions.tenantsActivate)
+          platformPermissions.tenantsEntitlementsUpdate,
+          platformPermissions.tenantSubscriptionsView,
+          platformPermissions.billingView,
+          platformPermissions.auditView
+        ].includes(permission as any)
       )
     };
   });

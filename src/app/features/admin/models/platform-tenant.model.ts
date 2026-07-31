@@ -20,6 +20,7 @@ export interface PlatformTenantListItem {
   setupMissingSteps?: string[] | null;
   setupProgressPercent?: number | null;
   continueSetupPath?: string | null;
+  concurrencyVersion?: string | null;
 }
 
 export interface PlatformTenantListResponse {
@@ -97,6 +98,7 @@ export interface PlatformTenantDetail extends PlatformTenantListItem {
   canActivate: boolean;
   canSuspend: boolean;
   canManageEntitlements: boolean;
+  concurrencyVersion?: string | null;
 }
 
 export interface UpdatePlatformTenantRequest {
@@ -107,4 +109,28 @@ export interface UpdatePlatformTenantRequest {
   operatingMode: string;
   businessType?: string | null;
   billingStatus: string;
+  concurrencyVersion?: string;
 }
+
+export interface PlatformTenantAuditLogActor {
+  platformUserId: string | null;
+  email: string | null;
+}
+
+export interface PlatformTenantAuditLogItem {
+  id: string;
+  occurredAt: string;
+  actor: PlatformTenantAuditLogActor;
+  action: string;
+  summary: string;
+  reason: string | null;
+}
+
+export interface PlatformTenantAuditLogListResponse {
+  items: PlatformTenantAuditLogItem[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+

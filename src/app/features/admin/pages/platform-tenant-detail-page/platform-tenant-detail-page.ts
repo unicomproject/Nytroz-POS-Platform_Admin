@@ -14,7 +14,7 @@ import {
   PlatformTenantEntitlementOptions,
   PlatformTenantEntitlementPlanOption
 } from '../../models/platform-tenant-entitlements.model';
-import { PlatformTenantDetail, UpdatePlatformTenantRequest } from '../../models/platform-tenant.model';
+import { PlatformTenantDetail, UpdatePlatformTenantRequest, PlatformTenantAuditLogListResponse } from '../../models/platform-tenant.model';
 import { PlatformTenantApiService } from '../../services/platform-tenant-api.service';
 import { tenantLifecycleBadgeClass, tenantLifecycleLabel, resolveTenantLifecycle } from '../../utils/tenant-lifecycle.util';
 
@@ -57,6 +57,11 @@ import { tenantLifecycleBadgeClass, tenantLifecycleLabel, resolveTenantLifecycle
                 {{ isActionPending() ? 'Activating...' : 'Activate Tenant' }}
               </button>
             }
+            @if (showReactivate(data)) {
+              <button type="button" class="btn success" [disabled]="isActionPending()" (click)="reactivateTenant()">
+                {{ isActionPending() ? 'Reactivating...' : 'Reactivate Tenant' }}
+              </button>
+            }
             @if (showSuspend(data)) {
               <button type="button" class="btn danger" [disabled]="isActionPending()" (click)="suspendTenant()">
                 {{ isActionPending() ? 'Suspending...' : 'Suspend Tenant' }}
@@ -78,159 +83,226 @@ import { tenantLifecycleBadgeClass, tenantLifecycleLabel, resolveTenantLifecycle
         <div class="state-card card error">
           <strong>Tenant lifecycle action failed</strong>
           <span>{{ actionError() }}</span>
+          @if (isConflictError()) {
+            <button type="button" class="btn primary" (click)="reload()">Reload Latest Data</button>
+          }
         </div>
       }
 
+      @if (hasAuditViewPermission()) {
+        <nav class="detail-tabs" aria-label="Tenant detail navigation">
+          <button type="button" class="tab-btn" [class.active]="activeTab() === 'details'" (click)="activeTab.set('details')">Details</button>
+          <button type="button" class="tab-btn" [class.active]="activeTab() === 'audit'" (click)="switchTab('audit')">Audit History</button>
+        </nav>
+      }
+
       @if (tenant(); as data) {
-        @if (data.setupProgressPercent != null) {
-          <article class="card setup-checklist-card">
-            <header class="setup-header">
-              <h2>Setup Progress</h2>
-              <strong>{{ data.setupProgressPercent }}%</strong>
-            </header>
-            <p>Mandatory onboarding checklist. Outlets and tills remain optional.</p>
-            <div class="setup-columns">
-              <div>
-                <h3>Completed</h3>
-                @if (data.setupCompletedSteps?.length) {
-                  <ul>
-                    @for (step of data.setupCompletedSteps; track step) {
-                      <li>{{ formatSetupStep(step) }}</li>
-                    }
-                  </ul>
-                } @else {
-                  <span>No mandatory steps completed yet.</span>
-                }
-              </div>
-              <div>
-                <h3>Missing</h3>
-                @if (data.setupMissingSteps?.length) {
-                  <ul>
-                    @for (step of data.setupMissingSteps; track step) {
-                      <li>{{ formatSetupStep(step) }}</li>
-                    }
-                  </ul>
-                } @else {
-                  <span>All mandatory steps complete.</span>
-                }
-              </div>
-            </div>
-          </article>
-        }
-        <section class="summary-grid">
-          <article class="summary-card card">
-            <span class="label">Lifecycle Status</span>
-            <span
-              class="status-badge"
-              [class]="statusClass(data)"
-              [attr.aria-label]="'Lifecycle status: ' + statusLabel(data)"
-            >{{ statusLabel(data) }}</span>
-          </article>
-          <article class="summary-card card">
-            <span class="label">Billing Status</span>
-            <strong>{{ data.billingStatus }}</strong>
-          </article>
-          <article class="summary-card card">
-            <span class="label">Users</span>
-            <strong>{{ data.userCount }}</strong>
-          </article>
-          <article class="summary-card card">
-            <span class="label">Outlets</span>
-            <strong>{{ data.outletCount }}</strong>
-          </article>
-          <article class="summary-card card">
-            <span class="label">Tills</span>
-            <strong>{{ data.tillCount }}</strong>
-          </article>
-        </section>
-
-        <div class="detail-grid">
-          <article class="panel card">
-            <h2>Profile</h2>
-            @if (editMode()) {
-              <form class="edit-form" (ngSubmit)="saveTenantEdit()">
-                <label>
-                  <span>Name</span>
-                  <input type="text" [ngModel]="editDraft().name" (ngModelChange)="updateEditField('name', $event)" name="name" />
-                </label>
-                <label>
-                  <span>Operating Mode</span>
-                  <input type="text" [ngModel]="editDraft().operatingMode" (ngModelChange)="updateEditField('operatingMode', $event)" name="operatingMode" />
-                </label>
-                <label>
-                  <span>Business Type</span>
-                  <input type="text" [ngModel]="editDraft().businessType" (ngModelChange)="updateEditField('businessType', $event)" name="businessType" />
-                </label>
-                <label>
-                  <span>Base Currency</span>
-                  <input type="text" [ngModel]="editDraft().baseCurrency" (ngModelChange)="updateEditField('baseCurrency', $event)" name="baseCurrency" />
-                </label>
-                <label>
-                  <span>Timezone</span>
-                  <input type="text" [ngModel]="editDraft().defaultTimezone" (ngModelChange)="updateEditField('defaultTimezone', $event)" name="defaultTimezone" />
-                </label>
-                <label>
-                  <span>Locale</span>
-                  <input type="text" [ngModel]="editDraft().defaultLocale" (ngModelChange)="updateEditField('defaultLocale', $event)" name="defaultLocale" />
-                </label>
-                <label>
-                  <span>Billing Status</span>
-                  <input type="text" [ngModel]="editDraft().billingStatus" (ngModelChange)="updateEditField('billingStatus', $event)" name="billingStatus" />
-                </label>
-                <div class="edit-actions">
-                  <button type="button" class="btn ghost" [disabled]="isActionPending()" (click)="cancelEditTenant()">Cancel</button>
-                  <button type="submit" class="btn primary" [disabled]="isActionPending()">{{ isActionPending() ? 'Saving...' : 'Save Tenant' }}</button>
+        @if (activeTab() === 'details') {
+          @if (data.setupProgressPercent != null) {
+            <article class="card setup-checklist-card">
+              <header class="setup-header">
+                <h2>Setup Progress</h2>
+                <strong>{{ data.setupProgressPercent }}%</strong>
+              </header>
+              <p>Mandatory onboarding checklist. Outlets and tills remain optional.</p>
+              <div class="setup-columns">
+                <div>
+                  <h3>Completed</h3>
+                  @if (data.setupCompletedSteps?.length) {
+                    <ul>
+                      @for (step of data.setupCompletedSteps; track step) {
+                        <li>{{ formatSetupStep(step) }}</li>
+                      }
+                    </ul>
+                  } @else {
+                    <span>No mandatory steps completed yet.</span>
+                  }
                 </div>
-              </form>
-            } @else {
-              <dl>
-                <div><dt>Tenant Code</dt><dd>{{ data.code }}</dd></div>
-                <div><dt>Operating Mode</dt><dd>{{ data.operatingMode }}</dd></div>
-                <div><dt>Business Type</dt><dd>{{ data.businessType || '—' }}</dd></div>
-                <div><dt>Base Currency</dt><dd>{{ data.baseCurrency }}</dd></div>
-                <div><dt>Timezone</dt><dd>{{ data.defaultTimezone }}</dd></div>
-                <div><dt>Locale</dt><dd>{{ data.defaultLocale }}</dd></div>
-                <div><dt>Created On</dt><dd>{{ data.createdOn | date: 'medium' }}</dd></div>
-                <div><dt>Last Activity</dt><dd>{{ data.lastActivityAt ? (data.lastActivityAt | date: 'medium') : '—' }}</dd></div>
-              </dl>
-            }
-          </article>
-
-          <article class="panel card">
-            <h2>Subscription</h2>
-            @if (data.subscription) {
-              <dl>
-                <div><dt>Plan</dt><dd>{{ data.subscription.planName }}</dd></div>
-                <div><dt>Plan Code</dt><dd>{{ data.subscription.planCode }}</dd></div>
-                <div><dt>Subscription Status</dt><dd>{{ data.subscription.subscriptionStatus }}</dd></div>
-              </dl>
-            } @else {
-              <p class="muted">No subscription plan is assigned to this tenant.</p>
-            }
-          </article>
-
-          <article class="panel card">
-            <div class="panel-heading">
-              <h2>Entitlements</h2>
-              @if (data.canManageEntitlements && canManageEntitlements()) {
-                <button type="button" class="btn secondary" (click)="openEntitlementEditor()">Edit Entitlements</button>
+                <div>
+                  <h3>Missing</h3>
+                  @if (data.setupMissingSteps?.length) {
+                    <ul>
+                      @for (step of data.setupMissingSteps; track step) {
+                        <li>{{ formatSetupStep(step) }}</li>
+                      }
+                    </ul>
+                  } @else {
+                    <span>All mandatory steps complete.</span>
+                  }
+                </div>
+              </div>
+              @if (data.continueSetupPath || (data.setupMissingSteps && data.setupMissingSteps.length > 0)) {
+                <div class="setup-cta" style="margin-top: 1rem;">
+                  <a class="btn primary" [routerLink]="data.continueSetupPath || ['/admin/tenants', data.id]">Continue Setup</a>
+                </div>
               }
-            </div>
-            <p class="section-note">Enabled features returned by the tenant detail API.</p>
-            @if (data.enabledFeatureCodes.length) {
-              <ul class="feature-list">
-                @for (code of data.enabledFeatureCodes; track code) {
-                  <li>
-                    <span>{{ featureLabelForCode(code) }}</span>
-                    <code class="feature-code">{{ code }}</code>
-                  </li>
-                }
-              </ul>
-            } @else {
-              <p class="muted">No features are enabled for this tenant.</p>
+            </article>
+          }
+          <section class="summary-grid">
+            <article class="summary-card card">
+              <span class="label">Lifecycle Status</span>
+              <span
+                class="status-badge"
+                [class]="statusClass(data)"
+                [attr.aria-label]="'Lifecycle status: ' + statusLabel(data)"
+              >{{ statusLabel(data) }}</span>
+            </article>
+            @if (hasBillingViewPermission()) {
+              <article class="summary-card card">
+                <span class="label">Billing Status</span>
+                <strong>{{ data.billingStatus }}</strong>
+              </article>
             }
-          </article>
-        </div>
+            <article class="summary-card card">
+              <span class="label">Users</span>
+              <strong>{{ data.userCount }}</strong>
+            </article>
+            <article class="summary-card card">
+              <span class="label">Outlets</span>
+              <strong>{{ data.outletCount }}</strong>
+            </article>
+            <article class="summary-card card">
+              <span class="label">Tills</span>
+              <strong>{{ data.tillCount }}</strong>
+            </article>
+          </section>
+
+          <div class="detail-grid">
+            <article class="panel card">
+              <h2>Profile</h2>
+              @if (editMode()) {
+                <form class="edit-form" (ngSubmit)="saveTenantEdit()">
+                  <label>
+                    <span>Name</span>
+                    <input type="text" [ngModel]="editDraft().name" (ngModelChange)="updateEditField('name', $event)" name="name" />
+                  </label>
+                  <label>
+                    <span>Operating Mode</span>
+                    <input type="text" [ngModel]="editDraft().operatingMode" (ngModelChange)="updateEditField('operatingMode', $event)" name="operatingMode" />
+                  </label>
+                  <label>
+                    <span>Business Type</span>
+                    <input type="text" [ngModel]="editDraft().businessType" (ngModelChange)="updateEditField('businessType', $event)" name="businessType" />
+                  </label>
+                  <label>
+                    <span>Base Currency</span>
+                    <input type="text" [ngModel]="editDraft().baseCurrency" (ngModelChange)="updateEditField('baseCurrency', $event)" name="baseCurrency" />
+                  </label>
+                  <label>
+                    <span>Timezone</span>
+                    <input type="text" [ngModel]="editDraft().defaultTimezone" (ngModelChange)="updateEditField('defaultTimezone', $event)" name="defaultTimezone" />
+                  </label>
+                  <label>
+                    <span>Locale</span>
+                    <input type="text" [ngModel]="editDraft().defaultLocale" (ngModelChange)="updateEditField('defaultLocale', $event)" name="defaultLocale" />
+                  </label>
+                  <label>
+                    <span>Billing Status</span>
+                    <input type="text" [ngModel]="editDraft().billingStatus" (ngModelChange)="updateEditField('billingStatus', $event)" name="billingStatus" />
+                  </label>
+                  <div class="edit-actions">
+                    <button type="button" class="btn ghost" [disabled]="isActionPending()" (click)="cancelEditTenant()">Cancel</button>
+                    <button type="submit" class="btn primary" [disabled]="isActionPending()">{{ isActionPending() ? 'Saving...' : 'Save Tenant' }}</button>
+                  </div>
+                </form>
+              } @else {
+                <dl>
+                  <div><dt>Tenant Code</dt><dd>{{ data.code }}</dd></div>
+                  <div><dt>Operating Mode</dt><dd>{{ data.operatingMode }}</dd></div>
+                  <div><dt>Business Type</dt><dd>{{ data.businessType || '—' }}</dd></div>
+                  <div><dt>Base Currency</dt><dd>{{ data.baseCurrency }}</dd></div>
+                  <div><dt>Timezone</dt><dd>{{ data.defaultTimezone }}</dd></div>
+                  <div><dt>Locale</dt><dd>{{ data.defaultLocale }}</dd></div>
+                  <div><dt>Created On</dt><dd>{{ data.createdOn | date: 'medium' }}</dd></div>
+                  <div><dt>Last Activity</dt><dd>{{ data.lastActivityAt ? (data.lastActivityAt | date: 'medium') : '—' }}</dd></div>
+                </dl>
+              }
+            </article>
+
+            @if (hasSubscriptionViewPermission()) {
+              <article class="panel card">
+                <h2>Subscription</h2>
+                @if (data.subscription) {
+                  <dl>
+                    <div><dt>Plan</dt><dd>{{ data.subscription.planName }}</dd></div>
+                    <div><dt>Plan Code</dt><dd>{{ data.subscription.planCode }}</dd></div>
+                    <div><dt>Subscription Status</dt><dd>{{ data.subscription.subscriptionStatus }}</dd></div>
+                  </dl>
+                } @else {
+                  <p class="muted">No subscription plan is assigned to this tenant.</p>
+                }
+              </article>
+            }
+
+            <article class="panel card">
+              <div class="panel-heading">
+                <h2>Entitlements</h2>
+                @if (data.canManageEntitlements && canManageEntitlements()) {
+                  <button type="button" class="btn secondary" (click)="openEntitlementEditor()">Edit Entitlements</button>
+                }
+              </div>
+              <p class="section-note">Enabled features returned by the tenant detail API.</p>
+              @if (data.enabledFeatureCodes.length) {
+                <ul class="feature-list">
+                  @for (code of data.enabledFeatureCodes; track code) {
+                    <li>
+                      <span>{{ featureLabelForCode(code) }}</span>
+                      <code class="feature-code">{{ code }}</code>
+                    </li>
+                  }
+                </ul>
+              } @else {
+                <p class="muted">No features are enabled for this tenant.</p>
+              }
+            </article>
+          </div>
+        } @else if (activeTab() === 'audit') {
+          <section class="card audit-panel" style="padding: 1.25rem;">
+            <h2>Audit History</h2>
+            @if (auditLogsLoading()) {
+              <div class="state-card">Loading tenant audit logs...</div>
+            } @else if (auditLogsError()) {
+              <div class="state-card error">
+                <span>{{ auditLogsError() }}</span>
+                <button type="button" class="btn primary" (click)="loadAuditLogs()">Try again</button>
+              </div>
+            } @else if (auditLogs(); as logData) {
+              @if (logData.items.length) {
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Occurred At</th>
+                        <th>Actor</th>
+                        <th>Action</th>
+                        <th>Summary</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (log of logData.items; track log.id) {
+                        <tr>
+                          <td>{{ log.occurredAt | date: 'medium' }}</td>
+                          <td>{{ log.actor.email || log.actor.platformUserId || 'System' }}</td>
+                          <td><code>{{ log.action }}</code></td>
+                          <td>{{ log.summary }}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+                <footer class="pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem;">
+                  <span>Page {{ logData.pageNumber }} of {{ logData.totalPages || 1 }}</span>
+                  <div class="pagination-controls" style="display: flex; gap: 0.5rem;">
+                    <button type="button" class="btn secondary" [disabled]="logData.pageNumber <= 1" (click)="changeAuditPage(logData.pageNumber - 1)">Previous</button>
+                    <button type="button" class="btn secondary" [disabled]="logData.pageNumber >= logData.totalPages" (click)="changeAuditPage(logData.pageNumber + 1)">Next</button>
+                  </div>
+                </footer>
+              } @else {
+                <p class="muted">No audit history recorded for this tenant.</p>
+              }
+            }
+          </section>
+        }
       }
 
       @if (editorOpen()) {
@@ -746,6 +818,27 @@ export class PlatformTenantDetailPage {
     billingStatus: ''
   });
 
+  readonly hasSubscriptionViewPermission = computed(() =>
+    this.accessControl.hasPermission(platformPermissions.tenantSubscriptionsView)
+  );
+  readonly hasBillingViewPermission = computed(() =>
+    this.accessControl.hasPermission(platformPermissions.billingView)
+  );
+  readonly hasAuditViewPermission = computed(() =>
+    this.accessControl.hasPermission(platformPermissions.auditView)
+  );
+
+  readonly activeTab = signal<'details' | 'audit'>('details');
+  readonly auditLogs = signal<PlatformTenantAuditLogListResponse | null>(null);
+  readonly auditLogsLoading = signal(false);
+  readonly auditLogsError = signal<string | null>(null);
+  readonly auditPageNumber = signal(1);
+
+  readonly isConflictError = computed(() => {
+    const err = (this.actionError() ?? '').toLowerCase();
+    return err.includes('conflict') || err.includes('another user') || err.includes('stale');
+  });
+
   readonly editorOpen = signal(false);
   readonly editorLoading = signal(false);
   readonly editorError = signal<string | null>(null);
@@ -925,7 +1018,8 @@ export class PlatformTenantDetailPage {
       .updateEntitlements(tenantId, {
         subscriptionPlanId: planId,
         enabledFeatureIds: [...this.selectedFeatureIds()],
-        enabledFeatureCodes
+        enabledFeatureCodes,
+        concurrencyVersion: this.tenant()?.concurrencyVersion ?? undefined
       })
       .subscribe({
         next: (tenant) => {
@@ -950,6 +1044,10 @@ export class PlatformTenantDetailPage {
     this.runLifecycleAction('activate');
   }
 
+  reactivateTenant(): void {
+    this.runLifecycleAction('reactivate');
+  }
+
   suspendTenant(): void {
     this.runLifecycleAction('suspend');
   }
@@ -969,11 +1067,21 @@ export class PlatformTenantDetailPage {
       lifecycle === TenantLifecycleStatuses.PendingPayment
       || lifecycle === TenantLifecycleStatuses.Active
       || lifecycle === TenantLifecycleStatuses.Cancelled
+      || lifecycle === TenantLifecycleStatuses.Suspended
     ) {
       return false;
     }
 
     return true;
+  }
+
+  showReactivate(tenant: PlatformTenantDetail): boolean {
+    const lifecycle = resolveTenantLifecycle({
+      lifecycleStatus: tenant.lifecycleStatus,
+      status: tenant.status
+    }).value;
+
+    return (lifecycle === TenantLifecycleStatuses.Suspended || tenant.status === 'SUSPENDED') && this.canActivate();
   }
 
   showSuspend(tenant: PlatformTenantDetail): boolean {
@@ -994,6 +1102,39 @@ export class PlatformTenantDetailPage {
 
   canUpdate(): boolean {
     return this.accessControl.hasPermission(platformPermissions.tenantsUpdate);
+  }
+
+  switchTab(tab: 'details' | 'audit'): void {
+    this.activeTab.set(tab);
+    if (tab === 'audit' && !this.auditLogs()) {
+      this.loadAuditLogs();
+    }
+  }
+
+  loadAuditLogs(): void {
+    const tenantId = this.route.snapshot.paramMap.get('tenantId');
+    if (!tenantId) {
+      return;
+    }
+
+    this.auditLogsLoading.set(true);
+    this.auditLogsError.set(null);
+
+    this.api.getTenantAuditLogs(tenantId, this.auditPageNumber(), 10).subscribe({
+      next: (response) => {
+        this.auditLogs.set(response.data);
+        this.auditLogsLoading.set(false);
+      },
+      error: (error) => {
+        this.auditLogsError.set(this.apiError.toSafeMessage(error));
+        this.auditLogsLoading.set(false);
+      }
+    });
+  }
+
+  changeAuditPage(page: number): void {
+    this.auditPageNumber.set(page);
+    this.loadAuditLogs();
   }
 
   toggleEditTenant(): void {
@@ -1035,7 +1176,11 @@ export class PlatformTenantDetailPage {
       return;
     }
 
-    const payload = this.editDraft();
+    const payload: UpdatePlatformTenantRequest = {
+      ...this.editDraft(),
+      concurrencyVersion: tenant.concurrencyVersion ?? undefined
+    };
+
     if (!payload.name.trim()) {
       this.actionError.set('Tenant name is required.');
       return;
@@ -1154,7 +1299,7 @@ export class PlatformTenantDetailPage {
     this.featureNameByCode.set(map);
   }
 
-  private runLifecycleAction(action: 'activate' | 'suspend'): void {
+  private runLifecycleAction(action: 'activate' | 'suspend' | 'reactivate'): void {
     const tenantId = this.route.snapshot.paramMap.get('tenantId');
     const current = this.tenant();
     if (!tenantId || !current) {
@@ -1162,6 +1307,10 @@ export class PlatformTenantDetailPage {
     }
 
     if (action === 'activate' && !this.showActivate(current)) {
+      return;
+    }
+
+    if (action === 'reactivate' && !this.showReactivate(current)) {
       return;
     }
 
@@ -1173,13 +1322,23 @@ export class PlatformTenantDetailPage {
     this.actionError.set(null);
     this.successMessage.set(null);
 
-    const request$ = action === 'activate' ? this.api.activateTenant(tenantId) : this.api.suspendTenant(tenantId);
+    const request$ = action === 'activate'
+      ? this.api.activateTenant(tenantId)
+      : action === 'reactivate'
+        ? this.api.reactivateTenant(tenantId)
+        : this.api.suspendTenant(tenantId);
 
     request$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (tenant) => {
         this.tenant.set(tenant);
         this.isActionPending.set(false);
-        this.successMessage.set(action === 'activate' ? 'Tenant activated successfully.' : 'Tenant suspended successfully.');
+        this.successMessage.set(
+          action === 'activate'
+            ? 'Tenant activated successfully.'
+            : action === 'reactivate'
+              ? 'Tenant reactivated successfully.'
+              : 'Tenant suspended successfully.'
+        );
       },
       error: (error) => {
         this.isActionPending.set(false);
