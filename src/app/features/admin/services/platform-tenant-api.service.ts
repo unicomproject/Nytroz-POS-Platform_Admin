@@ -30,7 +30,8 @@ import {
   PlatformTenantListQuery,
   PlatformTenantListResponse,
   PlatformTenantSummary,
-  UpdatePlatformTenantRequest
+  UpdatePlatformTenantRequest,
+  PlatformTenantAuditLogListResponse
 } from '../models/platform-tenant.model';
 
 @Injectable({ providedIn: 'root' })
@@ -98,7 +99,8 @@ export class PlatformTenantApiService {
           defaultLocale: request.defaultLocale,
           operatingMode: request.operatingMode,
           businessType: request.businessType,
-          billingStatus: request.billingStatus
+          billingStatus: request.billingStatus,
+          concurrencyVersion: request.concurrencyVersion
         }
       )
       .pipe(map((response) => mapPlatformTenantDetail(response.data)));
@@ -113,6 +115,15 @@ export class PlatformTenantApiService {
       .pipe(map((response) => mapPlatformTenantDetail(response.data)));
   }
 
+  reactivateTenant(tenantId: string): Observable<PlatformTenantDetail> {
+    return this.http
+      .post<ApiResponse<PlatformTenantDetailApiDto>>(
+        `${appSettings.apiBaseUrl}${apiEndpoints.platform.tenants}/${tenantId}/reactivate`,
+        {}
+      )
+      .pipe(map((response) => mapPlatformTenantDetail(response.data)));
+  }
+
   suspendTenant(tenantId: string): Observable<PlatformTenantDetail> {
     return this.http
       .post<ApiResponse<PlatformTenantDetailApiDto>>(
@@ -120,6 +131,21 @@ export class PlatformTenantApiService {
         {}
       )
       .pipe(map((response) => mapPlatformTenantDetail(response.data)));
+  }
+
+  getTenantAuditLogs(
+    tenantId: string,
+    pageNumber: number = 1,
+    pageSize: number = 10
+  ): Observable<ApiResponse<PlatformTenantAuditLogListResponse>> {
+    const params = new HttpParams()
+      .set('pageNumber', String(pageNumber))
+      .set('pageSize', String(pageSize));
+
+    return this.http.get<ApiResponse<PlatformTenantAuditLogListResponse>>(
+      `${appSettings.apiBaseUrl}${apiEndpoints.platform.tenants}/${tenantId}/audit-logs`,
+      { params }
+    );
   }
 
   getEntitlementOptions(tenantId: string): Observable<PlatformTenantEntitlementOptions> {

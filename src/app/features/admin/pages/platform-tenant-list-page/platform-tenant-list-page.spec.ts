@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 
+import { AccessControlService } from '../../../../core/services/access-control.service';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import {
   createTenantFilterOptions,
@@ -24,6 +25,7 @@ describe('PlatformTenantListPage', () => {
       providers: [
         provideRouter([]),
         { provide: PlatformTenantApiService, useValue: api },
+        { provide: AccessControlService, useValue: { hasPermission: () => true } },
         { provide: ApiErrorService, useValue: { toSafeMessage: () => 'Tenant list failed safely' } }
       ]
     }).compileComponents();

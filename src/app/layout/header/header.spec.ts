@@ -22,8 +22,8 @@ describe('Header', () => {
     const fixture = TestBed.createComponent(Header);
     fixture.detectChanges();
 
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Nytroz Platform Admin');
-    expect(fixture.componentInstance.initials()).toBe('NP');
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('OneVerz Platform Admin');
+    expect(fixture.componentInstance.initials()).toBe('OP');
   });
 
   it('shows the global tenant search bar on /admin/tenants', async () => {

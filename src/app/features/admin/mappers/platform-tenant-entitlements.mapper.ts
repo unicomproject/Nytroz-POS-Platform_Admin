@@ -104,6 +104,7 @@ export function mapUpdatePlatformTenantEntitlementsRequest(
   return {
     subscriptionPlanId: request.subscriptionPlanId,
     enabledFeatureIds: request.enabledFeatureIds,
-    enabledFeatureCodes: request.enabledFeatureCodes
+    enabledFeatureCodes: request.enabledFeatureCodes,
+    concurrencyVersion: request.concurrencyVersion
   };
 }

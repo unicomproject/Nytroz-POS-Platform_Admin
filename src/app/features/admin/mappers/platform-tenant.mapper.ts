@@ -36,6 +36,7 @@ export interface PlatformTenantListItemApiDto {
   setupMissingSteps?: string[] | null;
   setupProgressPercent?: number | null;
   continueSetupPath?: string | null;
+  concurrencyVersion?: string | null;
 }
 
 export interface PlatformTenantSubscriptionSummaryApiDto {
@@ -136,7 +137,8 @@ export function mapPlatformTenantListItem(dto: PlatformTenantListItemApiDto): Pl
     setupCompletedSteps: dto.setupCompletedSteps ?? null,
     setupMissingSteps: dto.setupMissingSteps ?? null,
     setupProgressPercent: dto.setupProgressPercent ?? null,
-    continueSetupPath: dto.continueSetupPath ?? null
+    continueSetupPath: dto.continueSetupPath ?? null,
+    concurrencyVersion: dto.concurrencyVersion ?? null
   };
 }
 
@@ -223,7 +225,8 @@ export function mapPlatformTenantDetail(dto: PlatformTenantDetailApiDto): Platfo
     canUpdate: dto.canUpdate,
     canActivate: dto.canActivate,
     canSuspend: dto.canSuspend,
-    canManageEntitlements: dto.canManageEntitlements
+    canManageEntitlements: dto.canManageEntitlements,
+    concurrencyVersion: dto.concurrencyVersion ?? null
   };
 }
 
@@ -244,6 +247,10 @@ export function mapPlatformTenantListQueryParams(query: PlatformTenantListQuery)
 
   if (query.status?.trim()) {
     params['status'] = query.status.trim();
+  }
+
+  if (query.statusGroup?.trim()) {
+    params['statusGroup'] = query.statusGroup.trim();
   }
 
   if (query.billingStatus?.trim()) {

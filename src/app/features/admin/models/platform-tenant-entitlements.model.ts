@@ -36,4 +36,5 @@ export interface UpdatePlatformTenantEntitlementsRequest {
   subscriptionPlanId?: string;
   enabledFeatureIds: string[];
   enabledFeatureCodes: string[];
+  concurrencyVersion?: string;
 }
