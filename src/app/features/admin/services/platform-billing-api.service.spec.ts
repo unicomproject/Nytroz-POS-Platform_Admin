@@ -2,6 +2,8 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpErrorResponse } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import { skipPlatformAuth } from '../../../core/interceptors/auth-token.interceptor';
+import { manualPaymentDetail, manualPaymentQueue, recipientAccess } from '../../../testing/manual-payment-test-fixtures';
 
 import {
   PlatformBillingInvoiceApiDto,
@@ -198,6 +200,99 @@ describe('PlatformBillingApiService', () => {
     );
     expect(error?.status).toBe(409);
     expect(error?.error.errorCode).toBe('platform_billing.concurrency_conflict');
+  });
+
+  it('loads recipient access without attaching platform authentication context', () => {
+    let tenant = '';
+    service.getRecipientPaymentAccess('secure/token').subscribe((value) => tenant = value.tenantName);
+    const request = httpTesting.expectOne('/api/v1/tenant-onboarding/payment-access/secure%2Ftoken');
+    expect(request.request.method).toBe('GET');
+    expect(request.request.context.get(skipPlatformAuth)).toBe(true);
+    request.flush(envelope(recipientAccess()));
+    expect(tenant).toBe('Alpha Retail');
+  });
+
+  it('submits exact multipart fields with a stable idempotency key', () => {
+    const proof = new File(['proof'], 'proof.pdf', { type: 'application/pdf' });
+    service.submitRecipientEvidence('token', {
+      paymentMethod: 'bank_transfer', bankOrTransactionReference: 'BANK-1234', submittedAmount: 110,
+      currencyCode: 'LKR', paymentDate: '2026-08-03T00:00:00Z', payerNote: 'Paid', expectedVersion: 1, proof
+    }, 'logical-key').subscribe();
+    const request = httpTesting.expectOne('/api/v1/tenant-onboarding/payment-access/token/evidence');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.headers.get('Idempotency-Key')).toBe('logical-key');
+    expect(request.request.context.get(skipPlatformAuth)).toBe(true);
+    const body = request.request.body as FormData;
+    expect(body.get('PaymentMethod')).toBe('bank_transfer');
+    expect(body.get('BankOrTransactionReference')).toBe('BANK-1234');
+    expect(body.get('SubmittedAmount')).toBe('110');
+    expect(body.get('CurrencyCode')).toBe('LKR');
+    expect(body.get('PaymentDate')).toBe('2026-08-03T00:00:00Z');
+    expect(body.get('ExpectedVersion')).toBe('1');
+    expect((body.get('Proof') as File).name).toBe('proof.pdf');
+    request.flush(envelope({ paymentId: 'payment-1', status: 'PAYMENT_SUBMITTED', version: 2, referenceSuffix: '***1234',
+      expectedAmount: 110, submittedAmount: 110, currencyCode: 'LKR', paymentDate: '2026-08-03T00:00:00Z', evidence: [],
+      submittedAt: 'now', updatedAt: 'now', nextAction: 'WAIT_FOR_REVIEW', idempotentReplay: false }));
+  });
+
+  it('corrects a submission with PUT, If-Match, version, and idempotency', () => {
+    const proof = new File(['proof'], 'proof.png', { type: 'image/png' });
+    service.updateRecipientSubmission('token', 'payment-1', {
+      paymentMethod: 'cash_deposit', bankOrTransactionReference: 'CASH-9', submittedAmount: 110,
+      currencyCode: 'LKR', paymentDate: '2026-08-03T00:00:00Z', expectedVersion: 4, proof
+    }, 'correction-key').subscribe();
+    const request = httpTesting.expectOne('/api/v1/tenant-onboarding/payment-access/token/submissions/payment-1');
+    expect(request.request.method).toBe('PUT');
+    expect(request.request.headers.get('If-Match')).toBe('"4"');
+    expect(request.request.headers.get('Idempotency-Key')).toBe('correction-key');
+    expect((request.request.body as FormData).get('ExpectedVersion')).toBe('4');
+    request.flush(envelope({ paymentId: 'payment-1', status: 'PAYMENT_SUBMITTED', version: 5, referenceSuffix: '***ASH9',
+      expectedAmount: 110, submittedAmount: 110, currencyCode: 'LKR', paymentDate: 'now', evidence: [], submittedAt: 'now',
+      updatedAt: 'now', nextAction: 'WAIT_FOR_REVIEW', idempotentReplay: false }));
+  });
+
+  it('maps manual queue filters and pagination', () => {
+    service.getManualPayments({ pageNumber: 2, pageSize: 25, status: 'PAYMENT_SUBMITTED', tenantId: 'tenant-1',
+      planId: 'plan-1', search: 'INV', submittedFrom: 'from', submittedTo: 'to', sortBy: 'amount', sortDirection: 'asc' }).subscribe();
+    const request = httpTesting.expectOne((req) => req.url === '/api/v1/platform-admin/billing/manual-payments');
+    expect(request.request.params.get('pageNumber')).toBe('2');
+    expect(request.request.params.get('status')).toBe('PAYMENT_SUBMITTED');
+    expect(request.request.params.get('planId')).toBe('plan-1');
+    expect(request.request.params.get('sortBy')).toBe('amount');
+    request.flush(envelope(manualPaymentQueue()));
+  });
+
+  it('loads detail, history, tenant status, and a private blob proof', () => {
+    service.getManualPayment('payment-1').subscribe();
+    httpTesting.expectOne('/api/v1/platform-admin/billing/manual-payments/payment-1').flush(envelope(manualPaymentDetail()));
+    service.getManualPaymentHistory('payment-1').subscribe();
+    httpTesting.expectOne('/api/v1/platform-admin/billing/manual-payments/payment-1/history')
+      .flush(envelope({ paymentId: 'payment-1', items: manualPaymentDetail().history }));
+    service.getTenantManualPaymentStatus('tenant-1').subscribe();
+    httpTesting.expectOne('/api/v1/platform-admin/tenant-onboarding/tenants/tenant-1/payment-status')
+      .flush(envelope(manualPaymentDetail()));
+    service.getManualPaymentProof('payment-1', 'evidence-1').subscribe();
+    const proof = httpTesting.expectOne('/api/v1/platform-admin/billing/manual-payments/payment-1/proof/evidence-1');
+    expect(proof.request.responseType).toBe('blob');
+    expect(proof.request.headers.get('Cache-Control')).toBe('no-store');
+    proof.flush(new Blob(['private']));
+  });
+
+  it('sends review and notification commands with exact preconditions', () => {
+    service.reviewManualPayment('payment-1', { action: 'APPROVE', expectedVersion: 2 }, 'review-key').subscribe();
+    const review = httpTesting.expectOne('/api/v1/platform-admin/billing/manual-payments/payment-1/review');
+    expect(review.request.headers.get('If-Match')).toBe('"2"');
+    expect(review.request.headers.get('Idempotency-Key')).toBe('review-key');
+    expect(review.request.body).toEqual({ action: 'APPROVE', expectedVersion: 2 });
+    review.flush(envelope({ paymentId: 'payment-1', invoiceId: 'invoice-1', tenantId: 'tenant-1', paymentStatus: 'PAID',
+      invoiceStatus: 'PAID', tenantStatus: 'PENDING_ACTIVATION', version: 4, reviewId: 'review-1', result: 'APPROVE',
+      activationEligible: true, idempotentReplay: false }));
+
+    service.resendManualPaymentNotification('payment-1', 'PAYMENT_REQUIRED', 'Intentional', 'notify-key').subscribe();
+    const resend = httpTesting.expectOne('/api/v1/platform-admin/billing/manual-payments/payment-1/notification/resend');
+    expect(resend.request.headers.get('Idempotency-Key')).toBe('notify-key');
+    expect(resend.request.body).toEqual({ notificationType: 'PAYMENT_REQUIRED', reason: 'Intentional' });
+    resend.flush(envelope({ paymentId: 'payment-1', notificationType: 'PAYMENT_REQUIRED', status: 'QUEUED', idempotentReplay: false }));
   });
 });
 

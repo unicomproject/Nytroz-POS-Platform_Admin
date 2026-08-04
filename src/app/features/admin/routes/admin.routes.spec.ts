@@ -26,4 +26,11 @@ describe('adminRoutes', () => {
     const wildcard = pageRoutes.find((route) => route.path === '**');
     expect(wildcard?.redirectTo).toBe('dashboard');
   });
+
+  it('protects manual payment queue and detail with billing view permission', () => {
+    const queue = pageRoutes.find((route) => route.path === 'billing/manual-payments');
+    const detail = pageRoutes.find((route) => route.path === 'billing/manual-payments/:paymentId');
+    expect(queue?.data?.['requiredPermission']).toBe('platform.billing.view');
+    expect(detail?.data?.['requiredPermission']).toBe('platform.billing.view');
+  });
 });
