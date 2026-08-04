@@ -43,7 +43,7 @@ import {
 
 @Injectable({ providedIn: 'root' })
 export class PlatformTenantApiService {
-  private readonly onboardingUrl = `${appSettings.apiBaseUrl}/api/v1/platform-admin/tenant-onboarding`;
+  private readonly onboardingUrl = `${appSettings.apiBaseUrl}/platform-admin/tenant-onboarding`;
   constructor(private readonly http: HttpClient) {}
 
   getTenants(query: PlatformTenantListQuery): Observable<PlatformTenantListResponse> {
@@ -131,6 +131,21 @@ export class PlatformTenantApiService {
       .pipe(map((response) => response.data));
   }
 
+  retryOnboardingOperation(operationId: string): Observable<TenantOnboardingOperation> {
+    return this.http.post<ApiResponse<TenantOnboardingOperation>>(
+      `${this.onboardingUrl}/operations/${encodeURIComponent(operationId)}/retry`,
+      {}
+    ).pipe(map((response) => response.data));
+  }
+
+  resendTenantAdminInvitation(tenantId: string, idempotencyKey: string): Observable<TenantOnboardingOperation> {
+    return this.http.post<ApiResponse<TenantOnboardingOperation>>(
+      `${this.onboardingUrl}/tenants/${encodeURIComponent(tenantId)}/invitation/resend`,
+      {},
+      { headers: new HttpHeaders({ 'Idempotency-Key': idempotencyKey }) }
+    ).pipe(map((response) => response.data));
+  }
+
   getTenantById(tenantId: string): Observable<PlatformTenantDetail> {
     return this.http
       .get<ApiResponse<PlatformTenantDetailApiDto>>(
@@ -157,11 +172,12 @@ export class PlatformTenantApiService {
       .pipe(map((response) => mapPlatformTenantDetail(response.data)));
   }
 
-  activateTenant(tenantId: string): Observable<PlatformTenantDetail> {
+  activateTenant(tenantId: string, idempotencyKey?: string): Observable<PlatformTenantDetail> {
     return this.http
       .post<ApiResponse<PlatformTenantDetailApiDto>>(
         `${appSettings.apiBaseUrl}${apiEndpoints.platform.tenants}/${tenantId}/activate`,
-        {}
+        {},
+        idempotencyKey ? { headers: new HttpHeaders({ 'Idempotency-Key': idempotencyKey }) } : {}
       )
       .pipe(map((response) => mapPlatformTenantDetail(response.data)));
   }

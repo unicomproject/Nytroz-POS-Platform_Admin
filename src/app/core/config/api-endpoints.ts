@@ -27,6 +27,16 @@ export const apiEndpoints = {
       issueInvoice: (invoiceId: string) => `/platform-admin/billing/invoices/${invoiceId}/issue`,
       markInvoicePaid: (invoiceId: string) =>
         `/platform-admin/billing/invoices/${invoiceId}/mark-paid`,
+      manualPayments: '/platform-admin/billing/manual-payments',
+      manualPayment: (paymentId: string) => `/platform-admin/billing/manual-payments/${paymentId}`,
+      manualPaymentProof: (paymentId: string, evidenceId: string) =>
+        `/platform-admin/billing/manual-payments/${paymentId}/proof/${evidenceId}`,
+      manualPaymentReview: (paymentId: string) =>
+        `/platform-admin/billing/manual-payments/${paymentId}/review`,
+      manualPaymentHistory: (paymentId: string) =>
+        `/platform-admin/billing/manual-payments/${paymentId}/history`,
+      manualPaymentNotificationResend: (paymentId: string) =>
+        `/platform-admin/billing/manual-payments/${paymentId}/notification/resend`,
     },
     users: '/platform-admin/users',
     settings: '/platform-admin/settings',
@@ -43,6 +53,8 @@ export const apiEndpoints = {
     categories: '/categories',
     reports: '/reports',
   },
+  paymentAccess: (accessToken: string) =>
+    `/tenant-onboarding/payment-access/${encodeURIComponent(accessToken)}`,
 } as const;
 
 export const tenantScopedApiSegments = [

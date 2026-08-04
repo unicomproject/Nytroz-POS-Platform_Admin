@@ -11,6 +11,13 @@ import { MainLayout } from './layout/main-layout/main-layout';
 
 export const routes: Routes = [
   {
+    path: 'payment/:accessToken',
+    loadComponent: () =>
+      import('./features/admin/pages/manual-payment-recipient-page/manual-payment-recipient-page').then(
+        (m) => m.ManualPaymentRecipientPage
+      )
+  },
+  {
     path: 'login',
     canActivate: [guestGuard],
     loadComponent: () => import('./features/auth/pages/login-page/login-page').then((m) => m.LoginPage)

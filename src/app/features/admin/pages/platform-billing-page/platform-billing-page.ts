@@ -61,6 +61,7 @@ import { PlatformBillingApiService } from '../../services/platform-billing-api.s
           @if (!canManageBilling()) {
             <span class="read-only">Read only</span>
           }
+          <a class="manual-payments-link" href="/admin/billing/manual-payments">Review manual payments</a>
           <button
             type="button"
             (click)="refresh()"
@@ -246,6 +247,15 @@ import { PlatformBillingApiService } from '../../services/platform-billing-api.s
       font-size: 0.72rem;
       font-weight: 700;
       padding: 0.45rem 0.65rem;
+    }
+    .manual-payments-link {
+      background: #eef4ff;
+      border-radius: 8px;
+      color: #1849a9;
+      font-size: 0.8rem;
+      font-weight: 700;
+      padding: 0.65rem 0.9rem;
+      text-decoration: none;
     }
     button {
       background: #0b5cff;

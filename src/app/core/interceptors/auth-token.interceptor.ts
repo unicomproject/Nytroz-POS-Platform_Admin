@@ -9,6 +9,7 @@ import { AuthSessionService } from '../services/auth-session.service';
 import { AuthApiService } from '../../features/auth/services/auth-api.service';
 
 const authRetryAttempted = new HttpContextToken<boolean>(() => false);
+export const skipPlatformAuth = new HttpContextToken<boolean>(() => false);
 
 export const authTokenInterceptor: HttpInterceptorFn = (request, next) => {
   const authSession = inject(AuthSessionService);
@@ -16,7 +17,8 @@ export const authTokenInterceptor: HttpInterceptorFn = (request, next) => {
   const router = inject(Router);
   const accessToken = authSession.accessToken();
   const isAuthEndpoint = isPlatformAuthEndpoint(request.url);
-  const requestWithToken = !accessToken || isAuthEndpoint
+  const skipsAuth = request.context.get(skipPlatformAuth);
+  const requestWithToken = !accessToken || isAuthEndpoint || skipsAuth
     ? request
     : request.clone({
         setHeaders: {
@@ -30,6 +32,7 @@ export const authTokenInterceptor: HttpInterceptorFn = (request, next) => {
         !(error instanceof HttpErrorResponse) ||
         error.status !== 401 ||
         isAuthEndpoint ||
+        skipsAuth ||
         request.context.get(authRetryAttempted)
       ) {
         return throwError(() => error);

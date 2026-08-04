@@ -125,6 +125,22 @@ const adminPageRoutes: Routes = [
     data: { title: 'Platform Users', requiredPermission: platformPermissions.usersView }
   },
   {
+    path: 'billing/manual-payments/:paymentId',
+    loadComponent: () =>
+      import('../pages/platform-manual-payment-detail-page/platform-manual-payment-detail-page').then(
+        (m) => m.PlatformManualPaymentDetailPage
+      ),
+    data: { title: 'Manual Payment Review', requiredPermission: platformPermissions.billingView }
+  },
+  {
+    path: 'billing/manual-payments',
+    loadComponent: () =>
+      import('../pages/platform-manual-payments-page/platform-manual-payments-page').then(
+        (m) => m.PlatformManualPaymentsPage
+      ),
+    data: { title: 'Manual Payments', requiredPermission: platformPermissions.billingView }
+  },
+  {
     path: 'billing',
     loadComponent: () =>
       import('../pages/platform-billing-page/platform-billing-page').then((m) => m.PlatformBillingPage),
