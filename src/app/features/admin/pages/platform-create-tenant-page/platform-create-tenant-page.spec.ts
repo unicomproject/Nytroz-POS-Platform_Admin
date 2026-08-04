@@ -4,538 +4,133 @@ import { of, throwError } from 'rxjs';
 
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import { createTenantCreateOptions } from '../../../../testing/test-fixtures';
+import { TenantOnboardingDraft } from '../../models/platform-tenant-onboarding.model';
 import { PlatformTenantApiService } from '../../services/platform-tenant-api.service';
 import { PlatformCreateTenantPage } from './platform-create-tenant-page';
 
-describe('PlatformCreateTenantPage', () => {
-  let api: {
-    getCreateOptions: ReturnType<typeof vi.fn>;
-    createTenant: ReturnType<typeof vi.fn>;
-  };
+describe('PlatformCreateTenantPage durable onboarding', () => {
+  let api: Record<string, ReturnType<typeof vi.fn>>;
   let router: Router;
+  const draft: TenantOnboardingDraft = {
+    id: 'draft-1', ownerPlatformUserId: 'user-1', status: 'in_progress', currentStep: 1,
+    completedSteps: [], progressPercent: 0,
+    payload: { basicDetails: null, businessContact: null, plan: null, billing: null, entitlements: null, tenantAdmin: null },
+    schemaVersion: 1, version: 1, createdAt: '2026-08-04T00:00:00Z', updatedAt: '2026-08-04T00:00:00Z',
+    expiresAt: '2026-09-03T00:00:00Z', createdTenantId: null, warnings: []
+  };
 
   beforeEach(async () => {
     api = {
-      getCreateOptions: vi.fn().mockReturnValue(of(createTenantCreateOptions())),
-      createTenant: vi.fn().mockReturnValue(of({ id: 'tenant-123', code: 'TEN-NEW', name: 'New Tenant' }))
+      getCreateOptions: vi.fn().mockReturnValue(of(createTenantCreateOptions({
+        defaults: { countryCode: 'LK', currencyCode: 'LKR', timezone: 'Asia/Colombo', locale: 'en-LK', billingCycle: 'monthly' }
+      }))),
+      createOnboardingDraft: vi.fn().mockReturnValue(of(draft)),
+      saveOnboardingDraft: vi.fn().mockReturnValue(of({ ...draft, version: 2, progressPercent: 14 })),
+      getOnboardingDraft: vi.fn().mockReturnValue(of(draft)),
+      finalizeOnboardingDraft: vi.fn().mockReturnValue(of({
+        tenantId: 'tenant-1', draftId: 'draft-1', operationId: 'operation-1', tenantStatus: 'pending_payment',
+        provisioningStatus: 'SUCCEEDED', paymentStatus: 'PENDING', invitationStatus: 'NOT_ELIGIBLE',
+        createdAt: '2026-08-04T00:00:00Z', idempotentReplay: false
+      }))
     };
-
     await TestBed.configureTestingModule({
       imports: [PlatformCreateTenantPage],
-      providers: [
-        provideRouter([]),
-        { provide: PlatformTenantApiService, useValue: api },
-        {
-          provide: ApiErrorService,
-          useValue: {
-            toSafeMessage: (error: unknown) => {
-              const body = (error as { error?: { message?: string } })?.error;
-              return body?.message ?? 'Create tenant failed safely';
-            },
-            toFieldErrors: (error: unknown) => (error as { error?: { errors?: { field: string; message: string }[] } })?.error?.errors ?? [],
-            applyFieldErrors: (
-              fieldErrors: { field: string; message: string }[],
-              controlsByField: Record<string, { setErrors: (errors: Record<string, string>) => void; markAsTouched: () => void } | null | undefined>
-            ) => {
-              for (const item of fieldErrors) {
-                const control = controlsByField[item.field];
-                if (!control) {
-                  continue;
-                }
-
-                control.setErrors({ server: item.message });
-                control.markAsTouched();
-              }
-            }
-          }
+      providers: [provideRouter([]), { provide: PlatformTenantApiService, useValue: api }, {
+        provide: ApiErrorService, useValue: {
+          toSafeMessage: (error: unknown) => (error as { error?: { message?: string } })?.error?.message ?? 'Safe failure',
+          toFieldErrors: () => [], applyFieldErrors: vi.fn()
         }
-      ]
+      }]
     }).compileComponents();
-
     router = TestBed.inject(Router);
     vi.spyOn(router, 'navigate').mockResolvedValue(true);
   });
 
-  function createFixture(): ComponentFixture<PlatformCreateTenantPage> {
-    const fixture = TestBed.createComponent(PlatformCreateTenantPage);
-    fixture.detectChanges();
-    return fixture;
+  function fixture(): ComponentFixture<PlatformCreateTenantPage> {
+    const value = TestBed.createComponent(PlatformCreateTenantPage); value.detectChanges(); return value;
   }
-
-  function fillBusinessInfo(component: PlatformCreateTenantPage): void {
+  function fillValid(component: PlatformCreateTenantPage): void {
     component.businessInfoForm.patchValue({
-      code: 'TEN-NEW',
-      name: 'New Tenant',
-      legalName: 'New Tenant Legal',
-      countryCode: 'LK',
-      addressLine1: '123 Main Street',
-      addressCity: 'Colombo',
-      addressCountryCode: 'LK',
-      baseCurrency: 'LKR',
-      defaultTimezone: 'Asia/Colombo',
-      defaultLocale: 'en-LK',
-      operatingMode: 'unified_epos'
+      code: 'TEN-NEW', tenantSlug: 'ten-new', name: 'New Tenant', legalName: 'New Tenant Legal', businessType: 'retail',
+      countryCode: 'LK', baseCurrency: 'LKR', defaultTimezone: 'Asia/Colombo', defaultLocale: 'en-LK', operatingMode: 'unified_epos',
+      addressLine1: '123 Main Street', addressCountryCode: 'LK', primaryContactName: 'Ada', primaryContactEmail: 'ada@tenant.test',
+      primaryContactPhone: '+94112223344', billingContactName: 'Billing', billingContactEmail: 'billing@tenant.test'
     });
-  }
-
-  function fillTenantAdmin(component: PlatformCreateTenantPage): void {
-    component.tenantAdminForm.patchValue({
-      firstName: 'Ada',
-      lastName: 'Lovelace',
-      email: 'ada@tenant.com',
-      phone: '+94112223344'
-    });
-  }
-
-  function fillBilling(component: PlatformCreateTenantPage): void {
-    component.billingSubscriptionForm.patchValue({
-      subscriptionType: 'PAID',
-      billingStatus: 'pending',
-      billingCycle: 'monthly',
-      subscriptionStatus: 'trial',
-      createDraftInvoice: true,
-      autoRenew: true,
-      invoiceEmail: 'billing@tenant.com',
-      paymentMethod: 'manual',
-      notes: 'Create from wizard'
-    });
-  }
-
-  function fillValidWizard(component: PlatformCreateTenantPage): void {
-    fillBusinessInfo(component);
     component.selectPlan('plan-1');
     component.limitsAddonsForm.patchValue({ maxOutlets: 5, maxTills: 10, maxUsers: 20 });
     const feature = component.createOptions().catalogModules[0].features[0];
     component.toggleFeature(feature, { target: { checked: true } } as unknown as Event);
-    fillTenantAdmin(component);
-    fillBilling(component);
+    component.tenantAdminForm.patchValue({ firstName: 'Ada', email: 'ada@tenant.test' });
+    component.billingSubscriptionForm.patchValue({ subscriptionType: 'PAID', billingStatus: 'pending', billingCycle: 'monthly',
+      subscriptionStatus: 'active', invoiceEmail: 'billing@tenant.test', paymentMethod: 'manual' });
   }
 
-  it('renders all 7 wizard steps', () => {
-    const fixture = createFixture();
-    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-
-    expect(text).toContain('Business Info');
-    expect(text).toContain('Plan Selection');
-    expect(text).toContain('Limits & Add-ons');
-    expect(text).toContain('Feature Entitlements');
-    expect(text).toContain('Tenant Admin');
-    expect(text).toContain('Billing & Subscription');
-    expect(text).toContain('Review & Create');
+  it('renders the exact canonical seven-step order', () => {
+    const component = fixture().componentInstance;
+    expect(component.steps.map((step) => step.label)).toEqual([
+      'Tenant Basic Details', 'Business & Contact Information', 'Subscription Plan', 'Billing / Payment Setup',
+      'Feature Entitlements', 'Tenant Admin User', 'Review, Create & Activation'
+    ]);
   });
-
-  it('loads create-options on init', () => {
-    const fixture = createFixture();
-    const component = fixture.componentInstance;
-
-    expect(api.getCreateOptions).toHaveBeenCalledOnce();
-    expect(component.createOptions().plans.length).toBe(1);
-    expect(component.createOptions().billingStatuses[0]?.value).toBe('pending');
-    expect(component.createOptions().paymentMethods[0]?.value).toBe('manual');
-    expect(component.createOptions().countryCodes[0]?.value).toBe('LK');
-    expect(component.createOptions().countryCodes[0]?.label).toBe('Sri Lanka');
+  it('loads authoritative create options', () => expect(fixture().componentInstance.createOptions().plans).toHaveLength(1));
+  it('uses server country default', () => expect(fixture().componentInstance.businessInfoForm.controls.countryCode.value).toBe('LK'));
+  it('uses server currency default', () => expect(fixture().componentInstance.businessInfoForm.controls.baseCurrency.value).toBe('LKR'));
+  it('uses server timezone default', () => expect(fixture().componentInstance.businessInfoForm.controls.defaultTimezone.value).toBe('Asia/Colombo'));
+  it('uses server locale default', () => expect(fixture().componentInstance.businessInfoForm.controls.defaultLocale.value).toBe('en-LK'));
+  it('uses server billing-cycle default', () => expect(fixture().componentInstance.billingSubscriptionForm.controls.billingCycle.value).toBe('monthly'));
+  it('does not select a geographic fallback when the server default is null', () => {
+    api['getCreateOptions'].mockReturnValueOnce(of(createTenantCreateOptions({ defaults: { countryCode: null, currencyCode: null, timezone: null, locale: null, billingCycle: null } })));
+    const component = fixture().componentInstance; expect(component.businessInfoForm.controls.countryCode.value).toBe('');
   });
-
-  it('renders countryCodes as dropdown options from create-options', () => {
-    const fixture = createFixture();
-    fixture.detectChanges();
-
-    const countrySelect = (fixture.nativeElement as HTMLElement).querySelector('select[formcontrolname="countryCode"]') as HTMLSelectElement;
-    const options = Array.from(countrySelect.options).map((option) => ({
-      value: option.value,
-      label: option.textContent?.trim() ?? ''
-    }));
-
-    expect(options.some((option) => option.value === 'LK' && option.label === 'Sri Lanka')).toBe(true);
+  it('blocks step one until required values are valid', () => expect(fixture().componentInstance.isCurrentStepValid()).toBe(false));
+  it('advances completed steps and saves the durable draft', () => {
+    const component = fixture().componentInstance; fillValid(component); component.currentStep.set('business-info'); component.nextStep();
+    expect(component.currentStep()).toBe('plan-selection'); expect(api['createOnboardingDraft']).toHaveBeenCalledOnce();
   });
-
-  it('auto-selects LK when only one country option exists', () => {
-    const fixture = createFixture();
-    const component = fixture.componentInstance;
-
-    expect(component.businessInfoForm.controls.countryCode.value).toBe('LK');
-    expect(component.businessInfoForm.controls.addressCountryCode.value).toBe('LK');
-    expect(component.businessInfoForm.controls.countryCode.disabled).toBe(false);
-    expect(component.businessInfoForm.controls.addressCountryCode.disabled).toBe(false);
+  it('provides an explicit Save Draft action', () => expect((fixture().nativeElement as HTMLElement).textContent).toContain('Save Draft'));
+  it('creates a draft on first explicit save', () => { const component = fixture().componentInstance; component.saveDraft(); expect(api['createOnboardingDraft']).toHaveBeenCalledOnce(); });
+  it('updates a draft with its latest version', () => {
+    const component = fixture().componentInstance; component.saveDraft(); component.saveDraft();
+    expect(api['saveOnboardingDraft']).toHaveBeenCalledWith('draft-1', 1, expect.any(Object), 1);
   });
-
-  it('shows country load error and disables Next when countryCodes is empty', () => {
-    api.getCreateOptions.mockReturnValueOnce(
-      of(createTenantCreateOptions({ countryCodes: [] }))
-    );
-    const fixture = createFixture();
-    const component = fixture.componentInstance;
-    fixture.detectChanges();
-
-    expect(component.countryOptionsLoadError()).toBe('Country list could not be loaded. Please retry.');
-    expect(component.isCurrentStepValid()).toBe(false);
-    const nextButton = (fixture.nativeElement as HTMLElement).querySelector('.action-bar .btn.primary') as HTMLButtonElement;
-    expect(nextButton.disabled).toBe(true);
+  it('shows saved status and last-saved time', () => { const component = fixture().componentInstance; component.saveDraft(); expect(component.saveState()).toBe('saved'); expect(component.lastSavedAt()).not.toBeNull(); });
+  it('shows a safe save failure state', () => {
+    api['createOnboardingDraft'].mockReturnValueOnce(throwError(() => new Error('network'))); const component = fixture().componentInstance;
+    component.saveDraft(); expect(component.saveState()).toBe('failed'); expect(component.errorMessage()).toBe('Safe failure');
   });
-
-  it('enables country field after options load', () => {
-    const fixture = createFixture();
-    const component = fixture.componentInstance;
-
-    expect(component.businessInfoForm.controls.countryCode.disabled).toBe(false);
-    expect(component.countryOptionsLoadError()).toBeNull();
+  it('persists contact and address data in the structured payload', () => {
+    const component = fixture().componentInstance; fillValid(component); component.saveDraft();
+    const payload = api['createOnboardingDraft'].mock.calls[0][0]; expect(payload.businessContact.primaryContact.email).toBe('ada@tenant.test');
   });
-
-  it('posts LK country and LKR currency values, not labels', () => {
-    const fixture = createFixture();
-    const component = fixture.componentInstance;
-    fillValidWizard(component);
-    component.currentStep.set('review-create');
-
-    component.createTenant();
-    fixture.detectChanges();
-
-    expect(api.createTenant).toHaveBeenCalledWith(
-      expect.objectContaining({
-        countryCode: 'LK',
-        baseCurrency: 'LKR',
-        defaultLocale: 'en-LK',
-        operatingMode: 'unified_epos',
-        address: expect.objectContaining({ countryCode: 'LK' })
-      })
-    );
+  it('persists explicit slug separately from tenant code', () => {
+    const component = fixture().componentInstance; fillValid(component); component.saveDraft();
+    expect(api['createOnboardingDraft'].mock.calls[0][0].basicDetails.tenantSlug).toBe('ten-new');
   });
-
-  it('posts non-default locale, operatingMode and businessType from wizard state', () => {
-    const fixture = createFixture();
-    const component = fixture.componentInstance;
-    fillValidWizard(component);
-    component.businessInfoForm.patchValue({
-      defaultLocale: 'en-GB',
-      operatingMode: 'pos_only',
-      businessType: 'retail',
-      countryCode: 'GB',
-      addressCountryCode: 'GB'
-    });
-    component.currentStep.set('review-create');
-
-    component.createTenant();
-    fixture.detectChanges();
-
-    expect(api.createTenant).toHaveBeenCalledWith(
-      expect.objectContaining({
-        defaultLocale: 'en-GB',
-        operatingMode: 'pos_only',
-        businessType: 'retail',
-        countryCode: 'GB'
-      })
-    );
+  it('persists the server-selected plan and billing cycle', () => {
+    const component = fixture().componentInstance; fillValid(component); component.saveDraft();
+    expect(api['createOnboardingDraft'].mock.calls[0][0].plan).toEqual(expect.objectContaining({ subscriptionPlanId: 'plan-1', billingCycle: 'monthly' }));
   });
-
-  it('retains wizard locale and operatingMode when navigating between steps', () => {
-    const fixture = createFixture();
-    const component = fixture.componentInstance;
-    fillValidWizard(component);
-    component.businessInfoForm.patchValue({
-      defaultLocale: 'en-GB',
-      operatingMode: 'pos_only',
-      businessType: 'retail'
-    });
-
-    component.nextStep();
-    component.goBack();
-    fixture.detectChanges();
-
-    expect(component.businessInfoForm.controls.defaultLocale.value).toBe('en-GB');
-    expect(component.businessInfoForm.controls.operatingMode.value).toBe('pos_only');
-    expect(component.businessInfoForm.controls.businessType.value).toBe('retail');
+  it('persists effective feature selections', () => {
+    const component = fixture().componentInstance; fillValid(component); component.saveDraft();
+    expect(api['createOnboardingDraft'].mock.calls[0][0].entitlements.featureIds).toContain('feature-1');
   });
-
-  it('shows visible country validation error for invalid country code', () => {
-    const fixture = createFixture();
-    const component = fixture.componentInstance;
-    component.businessInfoForm.patchValue({ countryCode: 'Sri Lanka' });
-    component.businessInfoForm.controls.countryCode.markAsTouched();
-    fixture.detectChanges();
-
-    expect(component.fieldMessage(component.businessInfoForm.controls.countryCode, 'Country')).toContain('2-letter ISO');
-    expect(component.isCurrentStepValid()).toBe(false);
+  it('keeps future steps inaccessible when the current step is invalid', () => { const component = fixture().componentInstance; component.nextStep(); expect(component.currentStep()).toBe('business-info'); });
+  it('allows completed steps to be revisited', () => { const component = fixture().componentInstance; fillValid(component); component.currentStep.set('plan-selection'); component.goBack(); expect(component.currentStep()).toBe('business-info'); });
+  it('reuses one idempotency key for a logical final submission retry', () => {
+    const component = fixture().componentInstance; fillValid(component); component.currentStep.set('review-create'); component.saveDraft(); component.createTenant();
+    const first = api['finalizeOnboardingDraft'].mock.calls[0][2];
+    api['finalizeOnboardingDraft'].mockReturnValueOnce(throwError(() => new Error('timeout'))); component.createTenant();
+    expect(api['finalizeOnboardingDraft'].mock.calls[1][2]).toBe(first);
   });
-
-  it('disables Next when current step is invalid', () => {
-    const fixture = createFixture();
-    const component = fixture.componentInstance;
-    fixture.detectChanges();
-
-    expect(component.isCurrentStepValid()).toBe(false);
-    const nextButton = (fixture.nativeElement as HTMLElement).querySelector('.action-bar .btn.primary') as HTMLButtonElement;
-    expect(nextButton.disabled).toBe(true);
+  it('routes finalization to operation status without query-string secrets', () => {
+    const component = fixture().componentInstance; fillValid(component); component.currentStep.set('review-create'); component.saveDraft(); component.createTenant();
+    expect(router.navigate).toHaveBeenCalledWith(['/admin/tenants/onboarding/operations', 'operation-1']);
   });
-
-  it('shows review validation summary when create is blocked', () => {
-    const fixture = createFixture();
-    const component = fixture.componentInstance;
-    component.currentStep.set('review-create');
-    fixture.detectChanges();
-
-    expect(component.validationSummary().length).toBeGreaterThan(0);
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Fix the following before creating');
+  it('disables overlapping draft saves', () => { const component = fixture().componentInstance; component.isSaving.set(true); component.saveDraft(); expect(api['createOnboardingDraft']).not.toHaveBeenCalled(); });
+  it('shows progress from the backend response', () => { const component = fixture().componentInstance; component.saveDraft(); component.saveDraft(); expect(component.progressPercent()).toBe(14); });
+  it('normalizes annual billing cycle to yearly in the draft', () => {
+    const component = fixture().componentInstance; fillValid(component); component.billingSubscriptionForm.controls.billingCycle.setValue('annual'); component.saveDraft();
+    expect(api['createOnboardingDraft'].mock.calls[0][0].plan.billingCycle).toBe('yearly');
   });
-
-  it('maps server validation errors to form fields', () => {
-    api.createTenant.mockReturnValueOnce(
-      throwError(() => ({
-        error: {
-          success: false,
-          message: 'One or more tenant create fields are invalid.',
-          errorCode: 'platform_tenants.validation_failed',
-          errors: [{ field: 'countryCode', message: 'Country must be a 2-letter ISO code (for example LK).' }]
-        }
-      }))
-    );
-    const fixture = createFixture();
-    const component = fixture.componentInstance;
-    fillValidWizard(component);
-    component.currentStep.set('review-create');
-
-    component.createTenant();
-    fixture.detectChanges();
-
-    expect(component.fieldMessage(component.businessInfoForm.controls.countryCode, 'Country')).toContain('2-letter ISO');
-    expect(component.errorMessage()).toBe('One or more tenant create fields are invalid.');
-  });
-
-  it('validates each step before moving forward', () => {
-    const fixture = createFixture();
-    const component = fixture.componentInstance;
-
-    component.nextStep();
-    fixture.detectChanges();
-
-    expect(component.currentStep()).toBe('business-info');
-
-    fillBusinessInfo(component);
-    component.nextStep();
-    fixture.detectChanges();
-
-    expect(component.currentStep()).toBe('plan-selection');
-  });
-
-  it('applies selected plan defaults to limits and billing cycle', () => {
-    const fixture = createFixture();
-    const component = fixture.componentInstance;
-
-    component.selectPlan('plan-1');
-    fixture.detectChanges();
-
-    expect(component.planSelectionForm.controls.subscriptionPlanId.value).toBe('plan-1');
-    expect(component.limitsAddonsForm.controls.maxOutlets.value).toBe(5);
-    expect(component.billingSubscriptionForm.controls.billingCycle.value).toBe('monthly');
-  });
-
-  it('updates effective limits based on selected add-ons', () => {
-    const fixture = createFixture();
-    const component = fixture.componentInstance;
-
-    component.selectPlan('plan-1');
-    component.setAddonQuantity(component.createOptions().addons[0], 2);
-    fixture.detectChanges();
-
-    expect(component.effectiveLimit('max_outlets')).toBe(7);
-  });
-
-  it('constrains feature selection by selected plan entitlements', () => {
-    const fixture = createFixture();
-    const component = fixture.componentInstance;
-    component.selectPlan('plan-1');
-    fixture.detectChanges();
-
-    const allowedFeature = component.createOptions().catalogModules[0].features[0];
-    expect(component.isFeatureAllowed(allowedFeature)).toBe(true);
-
-    component.toggleFeature(allowedFeature, { target: { checked: true } } as unknown as Event);
-    expect(component.selectedFeatureIds()).toContain(allowedFeature.id);
-  });
-
-  it('shows pending invite guidance on tenant admin step', () => {
-    const fixture = createFixture();
-    const component = fixture.componentInstance;
-    component.currentStep.set('tenant-admin');
-    fixture.detectChanges();
-
-    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-    expect(text).toContain('pending invite');
-    expect(text).not.toContain('Send invite email');
-  });
-
-  it('enforces billing step required fields', () => {
-    const fixture = createFixture();
-    const component = fixture.componentInstance;
-    component.currentStep.set('billing-subscription');
-    component.billingSubscriptionForm.patchValue({
-      subscriptionType: '',
-      billingStatus: '',
-      billingCycle: '',
-      subscriptionStatus: ''
-    });
-
-    component.nextStep();
-    fixture.detectChanges();
-
-    expect(component.currentStep()).toBe('billing-subscription');
-    expect(component.billingSubscriptionForm.invalid).toBe(true);
-  });
-
-  it('blocks create when subscription type is missing', () => {
-    const fixture = createFixture();
-    const component = fixture.componentInstance;
-    fillValidWizard(component);
-    component.billingSubscriptionForm.patchValue({ subscriptionType: '' });
-    component.currentStep.set('review-create');
-
-    component.createTenant();
-    fixture.detectChanges();
-
-    expect(api.createTenant).not.toHaveBeenCalled();
-    expect(component.canCreateTenant()).toBe(false);
-  });
-
-  it('sends expected POST payload shape on create', () => {
-    const fixture = createFixture();
-    const component = fixture.componentInstance;
-    fillValidWizard(component);
-    component.limitsAddonsForm.patchValue({ maxOutlets: 6, maxTills: 10, maxUsers: 20 });
-    component.setAddonQuantity(component.createOptions().addons[0], 2);
-    const feature = component.createOptions().catalogModules[0].features[0];
-    component.toggleFeature(feature, { target: { checked: true } } as unknown as Event);
-    component.currentStep.set('review-create');
-
-    component.createTenant();
-    fixture.detectChanges();
-
-    expect(api.createTenant).toHaveBeenCalledTimes(1);
-    expect(api.createTenant).toHaveBeenCalledWith(
-      expect.objectContaining({
-        code: 'TEN-NEW',
-        name: 'New Tenant',
-        subscriptionPlanId: 'plan-1',
-        limits: expect.objectContaining({ maxOutlets: 6, maxTills: 10, maxUsers: 20 }),
-        addons: [{ addonId: 'addon-1', quantity: 2 }],
-        enabledFeatureIds: expect.arrayContaining([feature.id]),
-        tenantAdmin: expect.objectContaining({
-          firstName: 'Ada',
-          email: 'ada@tenant.com',
-          sendInvite: true
-        }),
-        subscription: expect.objectContaining({
-          subscriptionType: 'PAID',
-          billingCycle: 'monthly',
-          subscriptionStatus: 'trial',
-          paymentMethod: 'manual',
-          createDraftInvoice: true
-        }),
-        billingStatus: 'pending',
-        address: expect.objectContaining({ countryCode: 'LK' })
-      })
-    );
-  });
-
-  it('sends TRIAL subscriptionType for trial wizard create', () => {
-    const fixture = createFixture();
-    const component = fixture.componentInstance;
-    fillValidWizard(component);
-    component.billingSubscriptionForm.patchValue({ subscriptionType: 'TRIAL' });
-    component.currentStep.set('review-create');
-
-    component.createTenant();
-
-    expect(api.createTenant).toHaveBeenCalledWith(
-      expect.objectContaining({
-        subscription: expect.objectContaining({ subscriptionType: 'TRIAL', billingCycle: 'monthly' })
-      })
-    );
-  });
-
-  it('sends DEMO subscriptionType without billingCycle demo', () => {
-    const fixture = createFixture();
-    const component = fixture.componentInstance;
-    fillValidWizard(component);
-    component.billingSubscriptionForm.patchValue({
-      subscriptionType: 'DEMO',
-      billingCycle: 'yearly'
-    });
-    component.currentStep.set('review-create');
-
-    component.createTenant();
-
-    expect(api.createTenant).toHaveBeenCalledWith(
-      expect.objectContaining({
-        subscription: expect.objectContaining({
-          subscriptionType: 'DEMO',
-          billingCycle: 'yearly'
-        })
-      })
-    );
-    expect(api.createTenant.mock.calls[0][0].subscription.billingCycle).not.toBe('demo');
-  });
-
-  it('serializes annual billing cycle as yearly on create', () => {
-    const fixture = createFixture();
-    const component = fixture.componentInstance;
-    fillValidWizard(component);
-    component.billingSubscriptionForm.patchValue({ billingCycle: 'annual' });
-    component.currentStep.set('review-create');
-
-    component.createTenant();
-
-    expect(api.createTenant).toHaveBeenCalledWith(
-      expect.objectContaining({
-        subscription: expect.objectContaining({ billingCycle: 'yearly' })
-      })
-    );
-  });
-
-  it('navigates to tenant detail on successful create', () => {
-    const fixture = createFixture();
-    const component = fixture.componentInstance;
-    fillValidWizard(component);
-    component.currentStep.set('review-create');
-
-    component.createTenant();
-    fixture.detectChanges();
-
-    expect(router.navigate).toHaveBeenCalledWith(['/admin/tenants', 'tenant-123']);
-  });
-
-  it('shows API error message when create fails with invalid billing status', () => {
-    api.createTenant.mockReturnValueOnce(throwError(() => ({
-      error: {
-        success: false,
-        message: 'One or more tenant create fields are invalid.',
-        errorCode: 'platform_tenants.validation_failed',
-        errors: [{ field: 'billingStatus', message: 'Billing status must be one of pending, paid, overdue, failed, or waived.' }]
-      }
-    })));
-    const fixture = createFixture();
-    const component = fixture.componentInstance;
-    fillValidWizard(component);
-    component.billingSubscriptionForm.patchValue({ billingStatus: 'trial' });
-    component.currentStep.set('review-create');
-
-    component.createTenant();
-    fixture.detectChanges();
-
-    expect(api.createTenant).toHaveBeenCalledWith(expect.objectContaining({ billingStatus: 'trial' }));
-    expect(component.errorMessage()).toBe('One or more tenant create fields are invalid.');
-    expect(component.isSaving()).toBe(false);
-  });
-
-  it('shows API error message when create fails', () => {
-    api.createTenant.mockReturnValueOnce(throwError(() => new Error('network failed')));
-    const fixture = createFixture();
-    const component = fixture.componentInstance;
-    fillValidWizard(component);
-    component.currentStep.set('review-create');
-
-    component.createTenant();
-    fixture.detectChanges();
-
-    expect(component.errorMessage()).toBe('Create tenant failed safely');
-    expect(component.isSaving()).toBe(false);
-  });
+  it('does not expose temporary-password controls', () => expect((fixture().nativeElement as HTMLElement).textContent).not.toContain('Temporary Password'));
 });

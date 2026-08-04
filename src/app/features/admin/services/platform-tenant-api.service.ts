@@ -1,4 +1,4 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { map, Observable } from 'rxjs';
 
@@ -25,6 +25,13 @@ import {
 } from '../mappers/platform-tenant-entitlements.mapper';
 import { UpdatePlatformTenantEntitlementsRequest, PlatformTenantEntitlementOptions } from '../models/platform-tenant-entitlements.model';
 import {
+  TenantOnboardingDraft,
+  TenantOnboardingDraftSummary,
+  TenantOnboardingOperation,
+  TenantOnboardingPayload,
+  TenantOnboardingReceipt
+} from '../models/platform-tenant-onboarding.model';
+import {
   PlatformTenantDetail,
   PlatformTenantFilterOptions,
   PlatformTenantListQuery,
@@ -36,6 +43,7 @@ import {
 
 @Injectable({ providedIn: 'root' })
 export class PlatformTenantApiService {
+  private readonly onboardingUrl = `${appSettings.apiBaseUrl}/api/v1/platform-admin/tenant-onboarding`;
   constructor(private readonly http: HttpClient) {}
 
   getTenants(query: PlatformTenantListQuery): Observable<PlatformTenantListResponse> {
@@ -78,6 +86,49 @@ export class PlatformTenantApiService {
         request
       )
       .pipe(map((response) => mapPlatformTenantDetail(response.data)));
+  }
+
+  createOnboardingDraft(payload: TenantOnboardingPayload, currentStep = 1): Observable<TenantOnboardingDraft> {
+    return this.http.post<ApiResponse<TenantOnboardingDraft>>(`${this.onboardingUrl}/drafts`, { payload, currentStep })
+      .pipe(map((response) => response.data));
+  }
+
+  listOnboardingDrafts(mine = true): Observable<TenantOnboardingDraftSummary[]> {
+    return this.http.get<ApiResponse<{ items: TenantOnboardingDraftSummary[] }>>(
+      `${this.onboardingUrl}/drafts`, { params: { mine } }
+    ).pipe(map((response) => response.data.items));
+  }
+
+  getOnboardingDraft(draftId: string): Observable<TenantOnboardingDraft> {
+    return this.http.get<ApiResponse<TenantOnboardingDraft>>(`${this.onboardingUrl}/drafts/${draftId}`)
+      .pipe(map((response) => response.data));
+  }
+
+  saveOnboardingDraft(draftId: string, version: number, payload: TenantOnboardingPayload, currentStep: number): Observable<TenantOnboardingDraft> {
+    return this.http.patch<ApiResponse<TenantOnboardingDraft>>(
+      `${this.onboardingUrl}/drafts/${draftId}`,
+      { payload, currentStep },
+      { headers: new HttpHeaders({ 'If-Match': `\"${version}\"` }) }
+    ).pipe(map((response) => response.data));
+  }
+
+  discardOnboardingDraft(draftId: string, version: number): Observable<void> {
+    return this.http.delete<void>(`${this.onboardingUrl}/drafts/${draftId}`, {
+      headers: new HttpHeaders({ 'If-Match': `\"${version}\"` })
+    });
+  }
+
+  finalizeOnboardingDraft(draftId: string, version: number, idempotencyKey: string): Observable<TenantOnboardingReceipt> {
+    return this.http.post<ApiResponse<TenantOnboardingReceipt>>(
+      `${this.onboardingUrl}/drafts/${draftId}/finalize`,
+      { acknowledgedWarningCodes: [], finalReviewConfirmed: true },
+      { headers: new HttpHeaders({ 'If-Match': `\"${version}\"`, 'Idempotency-Key': idempotencyKey }) }
+    ).pipe(map((response) => response.data));
+  }
+
+  getOnboardingOperation(operationId: string): Observable<TenantOnboardingOperation> {
+    return this.http.get<ApiResponse<TenantOnboardingOperation>>(`${this.onboardingUrl}/operations/${operationId}`)
+      .pipe(map((response) => response.data));
   }
 
   getTenantById(tenantId: string): Observable<PlatformTenantDetail> {

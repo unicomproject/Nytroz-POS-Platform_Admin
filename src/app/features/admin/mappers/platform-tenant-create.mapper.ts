@@ -80,6 +80,8 @@ export interface TenantCreateOptionsApiDto {
   operatingModes: TenantCreateLookupOptionApiDto[];
   subscriptionStatuses: TenantCreateLookupOptionApiDto[];
   billingCycles: TenantCreateLookupOptionApiDto[];
+  defaults?: TenantCreateOptions['defaults'] | null;
+  validation?: TenantCreateOptions['validation'] | null;
 }
 
 export function mapCreateOptions(dto: TenantCreateOptionsApiDto | null | undefined): TenantCreateOptions {
@@ -96,7 +98,9 @@ export function mapCreateOptions(dto: TenantCreateOptionsApiDto | null | undefin
     businessTypes: [],
     operatingModes: [],
     subscriptionStatuses: [],
-    billingCycles: []
+    billingCycles: [],
+    defaults: null,
+    validation: null
   };
 
   return {
@@ -154,7 +158,20 @@ export function mapCreateOptions(dto: TenantCreateOptionsApiDto | null | undefin
       .map((item) => ({
         value: normalizeBillingCycleForApi(item.value)!,
         label: item.label || (normalizeBillingCycleForApi(item.value) === 'yearly' ? 'Yearly' : 'Monthly')
-      }))
+      })),
+    defaults: {
+      countryCode: data.defaults?.countryCode ?? null,
+      currencyCode: data.defaults?.currencyCode ?? null,
+      timezone: data.defaults?.timezone ?? null,
+      locale: data.defaults?.locale ?? null,
+      billingCycle: normalizeBillingCycleForApi(data.defaults?.billingCycle ?? '') ?? null
+    },
+    validation: {
+      tenantCodePattern: data.validation?.tenantCodePattern ?? '^[A-Z0-9-]{3,60}$',
+      tenantSlugPattern: data.validation?.tenantSlugPattern ?? '^[a-z0-9](?:[a-z0-9-]{1,98}[a-z0-9])?$',
+      draftRetentionDays: data.validation?.draftRetentionDays ?? 30,
+      platformBaseDomain: data.validation?.platformBaseDomain ?? null
+    }
   };
 }
 

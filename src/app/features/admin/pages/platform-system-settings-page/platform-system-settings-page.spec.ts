@@ -31,7 +31,9 @@ describe('PlatformSystemSettingsPage', () => {
     businessTypes: [],
     operatingModes: [],
     subscriptionStatuses: [],
-    billingCycles: []
+    billingCycles: [],
+    defaults: { countryCode: null, currencyCode: null, timezone: null, locale: null, billingCycle: null },
+    validation: { tenantCodePattern: '^[A-Z0-9-]{3,60}$', tenantSlugPattern: '^[a-z0-9-]+$', draftRetentionDays: 30, platformBaseDomain: null }
   };
 
   const loadedSettings: PlatformSettings = {
