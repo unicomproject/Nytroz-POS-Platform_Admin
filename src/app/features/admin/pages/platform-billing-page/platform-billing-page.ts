@@ -189,6 +189,8 @@ import { PlatformBillingApiService } from '../../services/platform-billing-api.s
     :host {
       color: #14213d;
       display: block;
+      max-width: 100%;
+      min-width: 0;
     }
     * {
       box-sizing: border-box;
@@ -196,6 +198,8 @@ import { PlatformBillingApiService } from '../../services/platform-billing-api.s
     .billing-page {
       display: grid;
       gap: 1.25rem;
+      max-width: 100%;
+      min-width: 0;
       position: relative;
     }
     .toast {

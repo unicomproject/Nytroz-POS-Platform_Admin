@@ -161,6 +161,8 @@ interface InvoiceTableColumn {
   styles: `
     :host {
       display: block;
+      max-width: 100%;
+      min-width: 0;
     }
     * {
       box-sizing: border-box;
@@ -170,6 +172,7 @@ interface InvoiceTableColumn {
       border: 1px solid #e5eaf2;
       border-radius: 13px;
       box-shadow: 0 7px 22px rgba(31, 51, 86, 0.045);
+      max-width: 100%;
       overflow: hidden;
     }
     .table-heading {
@@ -205,7 +208,9 @@ interface InvoiceTableColumn {
       padding: 0.45rem;
     }
     .table-scroll {
+      max-width: 100%;
       overflow-x: auto;
+      width: 100%;
     }
     table {
       border-collapse: collapse;

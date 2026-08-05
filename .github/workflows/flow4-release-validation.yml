@@ -1,0 +1,98 @@
+name: Flow 4 release validation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  flow4-release:
+    name: Real services and browser gate
+    runs-on: ubuntu-latest
+    environment: flow4-release
+    timeout-minutes: 45
+    env:
+      FLOW4_E2E_ENABLED: "true"
+      FLOW4_VALIDATION_MODE: release
+      FLOW4_BASE_URL: ${{ vars.FLOW4_BASE_URL }}
+      FLOW4_API_URL: ${{ vars.FLOW4_API_URL }}
+      QA_BASE_URL: ${{ vars.FLOW4_BASE_URL }}
+      FLOW4_ARTIFACT_DIR: .flow4/release-results
+      FLOW4_PROOF_FILE: .flow4/fixtures/valid-proof.pdf
+      FLOW4_ADMIN_EMAIL: ${{ secrets.FLOW4_ADMIN_EMAIL }}
+      FLOW4_ADMIN_PASSWORD: ${{ secrets.FLOW4_ADMIN_PASSWORD }}
+      FLOW4_SECOND_ADMIN_EMAIL: ${{ secrets.FLOW4_SECOND_ADMIN_EMAIL }}
+      FLOW4_SECOND_ADMIN_PASSWORD: ${{ secrets.FLOW4_SECOND_ADMIN_PASSWORD }}
+      FLOW4_VIEW_EMAIL: ${{ secrets.FLOW4_VIEW_EMAIL }}
+      FLOW4_VIEW_PASSWORD: ${{ secrets.FLOW4_VIEW_PASSWORD }}
+      FLOW4_NO_BILLING_EMAIL: ${{ secrets.FLOW4_NO_BILLING_EMAIL }}
+      FLOW4_NO_BILLING_PASSWORD: ${{ secrets.FLOW4_NO_BILLING_PASSWORD }}
+      FLOW4_OPERATION_ID: ${{ secrets.FLOW4_OPERATION_ID }}
+      FLOW4_AWAITING_TOKEN: ${{ secrets.FLOW4_AWAITING_TOKEN }}
+      FLOW4_SUBMITTED_TOKEN: ${{ secrets.FLOW4_SUBMITTED_TOKEN }}
+      FLOW4_SUBMITTED_PAYMENT_ID: ${{ secrets.FLOW4_SUBMITTED_PAYMENT_ID }}
+      FLOW4_DUPLICATE_ASSERTION_URL: ${{ secrets.FLOW4_DUPLICATE_ASSERTION_URL }}
+      FLOW4_APPROVABLE_PAYMENT_ID: ${{ secrets.FLOW4_APPROVABLE_PAYMENT_ID }}
+      FLOW4_PAID_PAYMENT_ID: ${{ secrets.FLOW4_PAID_PAYMENT_ID }}
+      FLOW4_REJECTABLE_PAYMENT_ID: ${{ secrets.FLOW4_REJECTABLE_PAYMENT_ID }}
+      FLOW4_REJECTED_TOKEN: ${{ secrets.FLOW4_REJECTED_TOKEN }}
+      FLOW4_INFO_PAYMENT_ID: ${{ secrets.FLOW4_INFO_PAYMENT_ID }}
+      FLOW4_ACTION_REQUIRED_TOKEN: ${{ secrets.FLOW4_ACTION_REQUIRED_TOKEN }}
+      FLOW4_CONFLICT_PAYMENT_ID: ${{ secrets.FLOW4_CONFLICT_PAYMENT_ID }}
+      FLOW4_EXPIRED_TOKEN: ${{ secrets.FLOW4_EXPIRED_TOKEN }}
+      FLOW4_INVALID_EVIDENCE_TOKEN: ${{ secrets.FLOW4_INVALID_EVIDENCE_TOKEN }}
+      FLOW4_UNCLEAN_PAYMENT_ID: ${{ secrets.FLOW4_UNCLEAN_PAYMENT_ID }}
+      FLOW4_NOTIFICATION_FAILED_PAYMENT_ID: ${{ secrets.FLOW4_NOTIFICATION_FAILED_PAYMENT_ID }}
+      FLOW4_CROSS_TENANT_PROOF_URL: ${{ secrets.FLOW4_CROSS_TENANT_PROOF_URL }}
+      FLOW4_RETRY_OPERATION_ID: ${{ secrets.FLOW4_RETRY_OPERATION_ID }}
+      FLOW4_ACTIVE_PAYMENT_ID: ${{ secrets.FLOW4_ACTIVE_PAYMENT_ID }}
+      FLOW4_HAPPY_OPERATION_ID: ${{ secrets.FLOW4_HAPPY_OPERATION_ID }}
+      FLOW4_HAPPY_PAYMENT_ID: ${{ secrets.FLOW4_HAPPY_PAYMENT_ID }}
+      FLOW4_HAPPY_TOKEN: ${{ secrets.FLOW4_HAPPY_TOKEN }}
+      AzureBlobStorage__ConnectionString: ${{ secrets.FLOW4_BLOB_CONNECTION_STRING }}
+      AzureCommunicationEmail__ConnectionString: ${{ secrets.FLOW4_ACS_CONNECTION_STRING }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install application dependencies
+        run: npm ci
+
+      - name: Build and unit test
+        run: |
+          npm run build
+          npm test -- --watch=false
+
+      - name: Install browser harness
+        working-directory: qa-dashboard
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          npm run fixtures
+
+      - name: Fail-fast release preflight
+        working-directory: qa-dashboard
+        run: npm run preflight -- --release
+
+      - name: Run all 20 real-browser scenarios
+        working-directory: qa-dashboard
+        run: npm run test:flow4
+
+      - name: Upload Flow 4 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flow4-release-evidence-${{ github.run_id }}
+          path: |
+            qa-dashboard/.flow4/release-results
+            qa-dashboard/test-results/flow4-html
+            qa-dashboard/test-results/flow4-results.json
+            qa-dashboard/test-results/flow4-junit.xml
+          if-no-files-found: warn
+          retention-days: 30

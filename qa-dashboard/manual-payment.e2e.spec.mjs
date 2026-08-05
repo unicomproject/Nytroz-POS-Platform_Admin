@@ -10,23 +10,23 @@ import { test, expect } from '@playwright/test';
 
 const UI = process.env.FLOW4_BASE_URL || process.env.QA_BASE_URL || 'http://localhost:4200';
 const API = process.env.FLOW4_API_URL || `${UI}/api/v1`;
-const enabled = process.env.FLOW4_E2E_ENABLED === 'true';
+const validationMode = (process.env.FLOW4_VALIDATION_MODE || 'local').toLowerCase();
+const releaseMode = validationMode === 'release';
 const value = (name) => process.env[name] || '';
 
 test.describe.configure({ mode: 'serial' });
 test.describe('Flow 4 — Manual Payment canonical E2E', () => {
-  test.beforeEach(() => test.skip(!enabled, 'Blocked by environment: FLOW4_E2E_ENABLED and controlled runtime fixtures are required.'));
-
   test('E2E 1 — valid prepaid tenant creation reaches Pending Payment', async ({ page }) => {
     requireValues('FLOW4_OPERATION_ID', 'FLOW4_ADMIN_EMAIL', 'FLOW4_ADMIN_PASSWORD');
     await login(page, value('FLOW4_ADMIN_EMAIL'), value('FLOW4_ADMIN_PASSWORD'));
     await page.goto(`${UI}/admin/tenants/onboarding/operations/${encodeURIComponent(value('FLOW4_OPERATION_ID'))}`);
     await expect(page.getByText('Tenant created — payment pending')).toBeVisible();
-    await expect(page.getByText('Awaiting Payment')).toBeVisible();
+    await expect(page.getByText('Awaiting Payment', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('Account ready').locator('..')).not.toContainText('Confirmed');
   });
 
   test('E2E 2 — recipient opens secure payment status with no checkout', async ({ page }) => {
+    requireValues('FLOW4_AWAITING_TOKEN');
     await openRecipient(page, 'FLOW4_AWAITING_TOKEN');
     await expect(page.getByText('Payment instructions')).toBeVisible();
     await expect(page.getByText('Invoice', { exact: true }).first()).toBeVisible();
@@ -45,10 +45,10 @@ test.describe('Flow 4 — Manual Payment canonical E2E', () => {
   });
 
   test('E2E 4 — duplicate network retry remains one logical submission', async ({ page }) => {
+    requireValues('FLOW4_SUBMITTED_TOKEN', 'FLOW4_SUBMITTED_PAYMENT_ID', 'FLOW4_DUPLICATE_ASSERTION_URL');
     await openRecipient(page, 'FLOW4_SUBMITTED_TOKEN');
     await expect(page.getByText('Submission received')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Submit Payment Details' })).toHaveCount(0);
-    requireValues('FLOW4_SUBMITTED_PAYMENT_ID', 'FLOW4_DUPLICATE_ASSERTION_URL');
     const result = await page.request.get(value('FLOW4_DUPLICATE_ASSERTION_URL'));
     expect(result.ok()).toBe(true);
     expect((await result.json()).logicalSubmissionCount).toBe(1);
@@ -65,6 +65,7 @@ test.describe('Flow 4 — Manual Payment canonical E2E', () => {
   });
 
   test('E2E 6 — evidence is opened only through the private proof endpoint', async ({ page }) => {
+    requireValues('FLOW4_SUBMITTED_PAYMENT_ID');
     await loginAdmin(page); await openAdminPayment(page, 'FLOW4_SUBMITTED_PAYMENT_ID');
     const proofRequest = page.waitForResponse((response) => response.url().includes('/proof/') && response.request().method() === 'GET');
     await page.getByRole('button', { name: 'Preview securely' }).first().click();
@@ -74,6 +75,7 @@ test.describe('Flow 4 — Manual Payment canonical E2E', () => {
   });
 
   test('E2E 7 — approving payment reaches Paid and Pending Activation only', async ({ page }) => {
+    requireValues('FLOW4_APPROVABLE_PAYMENT_ID');
     await loginAdmin(page); await openAdminPayment(page, 'FLOW4_APPROVABLE_PAYMENT_ID');
     await page.getByRole('button', { name: 'Approve' }).click();
     await page.getByLabel(/I reviewed the expected amount/).check();
@@ -84,6 +86,7 @@ test.describe('Flow 4 — Manual Payment canonical E2E', () => {
   });
 
   test('E2E 8 — authorized activation makes tenant active and queues invitation', async ({ page }) => {
+    requireValues('FLOW4_PAID_PAYMENT_ID');
     await loginAdmin(page); await openAdminPayment(page, 'FLOW4_PAID_PAYMENT_ID');
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Activate tenant' }).click();
@@ -92,6 +95,7 @@ test.describe('Flow 4 — Manual Payment canonical E2E', () => {
   });
 
   test('E2E 9 — reviewer rejects with reason and recipient sees safe outcome', async ({ page }) => {
+    requireValues('FLOW4_REJECTABLE_PAYMENT_ID', 'FLOW4_REJECTED_TOKEN');
     await loginAdmin(page); await openAdminPayment(page, 'FLOW4_REJECTABLE_PAYMENT_ID');
     await page.getByRole('button', { name: 'Reject' }).click();
     await page.getByLabel('Actionable note').fill('The receipt could not be verified. Please submit a clear replacement.');
@@ -102,6 +106,7 @@ test.describe('Flow 4 — Manual Payment canonical E2E', () => {
   });
 
   test('E2E 10 — request information supports correction and immutable history', async ({ page }) => {
+    requireValues('FLOW4_INFO_PAYMENT_ID', 'FLOW4_ACTION_REQUIRED_TOKEN');
     await loginAdmin(page); await openAdminPayment(page, 'FLOW4_INFO_PAYMENT_ID');
     await page.getByRole('button', { name: 'Request information' }).click();
     await page.getByLabel('Actionable note').fill('Upload a clearer proof showing the complete transaction reference.');
@@ -113,7 +118,7 @@ test.describe('Flow 4 — Manual Payment canonical E2E', () => {
   });
 
   test('E2E 11 — stale concurrent review reports conflict and reload', async ({ browser }) => {
-    requireValues('FLOW4_CONFLICT_PAYMENT_ID');
+    requireValues('FLOW4_CONFLICT_PAYMENT_ID', 'FLOW4_ADMIN_EMAIL', 'FLOW4_ADMIN_PASSWORD', 'FLOW4_SECOND_ADMIN_EMAIL', 'FLOW4_SECOND_ADMIN_PASSWORD');
     const first = await browser.newPage(); const second = await browser.newPage();
     await login(first, value('FLOW4_ADMIN_EMAIL'), value('FLOW4_ADMIN_PASSWORD'));
     await login(second, value('FLOW4_SECOND_ADMIN_EMAIL'), value('FLOW4_SECOND_ADMIN_PASSWORD'));
@@ -142,6 +147,7 @@ test.describe('Flow 4 — Manual Payment canonical E2E', () => {
   });
 
   test('E2E 14 — expired payment link exposes no invoice or payment data', async ({ page }) => {
+    requireValues('FLOW4_EXPIRED_TOKEN');
     await openRecipient(page, 'FLOW4_EXPIRED_TOKEN');
     await expect(page.getByText('Payment link unavailable')).toBeVisible();
     await expect(page.getByText(/invalid or expired/i)).toBeVisible();
@@ -149,6 +155,7 @@ test.describe('Flow 4 — Manual Payment canonical E2E', () => {
   });
 
   test('E2E 15 — invalid and unclean evidence is blocked', async ({ page }) => {
+    requireValues('FLOW4_INVALID_EVIDENCE_TOKEN', 'FLOW4_UNCLEAN_PAYMENT_ID');
     await openRecipient(page, 'FLOW4_INVALID_EVIDENCE_TOKEN');
     await page.getByLabel('Proof of payment').setInputFiles({ name: 'proof.exe', mimeType: 'application/octet-stream', buffer: Buffer.from('unsafe') });
     await expect(page.getByText(/Only PDF, JPEG, and PNG/)).toBeVisible();
@@ -158,6 +165,7 @@ test.describe('Flow 4 — Manual Payment canonical E2E', () => {
   });
 
   test('E2E 16 — notification failure has an intentional authorized resend', async ({ page }) => {
+    requireValues('FLOW4_NOTIFICATION_FAILED_PAYMENT_ID');
     await loginAdmin(page); await openAdminPayment(page, 'FLOW4_NOTIFICATION_FAILED_PAYMENT_ID');
     page.once('dialog', (dialog) => dialog.accept());
     const responsePromise = page.waitForResponse((response) => response.url().endsWith('/notification/resend'));
@@ -167,8 +175,12 @@ test.describe('Flow 4 — Manual Payment canonical E2E', () => {
   });
 
   test('E2E 17 — cross-tenant proof access is privacy-safe', async ({ page }) => {
-    await loginAdmin(page); requireValues('FLOW4_CROSS_TENANT_PROOF_URL');
-    const response = await page.request.get(value('FLOW4_CROSS_TENANT_PROOF_URL'));
+    requireValues('FLOW4_CROSS_TENANT_PROOF_URL'); await loginAdmin(page);
+    const authenticatedRequest = page.waitForRequest((request) =>
+      request.url().includes('/api/v1/platform-admin/') && request.headers()['authorization']?.startsWith('Bearer '));
+    await page.goto(`${UI}/admin/billing/manual-payments`);
+    const authorization = (await authenticatedRequest).headers()['authorization'];
+    const response = await page.request.get(value('FLOW4_CROSS_TENANT_PROOF_URL'), { headers: { authorization } });
     expect([403, 404]).toContain(response.status());
     expect(await response.text()).not.toMatch(/storageKey|sha256|blob|container/i);
   });
@@ -182,6 +194,7 @@ test.describe('Flow 4 — Manual Payment canonical E2E', () => {
   });
 
   test('E2E 19 — invitation resend exposes status but no raw token', async ({ page }) => {
+    requireValues('FLOW4_ACTIVE_PAYMENT_ID');
     await loginAdmin(page); await openAdminPayment(page, 'FLOW4_ACTIVE_PAYMENT_ID');
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Resend Tenant Admin invitation' }).click();
@@ -202,14 +215,22 @@ test.describe('Flow 4 — Manual Payment canonical E2E', () => {
 });
 
 function requireValues(...names) {
-  test.skip(names.some((name) => !value(name)), `Blocked by environment: missing ${names.filter((name) => !value(name)).join(', ')}.`);
+  const missing = names.filter((name) => !value(name));
+  if (missing.length === 0) return;
+  const reason = `Blocked by environment: missing ${missing.join(', ')}.`;
+  if (releaseMode) throw new Error(reason);
+  test.skip(true, reason);
 }
 
 async function login(page, email, password) {
-  test.skip(!email || !password, 'Blocked by environment: login credentials are missing.');
+  if (!email || !password) {
+    const reason = 'Blocked by environment: login credentials are missing.';
+    if (releaseMode) throw new Error(reason);
+    test.skip(true, reason);
+  }
   await page.goto(`${UI}/login`);
   await page.getByLabel('Email Address').fill(email);
-  await page.getByLabel('Password').fill(password);
+  await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Sign In' }).click();
   await expect(page).toHaveURL(/\/admin\//);
 }
