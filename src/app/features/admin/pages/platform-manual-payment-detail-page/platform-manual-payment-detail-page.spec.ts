@@ -72,4 +72,29 @@ describe('PlatformManualPaymentDetailPage', () => {
     expect(component.conflict()).toBe(true); expect(component.actionError()).toContain('updated by another reviewer');
     expect(billing['reviewManualPayment']).toHaveBeenCalledTimes(1);
   });
+
+  it('creates and revokes object URL on proof preview, clear, and component destroy', async () => {
+    const createSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:http://localhost/mock-blob-1');
+    const revokeSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    const mockBlob = new Blob(['sample-proof'], { type: 'application/pdf' });
+    billing['getManualPaymentProof'].mockReturnValue(of({ body: mockBlob }));
+
+    const fixture = await create();
+    const component = fixture.componentInstance;
+    const evidence = component.detail()!.evidence[0];
+
+    component.previewProof(evidence);
+    expect(billing['getManualPaymentProof']).toHaveBeenCalledWith('payment-1', evidence.id);
+    expect(createSpy).toHaveBeenCalledWith(mockBlob);
+
+    component.clearProof();
+    expect(revokeSpy).toHaveBeenCalledWith('blob:http://localhost/mock-blob-1');
+
+    // Test destroy revocation
+    component.previewProof(evidence);
+    fixture.destroy();
+    expect(revokeSpy).toHaveBeenCalledWith('blob:http://localhost/mock-blob-1');
+    createSpy.mockRestore();
+    revokeSpy.mockRestore();
+  });
 });
