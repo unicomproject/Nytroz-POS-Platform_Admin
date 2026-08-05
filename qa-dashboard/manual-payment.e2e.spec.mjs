@@ -154,6 +154,14 @@ test.describe('Flow 4 — Manual Payment canonical E2E', () => {
     await expect(page.getByText('Invoice number')).toHaveCount(0);
   });
 
+  test('E2E 14b — revoked payment link exposes no invoice or payment data', async ({ page }) => {
+    requireValues('FLOW4_REVOKED_TOKEN');
+    await openRecipient(page, 'FLOW4_REVOKED_TOKEN');
+    await expect(page.getByText('Payment link unavailable')).toBeVisible();
+    await expect(page.getByText(/invalid or expired/i)).toBeVisible();
+    await expect(page.getByText('Invoice number')).toHaveCount(0);
+  });
+
   test('E2E 15 — invalid and unclean evidence is blocked', async ({ page }) => {
     requireValues('FLOW4_INVALID_EVIDENCE_TOKEN', 'FLOW4_UNCLEAN_PAYMENT_ID');
     await openRecipient(page, 'FLOW4_INVALID_EVIDENCE_TOKEN');

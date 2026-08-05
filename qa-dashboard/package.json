@@ -9,6 +9,8 @@
     "acceptance": "node flow4-browser-acceptance.mjs",
     "preflight": "node flow4-preflight.mjs",
     "test:flow4": "playwright test manual-payment.e2e.spec.mjs --config playwright.config.mjs",
+    "test:flow4:fixtures": "node flow4-fixture-launcher.mjs",
+    "test:flow4:fixtures:unit": "node --test flow4-fixture-manifest.test.mjs",
     "test:flow4:release": "node flow4-preflight.mjs --release && playwright test manual-payment.e2e.spec.mjs --config playwright.config.mjs"
   },
   "keywords": [],
