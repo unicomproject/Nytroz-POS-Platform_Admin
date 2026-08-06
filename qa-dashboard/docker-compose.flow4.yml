@@ -38,7 +38,7 @@ services:
     image: mcr.microsoft.com/azure-storage/azurite:3.35.0
     container_name: oneverz-flow4-azurite
     restart: "no"
-    command: azurite-blob --blobHost 0.0.0.0 --location /data --silent
+    command: azurite-blob --blobHost 0.0.0.0 --location /data --silent --skipApiVersionCheck
     ports:
       - "127.0.0.1:10000:10000"
     networks: [flow4]

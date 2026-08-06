@@ -103,7 +103,7 @@ export class PlatformTenantOnboardingResultPage implements OnInit {
 
   resendInvitation(): void {
     const op = this.operation();
-    if (!op || !this.canResendInvitation() || this.currentTenantStatus() !== 'ACTIVE' || this.actionBusy()) return;
+    if (!op || !this.canResendInvitation() || !this.isActiveTenant() || this.actionBusy()) return;
     if (!confirm('Queue a new Tenant Admin invitation? No setup token will be displayed.')) return;
     this.actionBusy.set(true); this.actionError.set(null);
     this.tenants.resendTenantAdminInvitation(op.tenantId, createKey()).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
@@ -115,12 +115,19 @@ export class PlatformTenantOnboardingResultPage implements OnInit {
   title(op: TenantOnboardingOperation): string {
     if (op.status.startsWith('FAILED')) return 'Tenant created — follow-up needs attention';
     if (this.normalizePaymentStatus(op.paymentStatus) === 'AWAITING_PAYMENT') return 'Tenant created — payment pending';
-    if (this.normalizePaymentStatus(op.paymentStatus) === 'PAID' && this.currentTenantStatus() !== 'ACTIVE') return 'Payment approved — activation pending';
-    if (this.currentTenantStatus() === 'ACTIVE') return 'Tenant active — setup handoff in progress';
+    if (this.normalizePaymentStatus(op.paymentStatus) === 'PAID' && !this.isActiveTenant()) return 'Payment approved — activation pending';
+    if (this.isActiveTenant()) return 'Tenant active — setup handoff in progress';
     return 'Tenant onboarding status';
   }
 
   currentTenantStatus(): string { return this.tenant()?.status ?? this.payment()?.payment.tenantStatus ?? ''; }
+  isActiveTenant(): boolean {
+    if (normalizeTenantLifecycleStatus(this.currentTenantStatus()) === 'active') return true;
+    // Invitation handoff is only reached after activation; use as fallback while tenant projection loads.
+    const invite = (this.operation()?.invitationStatus ?? '').trim().toUpperCase();
+    const paid = this.normalizePaymentStatus(this.operation()?.paymentStatus ?? '') === 'PAID';
+    return paid && ['SENT', 'ACCEPTED', 'PENDING'].includes(invite);
+  }
   normalizePaymentStatus(value: string): string { return value === 'PENDING' ? 'AWAITING_PAYMENT' : value; }
   format(value: string | null | undefined): string { return titleCase(value); }
 
@@ -143,3 +150,7 @@ export class PlatformTenantOnboardingResultPage implements OnInit {
 }
 
 function createKey(): string { return globalThis.crypto?.randomUUID?.() ?? `onboarding-${Date.now()}-${Math.random().toString(36).slice(2)}`; }
+
+function normalizeTenantLifecycleStatus(value: string | null | undefined): string {
+  return (value ?? '').trim().toLowerCase().replace(/-/g, '_');
+}

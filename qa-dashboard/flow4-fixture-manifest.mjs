@@ -34,19 +34,24 @@ export function playwrightEnvironment(manifest, sourceEnvironment, dashboardRoot
     FLOW4_REJECTABLE_PAYMENT_ID: payment('REJECTABLE_PAYMENT'),
     FLOW4_REJECTED_TOKEN: secret(manifest, 'REJECTED', 'paymentToken'),
     FLOW4_INFO_PAYMENT_ID: payment('REQUEST_INFORMATION_ELIGIBLE'),
-    FLOW4_ACTION_REQUIRED_TOKEN: secret(manifest, 'ACTION_REQUIRED', 'paymentToken'),
+    // Same payment token: after admin requests information, recipient resumes on this link.
+    FLOW4_ACTION_REQUIRED_TOKEN: secret(manifest, 'REQUEST_INFORMATION_ELIGIBLE', 'paymentToken'),
     FLOW4_CONFLICT_PAYMENT_ID: payment('CONCURRENT_REVIEW'),
     FLOW4_EXPIRED_TOKEN: secret(manifest, 'EXPIRED_PAYMENT_ACCESS', 'paymentToken'),
     FLOW4_REVOKED_TOKEN: secret(manifest, 'REVOKED_PAYMENT_ACCESS', 'paymentToken'),
-    FLOW4_INVALID_EVIDENCE_TOKEN: secret(manifest, 'UNCLEAN_EVIDENCE', 'paymentToken'),
+    // Client-side invalid MIME check needs an editable recipient form (awaiting/action-required), not unclean-submitted.
+    FLOW4_INVALID_EVIDENCE_TOKEN: secret(manifest, 'ACTION_REQUIRED', 'paymentToken'),
     FLOW4_UNCLEAN_PAYMENT_ID: payment('UNCLEAN_EVIDENCE'),
     FLOW4_NOTIFICATION_FAILED_PAYMENT_ID: payment('NOTIFICATION_FAILED'),
     FLOW4_CROSS_TENANT_PROOF_URL: `${api}/platform-admin/billing/manual-payments/${payment('CROSS_TENANT_PROOF')}/proof/${id(manifest, 'CROSS_TENANT_PROOF', 'evidenceId')}`,
     FLOW4_RETRY_OPERATION_ID: id(manifest, 'RETRYABLE_OPERATION', 'operationId'),
     FLOW4_ACTIVE_PAYMENT_ID: payment('ACTIVE_INVITATION_READY'),
+    FLOW4_ACTIVE_OPERATION_ID: id(manifest, 'ACTIVE_INVITATION_READY', 'operationId'),
     FLOW4_HAPPY_OPERATION_ID: id(manifest, 'COMPLETE_HAPPY_PATH', 'operationId'),
     FLOW4_HAPPY_PAYMENT_ID: payment('COMPLETE_HAPPY_PATH'),
     FLOW4_HAPPY_TOKEN: secret(manifest, 'COMPLETE_HAPPY_PATH', 'paymentToken'),
-    FLOW4_PROOF_FILE: sourceEnvironment.FLOW4_PROOF_FILE || resolve(dashboardRoot, '.flow4', 'fixtures', 'valid-proof.pdf')
+    FLOW4_PROOF_FILE: sourceEnvironment.FLOW4_PROOF_FILE || resolve(dashboardRoot, '.flow4', 'fixtures', 'valid-proof.pdf'),
+    // Fixture invoice numbers are INV-F4-*; tenant codes are F4-*. "FLOW4" does not match.
+    FLOW4_QUEUE_SEARCH: sourceEnvironment.FLOW4_QUEUE_SEARCH || 'INV-F4'
   };
 }

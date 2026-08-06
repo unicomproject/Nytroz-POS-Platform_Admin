@@ -184,7 +184,7 @@ export class PlatformManualPaymentDetailPage implements OnDestroy {
 
   resendInvitation(): void {
     const detail = this.detail();
-    if (!detail || !this.canResendInvitation() || detail.payment.tenantStatus !== 'ACTIVE' || this.invitationBusy()) return;
+    if (!detail || !this.canResendInvitation() || !this.isActiveTenantStatus(detail.payment.tenantStatus) || this.invitationBusy()) return;
     if (!confirm('Queue a new Tenant Admin invitation? This is separate from payment notifications.')) return;
     this.invitationBusy.set(true); this.actionError.set(null);
     this.tenants.resendTenantAdminInvitation(detail.payment.tenantId, createCommandKey()).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
@@ -194,6 +194,10 @@ export class PlatformManualPaymentDetailPage implements OnDestroy {
   }
 
   format(value: string | null | undefined): string { return titleCase(value); }
+
+  isActiveTenantStatus(value: string | null | undefined): boolean {
+    return normalizeTenantLifecycleStatus(value) === 'active';
+  }
 
   private loadHistory(paymentId: string): void {
     this.api.getManualPaymentHistory(paymentId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
@@ -205,4 +209,8 @@ export class PlatformManualPaymentDetailPage implements OnDestroy {
 
 function createCommandKey(): string {
   return globalThis.crypto?.randomUUID?.() ?? `command-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function normalizeTenantLifecycleStatus(value: string | null | undefined): string {
+  return (value ?? '').trim().toLowerCase().replace(/-/g, '_');
 }

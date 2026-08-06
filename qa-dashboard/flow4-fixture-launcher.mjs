@@ -36,11 +36,15 @@ function runCli(command, input, extra = []) {
 
 function runPlaywright(env) {
   const forwarded = process.argv.slice(2);
-  const focused = 'recipient opens secure payment status|user without billing view|billing-view-only user|expired payment link|revoked payment link';
-  const args = ['playwright', 'test', 'manual-payment.e2e.spec.mjs', '--config', 'playwright.config.mjs', '--grep', focused, ...forwarded];
+  // Chunk 6A: default to the full 21-scenario suite. Set FLOW4_PLAYWRIGHT_SCOPE=focused for the legacy 5-check smoke.
+  const scope = (process.env.FLOW4_PLAYWRIGHT_SCOPE || 'full').toLowerCase();
+  const args = ['playwright', 'test', 'manual-payment.e2e.spec.mjs', '--config', 'playwright.config.mjs', ...forwarded];
+  if (scope === 'focused') {
+    args.push('--grep', 'recipient opens secure payment status|user without billing view|billing-view-only user|expired payment link|revoked payment link');
+  }
   return new Promise((resolvePromise, reject) => {
     const child = spawn(process.platform === 'win32' ? 'npx.cmd' : 'npx', args, { cwd: here, env, stdio: 'inherit', windowsHide: true });
-    child.on('error', reject); child.on('close', code => code === 0 ? resolvePromise() : reject(new Error(`Focused Playwright exited with ${code}.`)));
+    child.on('error', reject); child.on('close', code => code === 0 ? resolvePromise() : reject(new Error(`Playwright exited with ${code}.`)));
   });
 }
 
