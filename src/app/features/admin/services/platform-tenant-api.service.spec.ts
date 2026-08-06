@@ -158,6 +158,28 @@ describe('PlatformTenantApiService', () => {
     expect(status).toBe('active');
   });
 
+  it('uses the canonical onboarding operation routes', () => {
+    const operation = { id: 'operation-1', draftId: 'draft-1', tenantId: 'tenant-1', status: 'FAILED_RETRYABLE',
+      provisioningStatus: 'COMPLETED', paymentStatus: 'AWAITING_PAYMENT', invitationStatus: 'NOT_ELIGIBLE',
+      attemptCount: 1, failureCode: 'email_failed', retryable: true, nextRetryAt: null, version: 2, updatedAt: null };
+    service.getOnboardingOperation('operation-1').subscribe();
+    httpTesting.expectOne('/api/v1/platform-admin/tenant-onboarding/operations/operation-1').flush({ success: true, message: 'ok', data: operation });
+    service.retryOnboardingOperation('operation-1').subscribe();
+    const retry = httpTesting.expectOne('/api/v1/platform-admin/tenant-onboarding/operations/operation-1/retry');
+    expect(retry.request.method).toBe('POST'); retry.flush({ success: true, message: 'ok', data: operation });
+    service.resendTenantAdminInvitation('tenant-1', 'invite-key').subscribe();
+    const resend = httpTesting.expectOne('/api/v1/platform-admin/tenant-onboarding/tenants/tenant-1/invitation/resend');
+    expect(resend.request.headers.get('Idempotency-Key')).toBe('invite-key');
+    resend.flush({ success: true, message: 'ok', data: operation });
+  });
+
+  it('adds an activation idempotency header when supplied', () => {
+    service.activateTenant('tenant-1', 'activation-key').subscribe();
+    const request = httpTesting.expectOne('/api/v1/platform-admin/tenants/tenant-1/activate');
+    expect(request.request.headers.get('Idempotency-Key')).toBe('activation-key');
+    request.flush({ success: true, message: 'ok', data: createTenantDetailApiDto() });
+  });
+
   it('calls POST /api/v1/platform-admin/tenants/{tenantId}/suspend and maps response data', () => {
     let status = '';
 

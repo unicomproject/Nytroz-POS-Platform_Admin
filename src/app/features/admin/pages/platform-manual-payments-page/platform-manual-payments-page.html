@@ -1,0 +1,28 @@
+<section class="queue-page">
+  <header class="page-heading"><div><nav aria-label="Breadcrumb"><a routerLink="/admin/billing">Billing</a><span>/</span><span>Manual payments</span></nav><h1>Manual payment review</h1><p>Review proof-backed tenant subscription payments without bypassing the payment lifecycle.</p></div><button type="button" class="button secondary" (click)="load()" [disabled]="loading()">Refresh</button></header>
+
+  <form class="filters card" (ngSubmit)="applyFilters()">
+    <label class="search">Search<input type="search" [ngModel]="search()" (ngModelChange)="search.set($event)" name="search" placeholder="Tenant, code, or invoice" /></label>
+    <label>Status<select [ngModel]="status()" (ngModelChange)="status.set($event)" name="status"><option value="">All statuses</option>@for (item of statuses; track item) { <option [value]="item">{{ formatStatus(item) }}</option> }</select></label>
+    <label>Tenant ID<input [ngModel]="tenantId()" (ngModelChange)="tenantId.set($event)" name="tenantId" /></label>
+    <label>Plan ID<input [ngModel]="planId()" (ngModelChange)="planId.set($event)" name="planId" /></label>
+    <label>Submitted from<input type="date" [ngModel]="submittedFrom()" (ngModelChange)="submittedFrom.set($event)" name="submittedFrom" /></label>
+    <label>Submitted to<input type="date" [ngModel]="submittedTo()" (ngModelChange)="submittedTo.set($event)" name="submittedTo" /></label>
+    <label>Sort by<select [ngModel]="sortBy()" (ngModelChange)="sortBy.set($event)" name="sortBy"><option value="submittedAt">Submitted date</option><option value="amount">Amount</option><option value="status">Status</option><option value="tenant">Tenant</option></select></label>
+    <label>Direction<select [ngModel]="sortDirection()" (ngModelChange)="sortDirection.set($event)" name="sortDirection"><option value="desc">Newest / high first</option><option value="asc">Oldest / low first</option></select></label>
+    <div class="filter-actions"><button type="submit" class="button primary">Apply filters</button><button type="button" class="button ghost" (click)="resetFilters()">Reset</button></div>
+  </form>
+
+  @if (error()) { <div class="state error" role="alert"><div><strong>Manual payments could not be loaded</strong><span>{{ error() }}</span></div><button type="button" class="button primary" (click)="load()">Try again</button></div> }
+  @else if (loading()) { <div class="state" aria-live="polite"><span class="spinner" aria-hidden="true"></span>Loading manual payments…</div> }
+  @else if (queue(); as data) {
+    @if (!data.items.length) { <div class="state"><div><strong>No manual payments match these filters</strong><span>Try a broader status or date range.</span></div></div> }
+    @else {
+      <div class="table-card"><table><caption class="sr-only">Manual payment review queue</caption><thead><tr><th scope="col">Tenant</th><th scope="col">Invoice</th><th scope="col">Plan</th><th scope="col">Expected</th><th scope="col">Submitted</th><th scope="col">Status</th><th scope="col">Submitted</th><th scope="col">Age</th><th scope="col"><span class="sr-only">Action</span></th></tr></thead><tbody>
+        @for (item of data.items; track item.paymentId) { <tr><td><strong>{{ item.tenantName }}</strong><span>{{ item.tenantCode }} · {{ formatStatus(item.tenantStatus) }}</span></td><td><strong>{{ item.invoiceNumber }}</strong><span>Due {{ item.invoiceDueAt ? (item.invoiceDueAt | date:'mediumDate') : 'not set' }}</span></td><td>{{ item.planName }}<span>{{ formatStatus(item.billingCycle) }}</span></td><td>{{ item.expectedAmount | number:'1.2-2' }} {{ item.currencyCode }}</td><td>{{ item.submittedAmount == null ? '—' : (item.submittedAmount | number:'1.2-2') }} {{ item.submittedAmount == null ? '' : item.currencyCode }}</td><td><app-manual-payment-status-badge [status]="item.status" /></td><td>{{ item.submittedAt ? (item.submittedAt | date:'short') : 'Not submitted' }}</td><td>{{ age(item.submittedAgeSeconds) }}</td><td><a class="row-action" [routerLink]="['/admin/billing/manual-payments', item.paymentId]">View review<span class="sr-only"> for {{ item.invoiceNumber }}</span></a></td></tr> }
+      </tbody></table></div>
+      <div class="mobile-cards">@for (item of data.items; track item.paymentId) { <article class="card"><div><strong>{{ item.tenantName }}</strong><app-manual-payment-status-badge [status]="item.status" /></div><p>{{ item.invoiceNumber }} · {{ item.planName }}</p><dl><div><dt>Expected</dt><dd>{{ item.expectedAmount | number:'1.2-2' }} {{ item.currencyCode }}</dd></div><div><dt>Submitted</dt><dd>{{ item.submittedAmount == null ? '—' : (item.submittedAmount | number:'1.2-2') }}</dd></div></dl><a class="row-action" [routerLink]="['/admin/billing/manual-payments', item.paymentId]">View review</a></article> }</div>
+      <nav class="pagination" aria-label="Manual payment pages"><span>Showing {{ ((data.pageNumber - 1) * data.pageSize) + 1 }}–{{ Math.min(data.pageNumber * data.pageSize, data.totalCount) }} of {{ data.totalCount }}</span><div><button type="button" class="button ghost" (click)="previousPage()" [disabled]="data.pageNumber <= 1" aria-label="Previous page">Previous</button><span>Page {{ data.pageNumber }} of {{ data.totalPages }}</span><button type="button" class="button ghost" (click)="nextPage()" [disabled]="data.pageNumber >= data.totalPages" aria-label="Next page">Next</button></div></nav>
+    }
+  }
+</section>

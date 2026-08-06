@@ -1,0 +1,141 @@
+<main class="recipient-shell">
+  <header class="brand"><span class="brand-mark" aria-hidden="true">N</span><span>Nytroz secure billing</span></header>
+
+  @if (loading() && !access()) {
+    <section class="state-card" aria-live="polite"><div class="spinner" aria-hidden="true"></div><h1>Loading payment status</h1><p>Verifying your secure access…</p></section>
+  } @else if (loadError() && !access()) {
+    <section class="state-card error-state" role="alert">
+      <h1>{{ expiredOrInvalid() ? 'Payment link unavailable' : 'Payment status unavailable' }}</h1>
+      <p>{{ loadError() }}</p>
+      @if (!expiredOrInvalid()) { <button type="button" class="button primary" (click)="loadAccess()">Try again</button> }
+    </section>
+  } @else if (access(); as payment) {
+    <section class="page-heading">
+      <div><p class="eyebrow">Manual payment</p><h1>{{ payment.tenantName || payment.tenantReference }}</h1><p>Secure invoice and payment-status portal</p></div>
+      <app-manual-payment-status-badge [status]="payment.paymentStatus" />
+    </section>
+
+    @if (loadError()) { <div class="alert error" role="alert">{{ loadError() }}</div> }
+    @if (submitSuccess()) { <div class="alert success" role="status">{{ submitSuccess() }}</div> }
+    @if (submitError()) { <div class="alert error" role="alert">{{ submitError() }}</div> }
+
+    <section class="status-card" aria-labelledby="status-title">
+      <div>
+        <p class="eyebrow">Current status</p><h2 id="status-title">
+          @switch (payment.paymentStatus) {
+            @case ('AWAITING_PAYMENT') { Payment details are required }
+            @case ('PAYMENT_SUBMITTED') { Submission received }
+            @case ('UNDER_REVIEW') { Payment is under review }
+            @case ('ACTION_REQUIRED') { More information is required }
+            @case ('REJECTED') { Payment was not approved }
+            @case ('PAID') { Payment approved }
+            @case ('FAILED') { Payment processing failed }
+            @case ('EXPIRED') { Payment request expired }
+            @case ('CANCELLED') { Payment request cancelled }
+            @default { {{ formatStatus(payment.paymentStatus) }} }
+          }
+        </h2>
+        @if (payment.paymentStatus === 'PAYMENT_SUBMITTED' || payment.paymentStatus === 'UNDER_REVIEW') {
+          <p>Your submission is safely recorded. Please wait while the billing team reviews the evidence.</p>
+        } @else if (payment.paymentStatus === 'PAID') {
+          <p>The payment is approved. Tenant activation and the Tenant Admin invitation remain separate steps.</p>
+        } @else if (payment.paymentStatus === 'ACTION_REQUIRED' || payment.paymentStatus === 'REJECTED') {
+          <p>{{ reviewerMessage() || 'Review the requested changes and submit corrected payment details.' }}</p>
+        } @else if (payment.paymentStatus === 'FAILED' || payment.paymentStatus === 'EXPIRED' || payment.paymentStatus === 'CANCELLED') {
+          <p>This status cannot be treated as a successful payment. Contact the billing team for assistance.</p>
+        } @else {
+          <p>Use the invoice and instructions below to complete the manual payment.</p>
+        }
+      </div>
+      <button type="button" class="button secondary" (click)="loadAccess(true)" [disabled]="loading()">Refresh status</button>
+    </section>
+
+    <div class="summary-grid">
+      <article class="card"><h2>Tenant</h2><dl>
+        <div><dt>Name</dt><dd>{{ payment.tenantName || 'Not available' }}</dd></div>
+        <div><dt>Reference</dt><dd>{{ payment.tenantReference }}</dd></div>
+        <div><dt>Status</dt><dd>{{ formatStatus(payment.tenantStatus) }}</dd></div>
+        <div><dt>Admin invitation</dt><dd>{{ formatStatus(payment.invitationStatus) }}</dd></div>
+      </dl></article>
+      <article class="card"><h2>Subscription</h2><dl>
+        <div><dt>Plan</dt><dd>{{ payment.planName }}</dd></div>
+        <div><dt>Billing cycle</dt><dd>{{ formatStatus(payment.billingCycle) }}</dd></div>
+        <div><dt>Status</dt><dd>{{ formatStatus(payment.subscriptionStatus) }}</dd></div>
+        <div><dt>Period</dt><dd>{{ payment.subscriptionPeriodStart ? (payment.subscriptionPeriodStart | date:'mediumDate') : 'Not available' }} – {{ payment.subscriptionPeriodEnd ? (payment.subscriptionPeriodEnd | date:'mediumDate') : 'Ongoing' }}</dd></div>
+      </dl></article>
+      <article class="card invoice-card"><div class="card-heading"><h2>Invoice</h2><button type="button" class="text-button" (click)="openInvoice()">View invoice</button></div><dl>
+        <div><dt>Invoice number</dt><dd>{{ payment.invoiceNumber }}</dd></div>
+        <div><dt>Status</dt><dd>{{ formatStatus(payment.invoiceStatus) }}</dd></div>
+        <div><dt>Subtotal</dt><dd>{{ payment.subtotalAmount | number:'1.2-2' }} {{ payment.currencyCode }}</dd></div>
+        <div><dt>Tax</dt><dd>{{ payment.taxAmount | number:'1.2-2' }} {{ payment.currencyCode }}</dd></div>
+        <div class="total"><dt>Total due</dt><dd>{{ payment.totalAmount | number:'1.2-2' }} {{ payment.currencyCode }}</dd></div>
+        <div><dt>Due date</dt><dd>{{ payment.dueAt ? (payment.dueAt | date:'mediumDate') : 'Not specified' }}</dd></div>
+      </dl></article>
+    </div>
+
+    <article class="card instructions"><h2>Payment instructions</h2><p>{{ payment.instructions }}</p><ul>
+      <li>Use invoice <strong>{{ payment.invoiceNumber }}</strong> as the payment context.</li>
+      <li>Submit the exact total of <strong>{{ payment.expectedAmount | number:'1.2-2' }} {{ payment.currencyCode }}</strong>.</li>
+      <li>The server validates the file type, contents, amount, currency, and malware scan.</li>
+    </ul></article>
+
+    @if (payment.submittedAt) {
+      <article class="card"><h2>Latest submission</h2><dl class="submission-grid">
+        <div><dt>Reference</dt><dd>{{ payment.referenceSuffix || 'Protected' }}</dd></div>
+        <div><dt>Amount</dt><dd>{{ payment.submittedAmount | number:'1.2-2' }} {{ payment.currencyCode }}</dd></div>
+        <div><dt>Payment date</dt><dd>{{ payment.paymentDate | date:'mediumDate' }}</dd></div>
+        <div><dt>Submitted</dt><dd>{{ payment.submittedAt | date:'medium' }}</dd></div>
+      </dl>
+      @if (payment.evidence.length) { <h3>Evidence</h3><ul class="evidence-list">@for (item of payment.evidence; track item.id) {
+        <li><span>{{ item.fileName }} · {{ (item.fileSize / 1024) | number:'1.0-0' }} KiB</span><strong>{{ formatStatus(item.scanStatus) }}</strong></li>
+      }</ul> }
+    </article>
+    }
+
+    @if (canSubmit()) {
+      <section class="card form-card" aria-labelledby="payment-form-title">
+        <div class="card-heading"><div><p class="eyebrow">{{ isCorrection() ? 'Correction' : 'Payment evidence' }}</p><h2 id="payment-form-title">{{ isCorrection() ? 'Update Payment Details' : 'Submit Payment Details' }}</h2></div></div>
+        <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+          <div class="form-grid">
+            <label>Payment method<select formControlName="paymentMethod"><option value="bank_transfer">Bank transfer</option><option value="cash_deposit">Cash deposit</option></select></label>
+            <label>Transaction/reference number<input formControlName="bankOrTransactionReference" autocomplete="off" maxlength="120" />
+              @if (form.controls.bankOrTransactionReference.touched && form.controls.bankOrTransactionReference.invalid) { <span class="field-error">A transaction/reference number is required.</span> }
+            </label>
+            <label>Submitted amount<input formControlName="submittedAmount" type="number" min="0.01" step="0.01" inputmode="decimal" />
+              @if (form.controls.submittedAmount.touched && form.controls.submittedAmount.invalid) { <span class="field-error">Enter a positive amount.</span> }
+            </label>
+            <label>Currency<input formControlName="currencyCode" readonly /></label>
+            <label>Payment date<input formControlName="paymentDate" type="date" [max]="maxPaymentDate" />
+              @if (form.controls.paymentDate.touched && form.controls.paymentDate.invalid) { <span class="field-error">Select the payment date.</span> }
+            </label>
+            <label class="wide">Note (optional)<textarea formControlName="payerNote" maxlength="500" rows="3"></textarea></label>
+          </div>
+          <div class="drop-zone" (dragover)="$event.preventDefault()" (drop)="onDrop($event)">
+            <label for="payment-proof"><strong>Proof of payment</strong><span>PDF, JPEG, or PNG · maximum 10 MiB</span></label>
+            <input id="payment-proof" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" (change)="chooseFile($event)" />
+            @if (selectedFile(); as file) { <div class="file-summary"><span>{{ file.name }} · {{ (file.size / 1024) | number:'1.0-0' }} KiB</span><button type="button" class="text-button danger-text" (click)="removeFile()">Remove</button></div> }
+            @if (fileError()) { <span class="field-error" role="alert">{{ fileError() }}</span> }
+          </div>
+          @if (submitting()) { <div class="progress" role="status" aria-live="polite"><div [style.width.%]="uploadProgress()"></div><span>Uploading and validating… {{ uploadProgress() }}%</span></div> }
+          <div class="form-actions"><button type="submit" class="button primary" [disabled]="submitting()">{{ submitting() ? 'Submitting…' : (isCorrection() ? 'Update Payment Details' : 'Submit Payment Details') }}</button></div>
+        </form>
+      </section>
+    }
+
+    <section class="card history" aria-labelledby="history-title"><h2 id="history-title">Status history</h2>
+      @if (historyError()) { <p class="inline-error">History is temporarily unavailable. {{ historyError() }}</p> }
+      @if (!history().length && !historyError()) { <p>No status events are available yet.</p> }
+      <ol>@for (item of history(); track item.id) { <li><span class="timeline-dot" aria-hidden="true"></span><div><strong>{{ formatStatus(item.action) }}</strong><p>{{ formatStatus(item.statusBefore) }} → {{ formatStatus(item.statusAfter) }}</p>@if (item.note) { <p>{{ item.note }}</p> }<time>{{ item.createdAt | date:'medium' }}</time></div></li> }</ol>
+    </section>
+
+    @if (invoiceOpen()) {
+      <div class="dialog-backdrop" (click)="closeInvoice()"></div><section class="invoice-dialog" role="dialog" aria-modal="true" aria-labelledby="invoice-dialog-title">
+        <div class="card-heading"><h2 id="invoice-dialog-title">Invoice {{ payment.invoiceNumber }}</h2><button type="button" class="icon-button" aria-label="Close invoice" (click)="closeInvoice()">×</button></div>
+        @if (invoiceLoading()) { <p>Loading authorized invoice…</p> } @else if (invoiceError()) { <p role="alert" class="inline-error">{{ invoiceError() }}</p> } @else {
+          <dl><div><dt>Tenant</dt><dd>{{ payment.tenantName }}</dd></div><div><dt>Subtotal</dt><dd>{{ payment.subtotalAmount | number:'1.2-2' }} {{ payment.currencyCode }}</dd></div><div><dt>Tax</dt><dd>{{ payment.taxAmount | number:'1.2-2' }} {{ payment.currencyCode }}</dd></div><div class="total"><dt>Total</dt><dd>{{ payment.totalAmount | number:'1.2-2' }} {{ payment.currencyCode }}</dd></div></dl>
+          <p class="privacy-note">This is an authorized invoice view. The current backend contract does not expose a public document URL.</p>
+        }
+      </section>
+    }
+  }
+</main>

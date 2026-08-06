@@ -61,6 +61,19 @@ export interface TenantCreateOptions {
   operatingModes: TenantCreateLookupOption[];
   subscriptionStatuses: TenantCreateLookupOption[];
   billingCycles: TenantCreateLookupOption[];
+  defaults: {
+    countryCode: string | null;
+    currencyCode: string | null;
+    timezone: string | null;
+    locale: string | null;
+    billingCycle: string | null;
+  };
+  validation: {
+    tenantCodePattern: string;
+    tenantSlugPattern: string;
+    draftRetentionDays: number;
+    platformBaseDomain: string | null;
+  };
 }
 
 export interface TenantCreateBusinessInfoForm {

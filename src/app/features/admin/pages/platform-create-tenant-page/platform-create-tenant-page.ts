@@ -1,6 +1,6 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { AbstractControl, FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import { TENANT_SUBSCRIPTION_TYPE_OPTIONS } from '../../constants/tenant-subscription-type.constants';
@@ -13,6 +13,7 @@ import {
   TenantCreateWizardState
 } from '../../models/platform-tenant-create.model';
 import { PlatformTenantApiService } from '../../services/platform-tenant-api.service';
+import { TenantOnboardingDraft, TenantOnboardingPayload } from '../../models/platform-tenant-onboarding.model';
 import { normalizeBillingCycleForApi } from '../../utils/billing-cycle.util';
 import {
   controlIssueMessage,
@@ -66,6 +67,8 @@ type WizardStep =
               <header class="step-header"><h2>Business Info</h2></header>
               <form [formGroup]="businessInfoForm" class="grid two">
                 <label><span>Tenant Code *</span><input formControlName="code" /></label>
+                <label><span>Tenant Slug *</span><input formControlName="tenantSlug" /></label>
+                <label><span>Requested Subdomain</span><input formControlName="requestedSubdomain" /></label>
                 <label><span>Business Name *</span><input formControlName="name" /></label>
                 <label><span>Legal Name</span><input formControlName="legalName" /></label>
                 <label><span>Registration Number</span><input formControlName="registrationNumber" /></label>
@@ -132,48 +135,45 @@ type WizardStep =
                     }
                   </select>
                 </label>
-                <label><span>Address Line 1</span><input formControlName="addressLine1" /></label>
-                <label><span>City</span><input formControlName="addressCity" /></label>
-                <label>
-                  <span>Address Country</span>
-                  <select formControlName="addressCountryCode">
-                    <option value="">Same as business country</option>
-                    @for (item of createOptions().countryCodes; track item.value) {
-                      <option [value]="item.value">{{ item.label }}</option>
-                    }
-                  </select>
-                  @if (fieldMessage(businessInfoForm.controls.addressCountryCode, 'Address country')) {
-                    <small class="error">{{ fieldMessage(businessInfoForm.controls.addressCountryCode, 'Address country') }}</small>
-                  }
-                </label>
               </form>
             }
 
             @case ('plan-selection') {
-              <header class="step-header"><h2>Plan Selection</h2></header>
+              <header class="step-header"><h2>Business & Contact Information</h2></header>
+              <form [formGroup]="businessInfoForm" class="grid two">
+                <label><span>Registered Address Line 1 *</span><input formControlName="addressLine1" /></label>
+                <label><span>City</span><input formControlName="addressCity" /></label>
+                <label><span>Address Country *</span><select formControlName="addressCountryCode">
+                  <option value="">Select country</option>
+                  @for (item of createOptions().countryCodes; track item.value) { <option [value]="item.value">{{ item.label }}</option> }
+                </select></label>
+                <label><span>Primary Contact Name *</span><input formControlName="primaryContactName" /></label>
+                <label><span>Primary Contact Email *</span><input type="email" formControlName="primaryContactEmail" /></label>
+                <label><span>Primary Contact Phone *</span><input formControlName="primaryContactPhone" /></label>
+                <label><span>Website</span><input type="url" formControlName="websiteUrl" /></label>
+                <label><span>Billing Contact Name *</span><input formControlName="billingContactName" /></label>
+                <label><span>Billing Contact Email *</span><input type="email" formControlName="billingContactEmail" /></label>
+                <label><span>Support Contact Name</span><input formControlName="supportContactName" /></label>
+                <label><span>Support Contact Email</span><input type="email" formControlName="supportContactEmail" /></label>
+              </form>
+            }
+
+            @case ('limits-addons') {
+              <header class="step-header"><h2>Subscription Plan</h2></header>
               <form [formGroup]="planSelectionForm">
                 <label><span>Subscription Plan *</span></label>
                 <div class="plan-grid">
                   @for (plan of createOptions().plans; track plan.id) {
                     <article class="plan-card" [class.selected]="planSelectionForm.controls.subscriptionPlanId.value === plan.id">
-                      <header>
-                        <strong>{{ plan.name }}</strong>
-                        <small>{{ plan.planCode }} • {{ plan.billingCycle }}</small>
-                      </header>
+                      <header><strong>{{ plan.name }}</strong><small>{{ plan.planCode }} • {{ plan.billingCycle }}</small></header>
                       <p>{{ plan.description || 'No description provided.' }}</p>
-                      <div class="plan-meta">
-                        <span>Price: {{ plan.baseCurrency }} {{ plan.basePrice }}</span>
-                        <span>Limits: {{ plan.maxOutlets ?? '—' }}/{{ plan.maxTills ?? '—' }}/{{ plan.maxUsers ?? '—' }}</span>
-                      </div>
+                      <div class="plan-meta"><span>Price: {{ plan.baseCurrency }} {{ plan.basePrice }}</span></div>
                       <button type="button" class="btn outline" (click)="selectPlan(plan.id)">Select</button>
                     </article>
                   }
                 </div>
               </form>
-            }
-
-            @case ('limits-addons') {
-              <header class="step-header"><h2>Limits & Add-ons</h2></header>
+              <h3>Limits & Add-ons</h3>
               <form [formGroup]="limitsAddonsForm" class="grid three">
                 <label><span>Max Outlets *</span><input type="number" min="1" formControlName="maxOutlets" /></label>
                 <label><span>Max Tills *</span><input type="number" min="1" formControlName="maxTills" /></label>
@@ -348,6 +348,12 @@ type WizardStep =
 
       <footer class="action-bar">
         <button type="button" class="btn outline" (click)="goBack()" [disabled]="isSaving()">Back</button>
+        <span class="save-state" aria-live="polite">
+          @if (saveState() === 'saving') { Saving draft... }
+          @else if (saveState() === 'saved') { Saved {{ lastSavedAt() }} }
+          @else if (saveState() === 'failed') { Draft save failed. Retry is available. }
+        </span>
+        <button type="button" class="btn outline" (click)="saveDraft()" [disabled]="isSaving() || isLoadingOptions()">Save Draft</button>
         @if (currentStep() !== 'review-create') {
           <button type="button" class="btn primary" (click)="nextStep()" [disabled]="isSaving() || isLoadingOptions() || !isCurrentStepValid()">Next</button>
         } @else {
@@ -423,15 +429,16 @@ export class PlatformCreateTenantPage implements OnInit {
   private readonly api = inject(PlatformTenantApiService);
   private readonly apiError = inject(ApiErrorService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   readonly steps = [
-    { key: 'business-info' as WizardStep, label: 'Business Info' },
-    { key: 'plan-selection' as WizardStep, label: 'Plan Selection' },
-    { key: 'limits-addons' as WizardStep, label: 'Limits & Add-ons' },
+    { key: 'business-info' as WizardStep, label: 'Tenant Basic Details' },
+    { key: 'plan-selection' as WizardStep, label: 'Business & Contact Information' },
+    { key: 'limits-addons' as WizardStep, label: 'Subscription Plan' },
+    { key: 'billing-subscription' as WizardStep, label: 'Billing / Payment Setup' },
     { key: 'feature-entitlements' as WizardStep, label: 'Feature Entitlements' },
-    { key: 'tenant-admin' as WizardStep, label: 'Tenant Admin' },
-    { key: 'billing-subscription' as WizardStep, label: 'Billing & Subscription' },
-    { key: 'review-create' as WizardStep, label: 'Review & Create' }
+    { key: 'tenant-admin' as WizardStep, label: 'Tenant Admin User' },
+    { key: 'review-create' as WizardStep, label: 'Review, Create & Activation' }
   ];
 
   readonly subscriptionTypeOptions = TENANT_SUBSCRIPTION_TYPE_OPTIONS;
@@ -450,7 +457,9 @@ export class PlatformCreateTenantPage implements OnInit {
     businessTypes: [],
     operatingModes: [],
     subscriptionStatuses: [],
-    billingCycles: []
+    billingCycles: [],
+    defaults: { countryCode: null, currencyCode: null, timezone: null, locale: null, billingCycle: null },
+    validation: { tenantCodePattern: '^[A-Z0-9-]{3,60}$', tenantSlugPattern: '^[a-z0-9-]+$', draftRetentionDays: 30, platformBaseDomain: null }
   });
   readonly addonQuantities = signal<Record<string, number>>({});
   readonly selectedFeatureIds = signal<string[]>([]);
@@ -458,22 +467,38 @@ export class PlatformCreateTenantPage implements OnInit {
   readonly isSaving = signal(false);
   readonly errorMessage = signal<string | null>(null);
   readonly countryOptionsLoadError = signal<string | null>(null);
+  readonly draftId = signal<string | null>(null);
+  readonly draftVersion = signal<number | null>(null);
+  readonly progressPercent = signal(0);
+  readonly saveState = signal<'idle' | 'saving' | 'saved' | 'failed'>('idle');
+  readonly lastSavedAt = signal<string | null>(null);
+  private finalizationKey: string | null = null;
 
   readonly businessInfoForm = this.fb.nonNullable.group({
     code: ['', Validators.required],
+    tenantSlug: ['', Validators.required],
+    requestedSubdomain: [''],
     name: ['', Validators.required],
-    legalName: [''],
+    legalName: ['', Validators.required],
     registrationNumber: [''],
     taxNumber: [''],
     baseCurrency: ['', [Validators.required, isoCurrencyCodeValidator()]],
     defaultTimezone: ['', Validators.required],
     defaultLocale: ['', Validators.required],
     operatingMode: ['', Validators.required],
-    businessType: [''],
+    businessType: ['', Validators.required],
     countryCode: ['', [Validators.required, isoCountryCodeValidator()]],
-    addressLine1: [''],
+    addressLine1: ['', Validators.required],
     addressCity: [''],
-    addressCountryCode: ['', isoCountryCodeValidator()]
+    addressCountryCode: ['', [Validators.required, isoCountryCodeValidator()]],
+    primaryContactName: ['', Validators.required],
+    primaryContactEmail: ['', [Validators.required, Validators.email]],
+    primaryContactPhone: ['', Validators.required],
+    websiteUrl: [''],
+    billingContactName: ['', Validators.required],
+    billingContactEmail: ['', [Validators.required, Validators.email]],
+    supportContactName: [''],
+    supportContactEmail: ['', Validators.email]
   });
 
   readonly planSelectionForm = this.fb.nonNullable.group({
@@ -512,6 +537,10 @@ export class PlatformCreateTenantPage implements OnInit {
 
   ngOnInit(): void {
     this.loadCreateOptions();
+    const draftId = this.route.snapshot.paramMap.get('draftId');
+    if (draftId) {
+      this.loadDraft(draftId);
+    }
   }
 
   stepIndex(step: WizardStep): number {
@@ -526,6 +555,7 @@ export class PlatformCreateTenantPage implements OnInit {
     const index = this.stepIndex(this.currentStep());
     if (index < this.steps.length - 1) {
       this.currentStep.set(this.steps[index + 1].key);
+      this.saveDraft();
     }
   }
 
@@ -603,20 +633,37 @@ export class PlatformCreateTenantPage implements OnInit {
       return;
     }
 
-    const state = this.buildWizardState();
-    const request = mapCreateTenantRequest(state);
+    if (!this.draftId()) {
+      this.saveDraft(() => this.finalizeDraft());
+      return;
+    }
+    this.finalizeDraft();
+  }
 
+  saveDraft(afterSave?: () => void): void {
+    if (this.isSaving()) {
+      return;
+    }
+    const payload = this.buildOnboardingPayload();
+    const step = this.stepIndex(this.currentStep()) + 1;
     this.isSaving.set(true);
+    this.saveState.set('saving');
     this.errorMessage.set(null);
-    this.api.createTenant(request).subscribe({
-      next: (tenant) => {
+    const request$ = this.draftId() && this.draftVersion()
+      ? this.api.saveOnboardingDraft(this.draftId()!, this.draftVersion()!, payload, step)
+      : this.api.createOnboardingDraft(payload, step);
+    request$.subscribe({
+      next: (draft) => {
+        this.applyDraftMetadata(draft);
         this.isSaving.set(false);
-        void this.router.navigate(['/admin/tenants', tenant.id]);
+        this.saveState.set('saved');
+        this.lastSavedAt.set(new Date(draft.updatedAt ?? draft.createdAt).toLocaleTimeString());
+        afterSave?.();
       },
       error: (error) => {
-        this.applyServerFieldErrors(error);
-        this.errorMessage.set(this.apiError.toSafeMessage(error));
         this.isSaving.set(false);
+        this.saveState.set('failed');
+        this.errorMessage.set(this.apiError.toSafeMessage(error));
       }
     });
   }
@@ -646,21 +693,17 @@ export class PlatformCreateTenantPage implements OnInit {
     const step = this.currentStep();
 
     if (step === 'business-info') {
-      this.businessInfoForm.markAllAsTouched();
-      return this.businessInfoForm.valid;
+      return this.collectStepIssues(step).length === 0;
     }
 
     if (step === 'plan-selection') {
-      this.planSelectionForm.markAllAsTouched();
-      if (!this.planSelectionForm.valid) {
-        this.errorMessage.set('Please select a subscription plan.');
-      }
-      return this.planSelectionForm.valid;
+      return this.collectStepIssues(step).length === 0;
     }
 
     if (step === 'limits-addons') {
+      this.planSelectionForm.markAllAsTouched();
       this.limitsAddonsForm.markAllAsTouched();
-      return this.limitsAddonsForm.valid;
+      return this.planSelectionForm.valid && this.limitsAddonsForm.valid;
     }
 
     if (step === 'feature-entitlements') {
@@ -719,21 +762,29 @@ export class PlatformCreateTenantPage implements OnInit {
       }
 
       this.pushControlIssue(issues, this.businessInfoForm.controls.code, 'Tenant code');
+      this.pushControlIssue(issues, this.businessInfoForm.controls.tenantSlug, 'Tenant slug');
       this.pushControlIssue(issues, this.businessInfoForm.controls.name, 'Business name');
+      this.pushControlIssue(issues, this.businessInfoForm.controls.legalName, 'Legal name');
       this.pushControlIssue(issues, this.businessInfoForm.controls.countryCode, 'Country');
       this.pushControlIssue(issues, this.businessInfoForm.controls.baseCurrency, 'Currency');
       this.pushControlIssue(issues, this.businessInfoForm.controls.defaultTimezone, 'Timezone');
       this.pushControlIssue(issues, this.businessInfoForm.controls.defaultLocale, 'Locale');
       this.pushControlIssue(issues, this.businessInfoForm.controls.operatingMode, 'Operating mode');
-      this.pushControlIssue(issues, this.businessInfoForm.controls.addressCountryCode, 'Address country');
       return issues;
     }
 
-    if (step === 'plan-selection' && this.planSelectionForm.invalid) {
-      issues.push('Subscription plan is required.');
+    if (step === 'plan-selection') {
+      this.pushControlIssue(issues, this.businessInfoForm.controls.addressLine1, 'Registered address');
+      this.pushControlIssue(issues, this.businessInfoForm.controls.addressCountryCode, 'Address country');
+      this.pushControlIssue(issues, this.businessInfoForm.controls.primaryContactName, 'Primary contact name');
+      this.pushControlIssue(issues, this.businessInfoForm.controls.primaryContactEmail, 'Primary contact email');
+      this.pushControlIssue(issues, this.businessInfoForm.controls.primaryContactPhone, 'Primary contact phone');
+      this.pushControlIssue(issues, this.businessInfoForm.controls.billingContactName, 'Billing contact name');
+      this.pushControlIssue(issues, this.businessInfoForm.controls.billingContactEmail, 'Billing contact email');
     }
 
     if (step === 'limits-addons') {
+      if (this.planSelectionForm.invalid) issues.push('Subscription plan is required.');
       this.pushControlIssue(issues, this.limitsAddonsForm.controls.maxOutlets, 'Max outlets');
       this.pushControlIssue(issues, this.limitsAddonsForm.controls.maxTills, 'Max tills');
       this.pushControlIssue(issues, this.limitsAddonsForm.controls.maxUsers, 'Max users');
@@ -784,6 +835,159 @@ export class PlatformCreateTenantPage implements OnInit {
     });
   }
 
+  private buildOnboardingPayload(): TenantOnboardingPayload {
+    const business = this.businessInfoForm.getRawValue();
+    const plan = this.planSelectionForm.getRawValue();
+    const limits = this.limitsAddonsForm.getRawValue();
+    const billing = this.billingSubscriptionForm.getRawValue();
+    const admin = this.tenantAdminForm.getRawValue();
+    return {
+      basicDetails: {
+        displayName: business.name,
+        legalName: business.legalName,
+        tenantCode: business.code,
+        tenantSlug: business.tenantSlug,
+        requestedSubdomain: business.requestedSubdomain || null,
+        registrationNumber: business.registrationNumber || null,
+        taxNumber: business.taxNumber || null,
+        businessTypeCode: business.businessType,
+        operatingMode: business.operatingMode,
+        defaultCountryCode: business.countryCode,
+        baseCurrencyCode: business.baseCurrency,
+        timezone: business.defaultTimezone,
+        locale: business.defaultLocale
+      },
+      businessContact: {
+        registeredAddress: {
+          line1: business.addressLine1,
+          line2: null,
+          city: business.addressCity,
+          stateOrProvince: null,
+          postalCode: null,
+          countryCode: business.addressCountryCode || business.countryCode
+        },
+        primaryContact: {
+          name: business.primaryContactName,
+          email: business.primaryContactEmail,
+          phone: business.primaryContactPhone
+        },
+        websiteUrl: business.websiteUrl || null,
+        billingContactSameAsPrimary: false,
+        billingContact: {
+          name: business.billingContactName,
+          email: business.billingContactEmail,
+          phone: null
+        },
+        billingAddressSameAsRegistered: true,
+        billingAddress: null,
+        supportContact: business.supportContactName || business.supportContactEmail
+          ? { name: business.supportContactName, email: business.supportContactEmail || null, phone: null }
+          : null
+      },
+      plan: {
+        subscriptionPlanId: plan.subscriptionPlanId || null,
+        subscriptionType: billing.subscriptionType,
+        billingCycle: normalizeBillingCycleForApi(billing.billingCycle),
+        addons: this.createOptions().addons
+          .map((addon) => ({ addonId: addon.id, quantity: this.addonQuantities()[addon.id] ?? 0 }))
+          .filter((addon) => addon.quantity > 0),
+        requestedLimits: limits
+      },
+      billing: {
+        invoiceEmail: billing.invoiceEmail || null,
+        paymentMethod: billing.paymentMethod || null,
+        trialStartAt: null,
+        trialEndAt: null,
+        billingStartAt: null,
+        nextBillingAt: null,
+        autoRenew: billing.autoRenew,
+        discountType: null,
+        discountValue: null,
+        taxPercentage: null,
+        notes: billing.notes || null,
+        waiverReason: null
+      },
+      entitlements: { featureIds: [...this.selectedFeatureIds()] },
+      tenantAdmin: admin,
+      reviewConfirmed: this.currentStep() === 'review-create'
+    };
+  }
+
+  private loadDraft(draftId: string): void {
+    this.api.getOnboardingDraft(draftId).subscribe({
+      next: (draft) => {
+        this.applyDraftMetadata(draft);
+        this.applyDraftPayload(draft.payload);
+        const index = Math.max(0, Math.min(6, draft.currentStep - 1));
+        this.currentStep.set(this.steps[index].key);
+      },
+      error: (error) => this.errorMessage.set(this.apiError.toSafeMessage(error))
+    });
+  }
+
+  private applyDraftMetadata(draft: TenantOnboardingDraft): void {
+    this.draftId.set(draft.id);
+    this.draftVersion.set(draft.version);
+    this.progressPercent.set(draft.progressPercent);
+  }
+
+  private applyDraftPayload(payload: TenantOnboardingPayload): void {
+    const basic = payload.basicDetails as Record<string, unknown> | null;
+    const contacts = payload.businessContact as Record<string, unknown> | null;
+    const registered = contacts?.['registeredAddress'] as Record<string, unknown> | undefined;
+    const primary = contacts?.['primaryContact'] as Record<string, unknown> | undefined;
+    const billingContact = contacts?.['billingContact'] as Record<string, unknown> | undefined;
+    const support = contacts?.['supportContact'] as Record<string, unknown> | undefined;
+    this.businessInfoForm.patchValue({
+      code: String(basic?.['tenantCode'] ?? ''), tenantSlug: String(basic?.['tenantSlug'] ?? ''),
+      requestedSubdomain: String(basic?.['requestedSubdomain'] ?? ''), name: String(basic?.['displayName'] ?? ''),
+      legalName: String(basic?.['legalName'] ?? ''), registrationNumber: String(basic?.['registrationNumber'] ?? ''),
+      taxNumber: String(basic?.['taxNumber'] ?? ''), businessType: String(basic?.['businessTypeCode'] ?? ''),
+      operatingMode: String(basic?.['operatingMode'] ?? ''), countryCode: String(basic?.['defaultCountryCode'] ?? ''),
+      baseCurrency: String(basic?.['baseCurrencyCode'] ?? ''), defaultTimezone: String(basic?.['timezone'] ?? ''),
+      defaultLocale: String(basic?.['locale'] ?? ''), addressLine1: String(registered?.['line1'] ?? ''),
+      addressCity: String(registered?.['city'] ?? ''), addressCountryCode: String(registered?.['countryCode'] ?? ''),
+      primaryContactName: String(primary?.['name'] ?? ''), primaryContactEmail: String(primary?.['email'] ?? ''),
+      primaryContactPhone: String(primary?.['phone'] ?? ''), websiteUrl: String(contacts?.['websiteUrl'] ?? ''),
+      billingContactName: String(billingContact?.['name'] ?? primary?.['name'] ?? ''),
+      billingContactEmail: String(billingContact?.['email'] ?? primary?.['email'] ?? ''),
+      supportContactName: String(support?.['name'] ?? ''), supportContactEmail: String(support?.['email'] ?? '')
+    });
+    const plan = payload.plan as Record<string, unknown> | null;
+    const billing = payload.billing as Record<string, unknown> | null;
+    this.planSelectionForm.patchValue({ subscriptionPlanId: String(plan?.['subscriptionPlanId'] ?? '') });
+    this.limitsAddonsForm.patchValue((plan?.['requestedLimits'] ?? {}) as never);
+    this.billingSubscriptionForm.patchValue({
+      subscriptionType: String(plan?.['subscriptionType'] ?? ''), billingCycle: String(plan?.['billingCycle'] ?? ''),
+      invoiceEmail: String(billing?.['invoiceEmail'] ?? ''), paymentMethod: String(billing?.['paymentMethod'] ?? ''),
+      autoRenew: Boolean(billing?.['autoRenew'] ?? true), notes: String(billing?.['notes'] ?? '')
+    });
+    const entitlements = payload.entitlements as { featureIds?: string[] } | null;
+    this.selectedFeatureIds.set(entitlements?.featureIds ?? []);
+    this.tenantAdminForm.patchValue((payload.tenantAdmin ?? {}) as never);
+  }
+
+  private finalizeDraft(): void {
+    const draftId = this.draftId();
+    const version = this.draftVersion();
+    if (!draftId || !version) {
+      return;
+    }
+    this.finalizationKey ??= globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+    this.isSaving.set(true);
+    this.api.finalizeOnboardingDraft(draftId, version, this.finalizationKey).subscribe({
+      next: (receipt) => {
+        this.isSaving.set(false);
+        void this.router.navigate(['/admin/tenants/onboarding/operations', receipt.operationId]);
+      },
+      error: (error) => {
+        this.isSaving.set(false);
+        this.applyServerFieldErrors(error);
+        this.errorMessage.set(this.apiError.toSafeMessage(error));
+      }
+    });
+  }
+
   private loadCreateOptions(): void {
     this.isLoadingOptions.set(true);
     this.countryOptionsLoadError.set(null);
@@ -820,48 +1024,26 @@ export class PlatformCreateTenantPage implements OnInit {
   }
 
   private applyLookupDefaults(options: TenantCreateOptions): void {
-    const defaultCountryCode = this.resolveDefaultCountryCode(options);
-    const defaultCurrency = this.resolveDefaultCurrency(options);
+    const defaultCountryCode = options.defaults.countryCode ?? '';
+    const defaultCurrency = options.defaults.currencyCode ?? '';
 
     this.businessInfoForm.patchValue({
       countryCode: this.businessInfoForm.controls.countryCode.value || defaultCountryCode,
       addressCountryCode: this.businessInfoForm.controls.addressCountryCode.value || defaultCountryCode,
       baseCurrency: this.businessInfoForm.controls.baseCurrency.value || defaultCurrency,
-      defaultTimezone: this.businessInfoForm.controls.defaultTimezone.value || options.timezones[0]?.value || '',
-      defaultLocale: this.businessInfoForm.controls.defaultLocale.value || options.locales[0]?.value || '',
+      defaultTimezone: this.businessInfoForm.controls.defaultTimezone.value || options.defaults.timezone || '',
+      defaultLocale: this.businessInfoForm.controls.defaultLocale.value || options.defaults.locale || '',
       operatingMode: this.businessInfoForm.controls.operatingMode.value || options.operatingModes[0]?.value || '',
       businessType: this.businessInfoForm.controls.businessType.value || options.businessTypes[0]?.value || ''
     });
 
     this.billingSubscriptionForm.patchValue({
       billingStatus: this.billingSubscriptionForm.controls.billingStatus.value || options.billingStatuses[0]?.value || '',
-      billingCycle: this.billingSubscriptionForm.controls.billingCycle.value || options.billingCycles[0]?.value || '',
+      billingCycle: this.billingSubscriptionForm.controls.billingCycle.value || options.defaults.billingCycle || '',
       subscriptionStatus:
         this.billingSubscriptionForm.controls.subscriptionStatus.value || options.subscriptionStatuses[0]?.value || '',
       paymentMethod: this.billingSubscriptionForm.controls.paymentMethod.value || options.paymentMethods[0]?.value || ''
     });
-  }
-
-  private resolveDefaultCountryCode(options: TenantCreateOptions): string {
-    if (options.countryCodes.length === 1) {
-      return options.countryCodes[0].value;
-    }
-
-    const sriLanka = options.countryCodes.find((item) => item.value === 'LK');
-    return sriLanka?.value ?? options.countryCodes[0]?.value ?? '';
-  }
-
-  private resolveDefaultCurrency(options: TenantCreateOptions): string {
-    const lkr = options.currencies.find((item) => item.value === 'LKR');
-    if (lkr) {
-      return lkr.value;
-    }
-
-    if (options.currencies.length === 1) {
-      return options.currencies[0].value;
-    }
-
-    return options.currencies[0]?.value ?? '';
   }
 
   private applyPlanDefaults(): void {

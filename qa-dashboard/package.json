@@ -4,10 +4,20 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "fixtures": "node flow4-generate-fixtures.mjs",
+    "email-sink": "node flow4-acs-email-sink.mjs",
+    "acceptance": "node flow4-browser-acceptance.mjs",
+    "preflight": "node flow4-preflight.mjs",
+    "test:flow4": "playwright test manual-payment.e2e.spec.mjs --config playwright.config.mjs",
+    "test:flow4:fixtures": "node flow4-fixture-launcher.mjs",
+    "test:flow4:fixtures:unit": "node --test flow4-fixture-manifest.test.mjs",
+    "test:flow4:release": "node flow4-preflight.mjs --release && playwright test manual-payment.e2e.spec.mjs --config playwright.config.mjs"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs"
+  "type": "module",
+  "devDependencies": {
+    "@playwright/test": "^1.54.1"
+  }
 }

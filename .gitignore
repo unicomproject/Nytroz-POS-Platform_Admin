@@ -38,6 +38,10 @@ yarn-error.log
 testem.log
 /typings
 __screenshots__/
+/qa-dashboard/.env.flow4.local
+/qa-dashboard/.flow4/
+/qa-dashboard/test-results/
+/qa-dashboard/playwright-report/
 
 # System files
 .DS_Store

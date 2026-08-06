@@ -48,9 +48,11 @@ import { Sidebar } from '../sidebar/sidebar';
     main {
       flex: 1;
       min-height: 0;
+      min-width: 0;
       overflow-x: hidden;
       overflow-y: auto;
       padding: 1.5rem 1.6rem 2rem;
+      width: 100%;
     }
 
     @media (max-width: 820px) {

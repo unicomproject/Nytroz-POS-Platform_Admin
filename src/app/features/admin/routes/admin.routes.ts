@@ -22,6 +22,21 @@ const adminPageRoutes: Routes = [
     data: { title: 'Create Tenant', requiredPermission: platformPermissions.tenantsCreate }
   },
   {
+    path: 'tenants/onboarding/drafts',
+    loadComponent: () => import('../pages/platform-tenant-onboarding-drafts-page/platform-tenant-onboarding-drafts-page').then((m) => m.PlatformTenantOnboardingDraftsPage),
+    data: { title: 'Tenant Onboarding Drafts', requiredPermission: platformPermissions.tenantsCreate }
+  },
+  {
+    path: 'tenants/onboarding/operations/:operationId',
+    loadComponent: () => import('../pages/platform-tenant-onboarding-result-page/platform-tenant-onboarding-result-page').then((m) => m.PlatformTenantOnboardingResultPage),
+    data: { title: 'Tenant Onboarding Status', requiredPermission: platformPermissions.tenantsCreate }
+  },
+  {
+    path: 'tenants/onboarding/:draftId',
+    loadComponent: () => import('../pages/platform-create-tenant-page/platform-create-tenant-page').then((m) => m.PlatformCreateTenantPage),
+    data: { title: 'Resume Tenant Onboarding', requiredPermission: platformPermissions.tenantsCreate }
+  },
+  {
     path: 'tenants/:tenantId',
     loadComponent: () =>
       import('../pages/platform-tenant-detail-page/platform-tenant-detail-page').then((m) => m.PlatformTenantDetailPage),
@@ -108,6 +123,22 @@ const adminPageRoutes: Routes = [
     loadComponent: () =>
       import('../pages/platform-users-page/platform-users-page').then((m) => m.PlatformUsersPage),
     data: { title: 'Platform Users', requiredPermission: platformPermissions.usersView }
+  },
+  {
+    path: 'billing/manual-payments/:paymentId',
+    loadComponent: () =>
+      import('../pages/platform-manual-payment-detail-page/platform-manual-payment-detail-page').then(
+        (m) => m.PlatformManualPaymentDetailPage
+      ),
+    data: { title: 'Manual Payment Review', requiredPermission: platformPermissions.billingView }
+  },
+  {
+    path: 'billing/manual-payments',
+    loadComponent: () =>
+      import('../pages/platform-manual-payments-page/platform-manual-payments-page').then(
+        (m) => m.PlatformManualPaymentsPage
+      ),
+    data: { title: 'Manual Payments', requiredPermission: platformPermissions.billingView }
   },
   {
     path: 'billing',
