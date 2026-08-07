@@ -247,7 +247,7 @@ type WizardStep =
                 <label><span>Email *</span><input formControlName="email" /></label>
                 <label><span>Phone</span><input formControlName="phone" /></label>
                 <p class="hint full">
-                  The tenant admin is saved as a pending invite. Email delivery is not wired in this release.
+                  The Tenant Admin is saved as a pending invite. After activation, an invitation email is queued via Azure Communication Services. Use Resend Invitation from the onboarding result if delivery needs another attempt.
                 </p>
               </form>
             }
