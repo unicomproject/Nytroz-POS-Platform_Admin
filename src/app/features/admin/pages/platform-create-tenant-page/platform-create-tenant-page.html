@@ -9,58 +9,16 @@
     [breadcrumbs]="breadcrumbs()"
   />
 
-  <section class="wizard-hero" aria-labelledby="wizard-hero-title">
-    <div class="hero-glow" aria-hidden="true"></div>
-    <div class="hero-copy">
-      <p class="hero-eyebrow" id="wizard-hero-title">7-step guided onboarding</p>
-      <p class="hero-lead">Launch a tenant with confidence</p>
-      <div class="hero-meta">
-        <span class="hero-chip">Current: {{ currentStepLabel() }}</span>
-        <span class="hero-chip">Step {{ currentStepNumber() }} of {{ steps.length }}</span>
-        @if (draftId()) {
-          <span class="hero-chip">Draft {{ progressPercent() }}%</span>
-        } @else {
-          <span class="hero-chip">New draft</span>
-        }
-      </div>
-      <p class="hero-note">Provisioning begins after Create Tenant — payment, activation, and invitation remain separate stages.</p>
-    </div>
-  </section>
-
-  <ol class="stepper" aria-label="Create tenant steps">
-    @for (step of steps; track step.key; let index = $index) {
-      <li
-        [attr.data-state]="stepState(step.key, index)"
-        [class.current]="stepState(step.key, index) === 'current'"
-        [class.completed]="stepState(step.key, index) === 'completed'"
-        [class.upcoming]="stepState(step.key, index) === 'upcoming'"
-        [class.error]="stepState(step.key, index) === 'error'"
-        [attr.aria-current]="currentStep() === step.key ? 'step' : null"
-      >
-        <span class="step-marker" aria-hidden="true">
-          @if (stepState(step.key, index) === 'completed') {
-            <svg class="step-check" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <path d="M3.5 8.5l3 3 6-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-          } @else {
-            <span class="step-num">{{ index + 1 }}</span>
-          }
-        </span>
-        <span class="step-copy">
-          <span class="step-label">{{ step.label }}</span>
-          <span class="step-short">{{ step.shortLabel }}</span>
-        </span>
-        @if (showStepErrorCount(step.key, index)) {
-          <span
-            class="step-errors"
-            [attr.aria-label]="stepErrorAriaLabel(step.label, stepErrorCount(step.key))"
-          >
-            {{ stepErrorCount(step.key) }}
-          </span>
-        }
-      </li>
-    }
-  </ol>
+  <app-create-tenant-wizard-nav
+    [steps]="steps"
+    [currentStepKey]="currentStep()"
+    [currentStepLabel]="currentStepLabel()"
+    [currentStepNumber]="currentStepNumber()"
+    [draftId]="draftId()"
+    [progressPercent]="progressPercent()"
+    [stepStates]="wizardStepStates()"
+    [stepErrorCounts]="wizardStepErrorCounts()"
+  />
 
   @if (isLoadingOptions() || isLoadingDraft()) {
     <app-loading-skeleton [rows]="6" />
@@ -257,14 +215,17 @@
                     <p>{{ addon.description || 'No description provided.' }}</p>
                     <div class="addon-footer">
                       <span>{{ addon.currency }} {{ addon.unitPrice }} / unit</span>
-                      <input
-                        type="number"
-                        min="0"
-                        [attr.aria-label]="'Quantity for ' + addon.name"
-                        [ngModel]="addonQuantity(addon.id)"
-                        (ngModelChange)="setAddonQuantity(addon, $event)"
-                        [ngModelOptions]="{ standalone: true }"
-                      />
+                      <app-form-field [id]="'addon-qty-' + addon.id">
+                        <input
+                          [id]="'addon-qty-' + addon.id"
+                          type="number"
+                          min="0"
+                          [attr.aria-label]="'Quantity for ' + addon.name"
+                          [ngModel]="addonQuantity(addon.id)"
+                          (ngModelChange)="setAddonQuantity(addon, $event)"
+                          [ngModelOptions]="{ standalone: true }"
+                        />
+                      </app-form-field>
                     </div>
                   </article>
                 }

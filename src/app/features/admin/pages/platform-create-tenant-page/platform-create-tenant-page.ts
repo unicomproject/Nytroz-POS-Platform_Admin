@@ -10,6 +10,7 @@ import { BreadcrumbItem, PageHeader } from '../../../../shared/components/page-h
 import { Button } from '../../../../shared/ui/button/button';
 import { FormField } from '../../../../shared/ui/form-field/form-field';
 import { StatusBadge } from '../../../../shared/ui/status-badge/status-badge';
+import { CreateTenantWizardNav } from './create-tenant-wizard-nav';
 import { TENANT_SUBSCRIPTION_TYPE_OPTIONS } from '../../constants/tenant-subscription-type.constants';
 import {
   TenantCreateAddonOption,
@@ -51,7 +52,8 @@ type StepVisualState = 'current' | 'completed' | 'upcoming' | 'error';
     StatusBadge,
     LoadingSkeleton,
     ErrorState,
-    EmptyState
+    EmptyState,
+    CreateTenantWizardNav
   ],
   templateUrl: './platform-create-tenant-page.html',
   styleUrl: './platform-create-tenant-page.scss'
@@ -229,6 +231,23 @@ export class PlatformCreateTenantPage implements OnInit {
     }
 
     return 'upcoming';
+  }
+
+  /** Template-evaluated each CD so form validity changes update stepper chrome. */
+  wizardStepStates(): Record<string, StepVisualState> {
+    const states: Record<string, StepVisualState> = {};
+    this.steps.forEach((step, index) => {
+      states[step.key] = this.stepState(step.key, index);
+    });
+    return states;
+  }
+
+  wizardStepErrorCounts(): Record<string, number> {
+    const counts: Record<string, number> = {};
+    this.steps.forEach((step) => {
+      counts[step.key] = this.stepErrorCount(step.key);
+    });
+    return counts;
   }
 
   showStepErrorCount(step: WizardStep, index: number): boolean {

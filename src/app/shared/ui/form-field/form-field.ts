@@ -47,6 +47,36 @@ import { Component, input } from '@angular/core';
       position: relative;
     }
 
+    /* Projected controls: FormField owns chrome so pages do not reimplement it. */
+    :host ::ng-deep .control-container :where(
+      input:not([type='checkbox']):not([type='radio']),
+      select,
+      textarea
+    ) {
+      background: var(--bg-surface-secondary, #f1f5f9);
+      border: 1px solid var(--border-default, #e2e8f0);
+      border-radius: var(--radius-md, 8px);
+      color: var(--text-primary, #0f172a);
+      font: inherit;
+      min-height: var(--control-height-default, 2.5rem);
+      padding: 0.45rem 0.7rem;
+      width: 100%;
+    }
+
+    :host ::ng-deep .control-container :where(
+      input:not([type='checkbox']):not([type='radio']),
+      select,
+      textarea
+    ):focus-visible {
+      border-color: var(--border-focus, #0b5cff);
+      box-shadow: var(--shadow-focus);
+      outline: none;
+    }
+
+    :host ::ng-deep .control-container textarea {
+      min-height: 5rem;
+    }
+
     .helper-text {
       color: var(--text-muted, #64748b);
       font-size: 0.75rem;

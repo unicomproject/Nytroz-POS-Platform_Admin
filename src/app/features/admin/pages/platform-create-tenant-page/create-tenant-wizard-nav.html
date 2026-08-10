@@ -1,0 +1,51 @@
+<section class="wizard-hero" aria-labelledby="wizard-hero-title">
+  <div class="hero-copy">
+    <p class="hero-eyebrow" id="wizard-hero-title">7-step guided onboarding</p>
+    <p class="hero-lead">Launch a tenant with confidence</p>
+    <div class="hero-meta">
+      <span class="hero-chip">Current: {{ currentStepLabel() }}</span>
+      <span class="hero-chip">Step {{ currentStepNumber() }} of {{ steps().length }}</span>
+      @if (draftId()) {
+        <span class="hero-chip">Draft {{ progressPercent() }}%</span>
+      } @else {
+        <span class="hero-chip">New draft</span>
+      }
+    </div>
+    <p class="hero-note">Provisioning begins after Create Tenant — payment, activation, and invitation remain separate stages.</p>
+  </div>
+</section>
+
+<ol class="stepper" aria-label="Create tenant steps">
+  @for (step of steps(); track step.key; let index = $index) {
+    <li
+      [attr.data-state]="stateFor(step.key)"
+      [class.current]="stateFor(step.key) === 'current'"
+      [class.completed]="stateFor(step.key) === 'completed'"
+      [class.upcoming]="stateFor(step.key) === 'upcoming'"
+      [class.error]="stateFor(step.key) === 'error'"
+      [attr.aria-current]="currentStepKey() === step.key ? 'step' : null"
+    >
+      <span class="step-marker" aria-hidden="true">
+        @if (stateFor(step.key) === 'completed') {
+          <svg class="step-check" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M3.5 8.5l3 3 6-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        } @else {
+          <span class="step-num">{{ index + 1 }}</span>
+        }
+      </span>
+      <span class="step-copy">
+        <span class="step-label">{{ step.label }}</span>
+        <span class="step-short">{{ step.shortLabel }}</span>
+      </span>
+      @if (showErrorCount(step.key)) {
+        <span
+          class="step-errors"
+          [attr.aria-label]="errorAriaLabel(step.label, errorCountFor(step.key))"
+        >
+          {{ errorCountFor(step.key) }}
+        </span>
+      }
+    </li>
+  }
+</ol>
