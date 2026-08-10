@@ -19,29 +19,35 @@ import { PlatformTenantApiService } from '../../services/platform-tenant-api.ser
 import { PlatformTenantSearchService } from '../../services/platform-tenant-search.service';
 import { tenantLifecycleBadgeClass, tenantLifecycleLabel } from '../../utils/tenant-lifecycle.util';
 
+import { PageHeader } from '../../../../shared/components/page-header/page-header';
+import { Button } from '../../../../shared/ui/button/button';
+import { StatusBadge } from '../../../../shared/ui/status-badge/status-badge';
+import { LoadingSkeleton } from '../../../../shared/components/loading-skeleton/loading-skeleton';
+import { ErrorState } from '../../../../shared/components/error-state/error-state';
+import { EmptyState } from '../../../../shared/components/empty-state/empty-state';
+
 @Component({
   selector: 'app-platform-tenant-list-page',
   standalone: true,
-  imports: [DatePipe, FormsModule, RouterLink],
+  imports: [
+    DatePipe,
+    FormsModule,
+    RouterLink,
+    PageHeader,
+    Button,
+    StatusBadge,
+    LoadingSkeleton,
+    ErrorState,
+    EmptyState
+  ],
   template: `
     <section class="tenant-list-page">
-      <header class="page-heading">
-        <div class="title-block">
-          <h1>Tenant List</h1>
-          <p>View and manage all platform tenants</p>
-          <span class="title-accent" aria-hidden="true"></span>
-        </div>
-        <div class="page-actions">
-          <button type="button" class="btn outline" disabled title="Import Tenants is not available in TM-EPOS MVP">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v10M8 9l4 4 4-4M5 21h14" /></svg>
-            Import Tenants
-          </button>
-          <button type="button" class="btn primary" routerLink="/admin/tenants/create">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
-            Create Tenant
-          </button>
-        </div>
-      </header>
+      <app-page-header title="Tenant Management" description="Manage tenant organisations, subscription context, setup progress, and platform access.">
+        <app-button variant="primary" routerLink="/admin/tenants/create">
+          <svg viewBox="0 0 24 24" aria-hidden="true" class="btn-icon"><path d="M12 5v14M5 12h14" /></svg>
+          Create Tenant
+        </app-button>
+      </app-page-header>
 
       @if (summary(); as summaryData) {
         <section class="kpi-grid">
@@ -98,7 +104,7 @@ import { tenantLifecycleBadgeClass, tenantLifecycleLabel } from '../../utils/ten
         </section>
       }
 
-      <section class="filters card">
+      <section class="filter-bar-container">
         <label class="filter-field search-field">
           <span class="field-label">Search</span>
           <span class="input-wrap">
@@ -132,30 +138,30 @@ import { tenantLifecycleBadgeClass, tenantLifecycleLabel } from '../../utils/ten
           </label>
         }
         <div class="filter-actions">
-          <button type="button" class="btn outline" disabled title="More Filters is not available in TM-EPOS MVP">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4" /></svg>
-            More Filters
-          </button>
-          <button type="button" class="btn outline" (click)="resetFilters()">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0115.5-6.7L21 8M21 3v5h-5M21 12a9 9 0 01-15.5 6.7L3 16M3 21v-5h5" /></svg>
+          <app-button variant="secondary" size="compact" (click)="resetFilters()">
+            <svg viewBox="0 0 24 24" aria-hidden="true" class="btn-icon"><path d="M3 12a9 9 0 0115.5-6.7L21 8M21 3v5h-5M21 12a9 9 0 01-15.5 6.7L3 16M3 21v-5h5" /></svg>
             Reset
-          </button>
+          </app-button>
         </div>
       </section>
 
       @if (isLoading()) {
-        <div class="state-card card">Loading tenant data from the backend...</div>
-      } @else if (errorMessage()) {
-        <div class="state-card card error">
-          <strong>Tenant list could not be loaded</strong>
-          <span>{{ errorMessage() }}</span>
-          <button type="button" class="btn primary" (click)="loadPage()">Try again</button>
+        <div class="skeleton-container card">
+          <span class="sr-only">Loading tenant data</span>
+          <app-loading-skeleton [rows]="5" [avatar]="true" />
         </div>
+      } @else if (errorMessage()) {
+        <app-error-state
+          title="Tenant list could not be loaded"
+          [message]="errorMessage()!"
+          [hasRetry]="true"
+          (retry)="loadPage()"
+        />
       } @else if (tenantList(); as list) {
         @if (list.items.length) {
           <section class="table-card card">
-            <div class="table-wrap">
-              <table>
+            <div class="data-table-container">
+              <table class="data-table">
                 <thead>
                   <tr>
                     <th>Tenant</th>
@@ -187,11 +193,9 @@ import { tenantLifecycleBadgeClass, tenantLifecycleLabel } from '../../utils/ten
                         <td class="cell-text">{{ tenant.planName || '—' }}</td>
                       }
                       <td>
-                        <span
-                          class="status-badge"
-                          [class]="statusClass(tenant)"
-                          [attr.aria-label]="'Lifecycle status: ' + statusLabel(tenant)"
-                        >{{ statusLabel(tenant) }}</span>
+                        <app-status-badge [variant]="mapStatusVariant(statusClass(tenant))">
+                          {{ statusLabel(tenant) }}
+                        </app-status-badge>
                       </td>
                       <td class="cell-text">
                         @if (tenant.setupProgressPercent != null) {
@@ -219,9 +223,9 @@ import { tenantLifecycleBadgeClass, tenantLifecycleLabel } from '../../utils/ten
                         }
                       </td>
                       <td>
-                        <a class="actions-link" [routerLink]="['/admin/tenants', tenant.id]" (click)="$event.stopPropagation()">
+                        <app-button variant="ghost" size="compact" [routerLink]="['/admin/tenants', tenant.id]" (click)="$event.stopPropagation()">
                           View
-                        </a>
+                        </app-button>
                       </td>
                     </tr>
                   }
@@ -233,95 +237,57 @@ import { tenantLifecycleBadgeClass, tenantLifecycleLabel } from '../../utils/ten
           <footer class="pagination">
             <span class="range-label">{{ rangeLabel(list) }}</span>
             <div class="pagination-controls">
-              <button type="button" class="page-btn nav" [disabled]="list.pageNumber <= 1" (click)="goToPage(list.pageNumber - 1)" aria-label="Previous page">
+              <app-button variant="secondary" size="compact" [disabled]="list.pageNumber <= 1" (click)="goToPage(list.pageNumber - 1)" aria-label="Previous page">
                 ‹
-              </button>
+              </app-button>
               @for (page of pageNumbers(list); track page) {
-                <button
-                  type="button"
-                  class="page-btn"
+                <app-button
+                  variant="secondary"
+                  size="compact"
                   [class.active]="page === list.pageNumber"
                   (click)="goToPage(page)"
                 >
                   {{ page }}
-                </button>
+                </app-button>
               }
-              <button
-                type="button"
-                class="page-btn nav"
+              <app-button
+                variant="secondary"
+                size="compact"
                 [disabled]="list.pageNumber >= list.totalPages"
                 (click)="goToPage(list.pageNumber + 1)"
                 aria-label="Next page"
               >
                 ›
-              </button>
+              </app-button>
             </div>
           </footer>
         } @else {
-          <div class="state-card card">No tenants match the current filters.</div>
+          <app-empty-state
+            title="No tenants found"
+            message="No tenants match the current filters"
+          >
+            <app-button variant="secondary" (click)="resetFilters()">Reset Filters</app-button>
+          </app-empty-state>
         }
       }
     </section>
   `,
   styles: `
-    :host { color: #14213d; display: block; }
-    * { box-sizing: border-box; }
-
-    .tenant-list-page { display: grid; gap: 1.15rem; }
-
-    .page-heading {
-      align-items: flex-start;
-      display: flex;
-      gap: 1.25rem;
-      justify-content: space-between;
-      margin-bottom: 0.15rem;
-    }
-
-    .title-block h1 {
-      color: #101a38;
-      font-size: clamp(1.65rem, 2.5vw, 2.05rem);
-      font-weight: 800;
-      letter-spacing: -0.02em;
-      margin: 0;
-    }
-
-    .title-block p {
-      color: #667085;
-      font-size: 0.92rem;
-      margin: 0.4rem 0 0;
-    }
-
-    .title-accent {
-      background: linear-gradient(90deg, #0b5cff, #5b8dff);
-      border-radius: 99px;
+    :host {
+      color: var(--text-primary, #0f172a);
       display: block;
-      height: 3px;
-      margin-top: 0.75rem;
-      width: 2.75rem;
     }
 
-    .page-actions {
-      display: flex;
-      flex-shrink: 0;
-      flex-wrap: wrap;
-      gap: 0.7rem;
-      padding-top: 0.15rem;
+    * {
+      box-sizing: border-box;
     }
 
-    .btn {
-      align-items: center;
-      border-radius: 10px;
-      cursor: pointer;
-      display: inline-flex;
-      font-size: 0.84rem;
-      font-weight: 700;
-      gap: 0.45rem;
-      min-height: 2.65rem;
-      padding: 0 1rem;
-      white-space: nowrap;
+    .tenant-list-page {
+      display: grid;
+      gap: var(--space-4, 1rem);
     }
 
-    .btn svg {
+    .btn-icon {
       height: 1rem;
       stroke: currentColor;
       stroke-linecap: round;
@@ -331,44 +297,27 @@ import { tenantLifecycleBadgeClass, tenantLifecycleLabel } from '../../utils/ten
       width: 1rem;
     }
 
-    .btn.outline {
-      background: #fff;
-      border: 1px solid #d0d9e6;
-      color: #344054;
-    }
-
-    .btn.primary {
-      background: #0b5cff;
-      border: 0;
-      color: #fff;
-    }
-
-    .btn:disabled {
-      cursor: not-allowed;
-      opacity: 0.55;
-    }
-
     .card {
-      background: #fff;
-      border: 1px solid #e5eaf2;
-      border-radius: 12px;
-      box-shadow: 0 1px 3px rgba(16, 24, 40, 0.04), 0 8px 24px rgba(16, 24, 40, 0.06);
+      background: var(--bg-surface-primary, #fff);
+      border: 1px solid var(--border-default, #e5eaf2);
+      border-radius: var(--radius-lg, 12px);
+      box-shadow: var(--shadow-sm);
     }
 
     .kpi-grid {
       display: grid;
-      gap: 1rem;
+      gap: var(--space-3, 0.75rem);
       grid-template-columns: repeat(5, minmax(0, 1fr));
     }
 
     .kpi-card {
       align-items: flex-start;
-      background: #fff;
-      border: 1px solid #e5eaf2;
-      border-radius: 12px;
-      box-shadow: 0 1px 3px rgba(16, 24, 40, 0.04), 0 8px 24px rgba(16, 24, 40, 0.06);
+      background: var(--bg-surface-primary, #fff);
+      border: 1px solid var(--border-default, #e5eaf2);
+      border-radius: var(--radius-lg, 12px);
+      box-shadow: var(--shadow-sm);
       display: flex;
-      gap: 0.85rem;
+      gap: var(--space-3, 0.75rem);
       min-height: 7.5rem;
       padding: 1.1rem 1rem;
     }
@@ -393,22 +342,26 @@ import { tenantLifecycleBadgeClass, tenantLifecycleLabel } from '../../utils/ten
       width: 1.25rem;
     }
 
-    .kpi-icon.blue { background: #eaf2ff; color: #1768e5; }
-    .kpi-icon.green { background: #e8f8ed; color: #18a44b; }
-    .kpi-icon.orange { background: #fff1e6; color: #f97316; }
-    .kpi-icon.red { background: #fef2f2; color: #ef4444; }
+    .kpi-icon.blue { background: var(--status-info-bg, #eaf2ff); color: var(--status-info-text, #1768e5); }
+    .kpi-icon.green { background: var(--status-success-bg, #e8f8ed); color: var(--status-success-text, #18a44b); }
+    .kpi-icon.orange { background: var(--status-warning-bg, #fff1e6); color: var(--status-warning-text, #f97316); }
+    .kpi-icon.red { background: var(--status-danger-bg, #fef2f2); color: var(--status-danger-text, #ef4444); }
     .kpi-icon.violet { background: #f0eaff; color: #7047eb; }
 
-    .kpi-body { display: grid; gap: 0.2rem; min-width: 0; }
+    .kpi-body {
+      display: grid;
+      gap: 0.2rem;
+      min-width: 0;
+    }
 
     .kpi-label {
-      color: #667085;
+      color: var(--text-secondary, #475569);
       font-size: 0.76rem;
       font-weight: 600;
     }
 
     .kpi-value {
-      color: #101a38;
+      color: var(--text-primary, #0f172a);
       font-size: clamp(1.35rem, 2vw, 1.65rem);
       font-weight: 800;
       letter-spacing: -0.02em;
@@ -416,120 +369,107 @@ import { tenantLifecycleBadgeClass, tenantLifecycleLabel } from '../../utils/ten
     }
 
     .kpi-meta {
-      color: #667085;
+      color: var(--text-secondary, #475569);
       font-size: 0.72rem;
       font-weight: 600;
     }
 
-    .kpi-meta.neutral { color: #98a2b3; }
-
-    .filters {
-      align-items: end;
-      display: grid;
-      gap: 0.9rem 1rem;
-      grid-template-columns: 1.35fr repeat(2, minmax(0, 1fr)) auto;
-      padding: 1.1rem 1.15rem;
+    .kpi-meta.neutral {
+      color: var(--text-muted, #64748b);
     }
 
-    .filter-field { display: grid; gap: 0.4rem; min-width: 0; }
+    .filter-field {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-1, 0.25rem);
+      min-width: 12rem;
+    }
+
+    .search-field {
+      flex: 1.5;
+      min-width: 16rem;
+    }
 
     .field-label {
-      color: #667085;
-      font-size: 0.68rem;
+      color: var(--text-muted, #64748b);
+      font-size: 0.6875rem;
       font-weight: 700;
       letter-spacing: 0.05em;
       text-transform: uppercase;
     }
 
     .input-wrap {
-      display: block;
       position: relative;
+      width: 100%;
     }
 
     .input-wrap input,
     .filter-field select {
-      appearance: none;
-      background: #fff;
-      border: 1px solid #d8e0ea;
-      border-radius: 10px;
-      color: #344054;
-      font-size: 0.84rem;
-      min-height: 2.55rem;
-      padding: 0 2.25rem 0 0.8rem;
+      background: var(--bg-surface-primary, #fff);
+      border: 1px solid var(--border-default, #e2e8f0);
+      border-radius: var(--radius-md, 8px);
+      color: var(--text-primary, #0f172a);
+      font-size: 0.875rem;
+      min-height: var(--control-height-default, 2.5rem);
+      padding: 0 var(--space-3, 0.75rem);
       width: 100%;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
     }
 
-    .input-wrap input::placeholder { color: #98a2b3; }
+    .input-wrap input {
+      padding-right: 2.25rem;
+    }
+
+    .input-wrap input::placeholder {
+      color: var(--text-muted, #94a3b8);
+    }
+
+    .input-wrap input:focus,
+    .filter-field select:focus {
+      border-color: var(--border-focus, #0b5cff);
+      box-shadow: var(--shadow-focus);
+      outline: none;
+    }
 
     .input-wrap svg {
-      color: #98a2b3;
+      color: var(--text-muted, #94a3b8);
       height: 1rem;
       pointer-events: none;
       position: absolute;
       right: 0.75rem;
       stroke: currentColor;
       stroke-linecap: round;
-      stroke-width: 1.75;
+      stroke-width: 2;
       fill: none;
       top: 50%;
       transform: translateY(-50%);
       width: 1rem;
     }
 
-    .select-wrap select { padding-right: 2.5rem; }
-
-    .calendar-icon { right: 0.7rem !important; }
-
     .filter-actions {
+      align-self: flex-end;
       display: flex;
-      flex-wrap: wrap;
-      gap: 0.55rem;
+      gap: var(--space-2, 0.5rem);
     }
 
-    .table-card { overflow: hidden; padding: 0; }
-
-    .table-wrap { overflow-x: auto; }
-
-    table {
-      border-collapse: collapse;
-      min-width: 1020px;
-      width: 100%;
+    .table-card {
+      overflow: hidden;
+      padding: 0;
     }
 
-    th {
-      background: #f8fafc;
-      border-bottom: 1px solid #edf1f6;
-      color: #667085;
-      font-size: 0.68rem;
-      font-weight: 700;
-      letter-spacing: 0.06em;
-      padding: 0.9rem 1rem;
-      text-align: left;
-      text-transform: uppercase;
-      white-space: nowrap;
+    .tenant-row {
+      cursor: pointer;
     }
-
-    td {
-      border-bottom: 1px solid #edf1f6;
-      padding: 1rem;
-      vertical-align: middle;
-    }
-
-    tbody tr:last-child td { border-bottom: 0; }
-
-    tbody tr:hover { background: #fafbfd; }
-
-    .tenant-row { cursor: pointer; }
 
     .tenant-row:focus-visible {
-      outline: 2px solid #0b5cff;
+      outline: 2px solid var(--border-focus, #0b5cff);
       outline-offset: -2px;
     }
 
     .tenant-cell {
       align-items: center;
       display: flex;
-      gap: 0.8rem;
+      gap: var(--space-3, 0.75rem);
       min-width: 15rem;
     }
 
@@ -539,62 +479,62 @@ import { tenantLifecycleBadgeClass, tenantLifecycleLabel } from '../../utils/ten
       color: #fff;
       display: flex;
       flex-shrink: 0;
-      font-size: 0.72rem;
+      font-size: 0.75rem;
       font-weight: 800;
       height: 2.35rem;
       justify-content: center;
       width: 2.35rem;
     }
 
-    .tenant-meta { display: grid; gap: 0.15rem; min-width: 0; }
+    .tenant-meta {
+      display: grid;
+      gap: 0.125rem;
+      min-width: 0;
+    }
 
     .tenant-meta strong {
-      color: #101a38;
-      font-size: 0.88rem;
+      color: var(--text-primary, #0f172a);
+      font-size: 0.875rem;
       font-weight: 700;
     }
 
     .tenant-meta small {
-      color: #667085;
-      font-size: 0.76rem;
+      color: var(--text-muted, #64748b);
+      font-size: 0.75rem;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
 
-    .cell-text { color: #344054; font-size: 0.84rem; }
-    .cell-num { color: #101a38; font-size: 0.84rem; font-weight: 600; }
-    .cell-muted { color: #98a2b3; }
-
-    .status-badge {
-      border-radius: 999px;
-      display: inline-block;
-      font-size: 0.72rem;
-      font-weight: 700;
-      padding: 0.3rem 0.7rem;
-      white-space: nowrap;
+    .cell-text {
+      color: var(--text-secondary, #475569);
+      font-size: 0.875rem;
     }
 
-    .status-badge.active { background: #dcfce7; color: #15803d; }
-    .status-badge.suspended { background: #ffedd5; color: #c2410c; }
-    .status-badge.draft { background: #e2e8f0; color: #475569; }
-    .status-badge.pending_payment { background: #fef3c7; color: #b45309; }
-    .status-badge.pending_activation { background: #dbeafe; color: #1d4ed8; }
-    .status-badge.cancelled { background: #fee2e2; color: #b91c1c; }
-    .status-badge.unknown { background: #f2f4f7; color: #667085; }
+    .cell-num {
+      color: var(--text-primary, #0f172a);
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+
+    .cell-muted {
+      color: var(--text-disabled, #94a3b8);
+    }
 
     .activity {
       align-items: center;
-      color: #344054;
+      color: var(--text-secondary, #475569);
       display: inline-flex;
-      font-size: 0.82rem;
-      gap: 0.45rem;
+      font-size: 0.8125rem;
+      gap: var(--space-2, 0.5rem);
     }
 
-    .activity.muted { color: #98a2b3; }
+    .activity.muted {
+      color: var(--text-disabled, #94a3b8);
+    }
 
     .activity i {
-      background: #cbd5e1;
+      background: var(--text-disabled, #cbd5e1);
       border-radius: 50%;
       display: inline-block;
       flex-shrink: 0;
@@ -602,89 +542,86 @@ import { tenantLifecycleBadgeClass, tenantLifecycleLabel } from '../../utils/ten
       width: 0.45rem;
     }
 
-    .activity i.recent { background: #16a34a; }
+    .activity i.recent {
+      background: var(--status-success, #16a34a);
+    }
 
     .actions-link {
-      color: #0b5cff;
-      font-size: 0.82rem;
+      color: var(--primary, #0b5cff);
+      font-size: 0.8125rem;
       font-weight: 700;
       text-decoration: none;
     }
 
-    .actions-link:hover { text-decoration: underline; }
+    .actions-link:hover {
+      text-decoration: underline;
+    }
+
+    .setup-cell {
+      display: flex;
+      flex-direction: column;
+      gap: 0.125rem;
+    }
 
     .pagination {
       align-items: center;
       display: flex;
-      gap: 1rem;
+      gap: var(--space-4, 1rem);
       justify-content: space-between;
-      padding: 0.25rem 0.15rem;
+      padding: var(--space-4, 1rem) var(--space-2, 0.5rem);
     }
 
     .range-label {
-      color: #667085;
-      font-size: 0.82rem;
+      color: var(--text-secondary, #475569);
+      font-size: 0.875rem;
     }
 
     .pagination-controls {
       display: flex;
       flex-wrap: wrap;
-      gap: 0.35rem;
+      gap: var(--space-2, 0.5rem);
     }
 
-    .page-btn {
-      align-items: center;
-      background: #fff;
-      border: 1px solid #d8e0ea;
-      border-radius: 8px;
-      color: #344054;
-      cursor: pointer;
-      display: inline-flex;
-      font-size: 0.82rem;
-      font-weight: 600;
-      height: 2.15rem;
-      justify-content: center;
-      min-width: 2.15rem;
-      padding: 0 0.55rem;
+    .pagination-controls app-button.active ::ng-deep button {
+      background-color: var(--primary, #0b5cff) !important;
+      border-color: var(--primary, #0b5cff) !important;
+      color: var(--text-inverse, #fff) !important;
     }
 
-    .page-btn.active {
-      background: #0b5cff;
-      border-color: #0b5cff;
-      color: #fff;
+    .skeleton-container {
+      padding: var(--space-5, 1.5rem);
     }
 
-    .page-btn:disabled {
-      cursor: not-allowed;
-      opacity: 0.45;
+    .sr-only {
+      clip: rect(0, 0, 0, 0);
+      clip-path: inset(50%);
+      height: 1px;
+      overflow: hidden;
+      position: absolute;
+      white-space: nowrap;
+      width: 1px;
     }
-
-    .state-card {
-      display: grid;
-      gap: 0.75rem;
-      padding: 2.25rem;
-      text-align: center;
-    }
-
-    .state-card.error { color: #b42318; }
 
     @media (max-width: 1280px) {
-      .kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-      .filters { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-      .filter-actions { grid-column: 1 / -1; }
+      .kpi-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
     }
 
     @media (max-width: 900px) {
-      .page-heading { flex-direction: column; }
-      .page-actions { width: 100%; }
-      .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .filters { grid-template-columns: 1fr 1fr; }
+      .kpi-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
     }
 
     @media (max-width: 560px) {
-      .kpi-grid,
-      .filters { grid-template-columns: 1fr; }
-      .pagination { align-items: flex-start; flex-direction: column; }
+      .kpi-grid {
+        grid-template-columns: 1fr;
+      }
+      .pagination {
+        align-items: flex-start;
+        flex-direction: column;
+      }
     }
   `
 })
@@ -877,6 +814,23 @@ export class PlatformTenantListPage {
       lifecycleStatus: tenant.lifecycleStatus,
       status: tenant.status
     });
+  }
+
+  mapStatusVariant(badgeClass: string): 'success' | 'info' | 'warning' | 'danger' | 'neutral' {
+    switch (badgeClass) {
+      case 'active':
+        return 'success';
+      case 'pending_activation':
+      case 'draft':
+        return 'info';
+      case 'suspended':
+      case 'pending_payment':
+        return 'warning';
+      case 'cancelled':
+        return 'danger';
+      default:
+        return 'neutral';
+    }
   }
 
   isRecentActivity(value: string): boolean {

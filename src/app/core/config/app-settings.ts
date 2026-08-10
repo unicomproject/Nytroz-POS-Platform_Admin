@@ -11,7 +11,7 @@ export interface AppSettings {
 export const appSettings: AppSettings = {
   production: false,
   apiBaseUrl: '/api/v1',
-  appName: 'SCS-TIX Platform Admin',
+  appName: 'OneVerz Platform Admin',
   appVersion: '0.0.0',
   defaultLocale: 'en',
   requestTimeoutMs: 30000,
