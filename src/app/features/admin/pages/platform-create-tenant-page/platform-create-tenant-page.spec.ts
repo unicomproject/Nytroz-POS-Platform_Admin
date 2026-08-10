@@ -4,7 +4,7 @@ import { of, throwError } from 'rxjs';
 
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import { createTenantCreateOptions } from '../../../../testing/test-fixtures';
-import { TenantOnboardingDraft } from '../../models/platform-tenant-onboarding.model';
+import { TenantOnboardingDraft, TenantOnboardingPayload } from '../../models/platform-tenant-onboarding.model';
 import { PlatformTenantApiService } from '../../services/platform-tenant-api.service';
 import { PlatformCreateTenantPage } from './platform-create-tenant-page';
 
@@ -83,6 +83,13 @@ describe('PlatformCreateTenantPage durable onboarding', () => {
     const component = fixture().componentInstance; expect(component.businessInfoForm.controls.countryCode.value).toBe('');
   });
   it('blocks step one until required values are valid', () => expect(fixture().componentInstance.isCurrentStepValid()).toBe(false));
+  it('requires business type on step one', () => {
+    const component = fixture().componentInstance;
+    fillValid(component);
+    component.currentStep.set('business-info');
+    component.businessInfoForm.controls.businessType.setValue('');
+    expect(component.isCurrentStepValid()).toBe(false);
+  });
   it('advances completed steps and saves the durable draft', () => {
     const component = fixture().componentInstance; fillValid(component); component.currentStep.set('business-info'); component.nextStep();
     expect(component.currentStep()).toBe('plan-selection'); expect(api['createOnboardingDraft']).toHaveBeenCalledOnce();
@@ -133,4 +140,78 @@ describe('PlatformCreateTenantPage durable onboarding', () => {
     expect(api['createOnboardingDraft'].mock.calls[0][0].plan.billingCycle).toBe('yearly');
   });
   it('does not expose temporary-password controls', () => expect((fixture().nativeElement as HTMLElement).textContent).not.toContain('Temporary Password'));
+
+  it('renders PageHeader with Tenants breadcrumb', () => {
+    const el = fixture().nativeElement as HTMLElement;
+    expect(el.querySelector('app-page-header')).toBeTruthy();
+    expect(el.textContent).toContain('Tenants');
+  });
+
+  it('renders a seven-step stepper', () => {
+    const el = fixture().nativeElement as HTMLElement;
+    expect(el.querySelectorAll('.stepper > li')).toHaveLength(7);
+  });
+
+  it('renders the premium wizard hero', () => {
+    const el = fixture().nativeElement as HTMLElement;
+    expect(el.querySelector('.wizard-hero')).toBeTruthy();
+    expect(el.textContent).toContain('7-step guided onboarding');
+  });
+
+  it('labels Continue before review and Create Tenant on review', () => {
+    const created = fixture();
+    expect((created.nativeElement as HTMLElement).querySelector('.footer-right')?.textContent).toContain('Continue');
+    created.componentInstance.currentStep.set('review-create');
+    created.detectChanges();
+    expect((created.nativeElement as HTMLElement).querySelector('.footer-right')?.textContent).toContain('Create Tenant');
+  });
+
+  it('renders Save Draft and Cancel actions', () => {
+    const el = fixture().nativeElement as HTMLElement;
+    expect(el.textContent).toContain('Save Draft');
+    expect(el.textContent).toContain('Cancel');
+  });
+
+  it('uses UI-1 app-button components in the footer', () => {
+    const el = fixture().nativeElement as HTMLElement;
+    expect(el.querySelectorAll('.wizard-footer app-button').length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('renders structured review summary groups', () => {
+    const created = fixture();
+    fillValid(created.componentInstance);
+    created.componentInstance.currentStep.set('review-create');
+    created.detectChanges();
+    const el = created.nativeElement as HTMLElement;
+    expect(el.querySelector('.review-groups')).toBeTruthy();
+    expect(el.textContent).toContain('Provisioning begins after submission.');
+    expect(el.textContent).toContain('Tenant Admin');
+  });
+
+  it('restores addon quantities from draft plan payload', () => {
+    const component = fixture().componentInstance;
+    const payload = {
+      basicDetails: null,
+      businessContact: null,
+      plan: {
+        subscriptionPlanId: 'plan-1',
+        subscriptionType: 'PAID',
+        billingCycle: 'monthly',
+        addons: [{ addonId: 'addon-1', quantity: 3 }],
+        requestedLimits: { maxOutlets: 5, maxTills: 10, maxUsers: 20 }
+      },
+      billing: null,
+      entitlements: null,
+      tenantAdmin: null
+    } as TenantOnboardingPayload;
+
+    (component as unknown as { applyDraftPayload: (value: TenantOnboardingPayload) => void }).applyDraftPayload(payload);
+    expect(component.addonQuantity('addon-1')).toBe(3);
+  });
+
+  it('navigates Cancel to the tenant list', () => {
+    const component = fixture().componentInstance;
+    component.cancelWizard();
+    expect(router.navigate).toHaveBeenCalledWith(['/admin/tenants']);
+  });
 });
