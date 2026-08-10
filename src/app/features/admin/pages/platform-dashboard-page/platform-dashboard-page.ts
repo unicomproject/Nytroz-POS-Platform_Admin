@@ -6,69 +6,88 @@ import { finalize } from 'rxjs';
 import { platformPermissions } from '../../../../core/config/permission-keys';
 import { AccessControlService } from '../../../../core/services/access-control.service';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
+import { EmptyState } from '../../../../shared/components/empty-state/empty-state';
+import { ErrorState } from '../../../../shared/components/error-state/error-state';
+import { LoadingSkeleton } from '../../../../shared/components/loading-skeleton/loading-skeleton';
+import { PageHeader } from '../../../../shared/components/page-header/page-header';
+import { Button } from '../../../../shared/ui/button/button';
+import { StatusBadge } from '../../../../shared/ui/status-badge/status-badge';
 import {
   PlatformDashboard,
   PlatformDashboardMrrGroup,
   PlatformRevenueState,
-  PlatformTrendPoint,
-  TenantStatusItem
+  PlatformTrendPoint
 } from '../../models/platform-dashboard.model';
 import { PlatformDashboardApiService } from '../../services/platform-dashboard-api.service';
+import { tenantLifecycleBadgeClass } from '../../utils/tenant-lifecycle.util';
 
 @Component({
   selector: 'app-platform-dashboard-page',
   standalone: true,
-  imports: [DatePipe, RouterLink],
+  imports: [
+    DatePipe,
+    RouterLink,
+    PageHeader,
+    Button,
+    StatusBadge,
+    LoadingSkeleton,
+    ErrorState,
+    EmptyState
+  ],
   template: `
     <section class="dashboard-page">
-      <header class="page-heading">
-        <div>
-          <h1>Platform Overview Dashboard</h1>
-          <p>See platform health, tenant status, and items that need attention.</p>
-          @if (dashboard()?.generatedAt; as generatedAt) {
-            <p class="last-updated">Last updated: {{ generatedAt | date: 'medium' }}</p>
-          }
-        </div>
+      <app-page-header
+        title="Dashboard"
+        description="Platform health, tenant status, and items that need attention."
+      >
         @if (dashboard()) {
-          <div class="heading-actions">
-            <button type="button" (click)="refreshDashboard()" [disabled]="isRefreshing()">
-              {{ isRefreshing() ? 'Refreshing…' : 'Refresh' }}
-            </button>
-          </div>
+          <app-button
+            variant="secondary"
+            size="compact"
+            [disabled]="isRefreshing()"
+            (click)="refreshDashboard()"
+          >
+            {{ isRefreshing() ? 'Refreshing…' : 'Refresh' }}
+          </app-button>
         }
-      </header>
+      </app-page-header>
+
+      @if (dashboard()?.generatedAt; as generatedAt) {
+        <p class="last-updated">Last updated: {{ generatedAt | date: 'medium' }}</p>
+      }
 
       @if (refreshErrorMessage()) {
-        <div class="state-card refresh-error" role="alert">
-          <strong>Refresh failed</strong>
-          <span>{{ refreshErrorMessage() }}</span>
-          <button type="button" (click)="refreshDashboard()">Try again</button>
+        <div class="banner danger" role="alert">
+          <div>
+            <strong>Refresh failed</strong>
+            <span>{{ refreshErrorMessage() }}</span>
+          </div>
+          <app-button variant="secondary" size="compact" (click)="refreshDashboard()">Try again</app-button>
         </div>
       }
 
       @if (isLoading()) {
-        <div class="state-card">Loading real platform data...</div>
+        <app-loading-skeleton [rows]="6" />
       } @else if (errorMessage()) {
-        <div class="state-card error">
-          <strong>Dashboard could not be loaded</strong>
-          <span>{{ errorMessage() }}</span>
-          <button type="button" (click)="loadDashboard()">Try again</button>
-        </div>
+        <app-error-state
+          title="Dashboard could not be loaded"
+          [message]="errorMessage()!"
+          [hasRetry]="true"
+          (retry)="loadDashboard()"
+        />
       } @else if (dashboard(); as data) {
         @if (data.sectionErrors.length) {
-          <div class="section-errors-banner" role="status">
+          <div class="banner warn" role="status">
             Some dashboard sections could not be loaded. Partial data is shown below.
           </div>
         }
 
-        <section class="kpi-grid">
-          <article class="kpi-card blue">
-            <i>TT</i>
-            <div>
-              <span>Total Tenants</span>
-              <strong>{{ data.kpis.totalTenants ?? '—' }}</strong>
-            </div>
+        <section class="kpi-grid" aria-label="Key metrics">
+          <article class="kpi">
+            <span class="kpi-label">Total Tenants</span>
+            <strong class="kpi-value">{{ data.kpis.totalTenants ?? '—' }}</strong>
             <small
+              class="kpi-meta"
               [class.negative]="(data.kpis.totalTenantsChangePercent ?? 0) < 0"
               [class.neutral]="data.kpis.totalTenantsChangeStatus === 'ok' && data.kpis.totalTenantsChangePercent === 0"
             >
@@ -77,13 +96,11 @@ import { PlatformDashboardApiService } from '../../services/platform-dashboard-a
           </article>
 
           @if (data.permissions.canViewTenantSubscriptions) {
-            <article class="kpi-card violet">
-              <i>AS</i>
-              <div>
-                <span>Active Paid Subscriptions</span>
-                <strong>{{ data.kpis.activeSubscriptions ?? '—' }}</strong>
-              </div>
+            <article class="kpi">
+              <span class="kpi-label">Active Paid Subscriptions</span>
+              <strong class="kpi-value">{{ data.kpis.activeSubscriptions ?? '—' }}</strong>
               <small
+                class="kpi-meta"
                 [class.negative]="(data.kpis.activeSubscriptionsChangePercent ?? 0) < 0"
                 [class.neutral]="
                   data.kpis.activeSubscriptionsChangeStatus === 'ok' && data.kpis.activeSubscriptionsChangePercent === 0
@@ -96,52 +113,44 @@ import { PlatformDashboardApiService } from '../../services/platform-dashboard-a
           }
 
           @if (data.revenue.status !== 'HIDDEN') {
-            <article class="kpi-card green">
-              <i>M$</i>
-              <div>
-                <span>Monthly Recurring Revenue</span>
-                <strong>{{ mrrDisplay(data.revenue) }}</strong>
-              </div>
+            <article class="kpi">
+              <span class="kpi-label">Monthly Recurring Revenue</span>
+              <strong class="kpi-value">{{ mrrDisplay(data.revenue) }}</strong>
             </article>
           }
 
-          <article class="kpi-card orange">
-            <i>!</i>
-            <div>
-              <span>Items Requiring Attention</span>
-              <strong>{{ data.kpis.itemsRequiringAttention }}</strong>
-            </div>
+          <article class="kpi">
+            <span class="kpi-label">Items Requiring Attention</span>
+            <strong class="kpi-value">{{ data.kpis.itemsRequiringAttention }}</strong>
           </article>
 
-          <article
-            class="kpi-card health"
-            [class.degraded]="data.kpis.systemHealthStatus === 'DEGRADED'"
-            [class.critical]="data.kpis.systemHealthStatus === 'CRITICAL'"
-            [class.unknown]="data.kpis.systemHealthStatus === 'UNKNOWN'"
-          >
-            <i>+</i>
-            <div>
-              <span>System Health</span>
-              <strong>{{ data.kpis.systemHealthLabel }}</strong>
-            </div>
-            <small>{{ systemHealthHint(data) }}</small>
+          <article class="kpi">
+            <span class="kpi-label">System Health</span>
+            <strong class="kpi-value health-row">
+              <app-status-badge [variant]="healthVariant(data.kpis.systemHealthStatus)">
+                {{ data.kpis.systemHealthLabel }}
+              </app-status-badge>
+            </strong>
+            <small class="kpi-meta neutral">{{ systemHealthHint(data) }}</small>
           </article>
         </section>
 
         <section class="main-grid">
-          <article class="panel overview-panel">
-            <div class="panel-title">
+          <article class="panel">
+            <header class="panel-head">
               <div>
                 <h2>Platform Status Overview</h2>
                 <p>Tenant growth, subscription health, and revenue trend</p>
               </div>
-              <span>This Month</span>
-            </div>
+              <span class="chip">This Month</span>
+            </header>
+
             <div class="summary-row">
               <div>
-                <span>Tenant Growth</span>
-                <strong>{{ data.statusOverview.tenantGrowth ?? '—' }}</strong>
+                <span class="kpi-label">Tenant Growth</span>
+                <strong class="summary-value">{{ data.statusOverview.tenantGrowth ?? '—' }}</strong>
                 <small
+                  class="kpi-meta"
                   [class.neutral]="
                     data.statusOverview.tenantGrowthChangeStatus === 'ok' &&
                     data.statusOverview.tenantGrowthChangePercent === 0
@@ -152,38 +161,41 @@ import { PlatformDashboardApiService } from '../../services/platform-dashboard-a
               </div>
 
               @if (data.permissions.canViewTenantSubscriptions) {
-                <div class="health-summary">
-                  <span>Subscription Health</span>
+                <div>
+                  <span class="kpi-label">Subscription Health</span>
                   @if (data.statusOverview.subscriptionHealthPercent !== null) {
-                    <section>
-                      <b>{{ data.statusOverview.subscriptionHealthPercent }}%</b>
-                      <p>
-                        <strong>Healthy</strong>
-                        <small
-                          >{{ data.statusOverview.activeSubscriptionCount }} Active
-                          <em>{{ data.statusOverview.atRiskSubscriptionCount }} At Risk</em></small
-                        >
-                      </p>
-                    </section>
+                    <strong class="summary-value">{{ data.statusOverview.subscriptionHealthPercent }}%</strong>
+                    <small class="kpi-meta neutral">
+                      {{ data.statusOverview.activeSubscriptionCount }} Active ·
+                      {{ data.statusOverview.atRiskSubscriptionCount }} At Risk
+                    </small>
                   } @else {
-                    <div class="empty-inline compact">Subscription metrics unavailable.</div>
+                    <p class="empty-inline compact">Subscription metrics unavailable.</p>
                   }
                 </div>
               }
 
               @if (data.revenue.status !== 'HIDDEN') {
                 <div>
-                  <span>Revenue Trend (MRR)</span>
-                  <strong>{{ mrrDisplay(data.revenue) }}</strong>
+                  <span class="kpi-label">Revenue Trend (MRR)</span>
+                  <strong class="summary-value">{{ mrrDisplay(data.revenue) }}</strong>
                 </div>
               }
             </div>
 
             @if (data.statusOverview.trendsUnavailable) {
-              <div class="empty-inline">Trend data is temporarily unavailable.</div>
+              <p class="empty-inline">Trend data is temporarily unavailable.</p>
             } @else if (data.statusOverview.trend.length) {
               <div class="chart-wrap">
-                <svg viewBox="0 0 720 235" role="img" aria-label="Tenant, subscription and MRR trend">
+                <svg
+                  viewBox="0 0 720 235"
+                  role="img"
+                  aria-labelledby="dashboard-trend-title dashboard-trend-desc"
+                >
+                  <title id="dashboard-trend-title">Platform trend chart</title>
+                  <desc id="dashboard-trend-desc">
+                    Line chart of tenant, subscription, and MRR trend for the current period.
+                  </desc>
                   @for (line of [40, 85, 130, 175, 220]; track line) {
                     <line x1="45" [attr.y1]="line" x2="700" [attr.y2]="line" />
                   }
@@ -198,7 +210,7 @@ import { PlatformDashboardApiService } from '../../services/platform-dashboard-a
                     <polyline class="mrr-line" [attr.points]="chartPoints(data.statusOverview.trend, 'mrr')" />
                   }
                 </svg>
-                <div class="legend">
+                <div class="legend" aria-hidden="true">
                   <span class="tenant-dot">Tenants</span>
                   @if (data.permissions.canViewTenantSubscriptions) {
                     <span class="subscription-dot">Subscriptions</span>
@@ -209,750 +221,571 @@ import { PlatformDashboardApiService } from '../../services/platform-dashboard-a
                 </div>
               </div>
             } @else {
-              <div class="empty-inline">Trend data will appear when platform records exist.</div>
+              <p class="empty-inline">Trend data will appear when platform records exist.</p>
             }
           </article>
 
-          <article class="panel attention-panel">
-            <div class="attention-heading">
-              <i>!</i>
+          <article class="panel">
+            <header class="panel-head">
               <div>
                 <h2>Attention Needed Today</h2>
                 <p>Items that need your immediate attention</p>
               </div>
-            </div>
-            <div class="attention-list">
-              @for (item of data.attention; track item.type) {
-                @if (canNavigateAttention(item.type)) {
-                  <a
-                    class="attention-row"
-                    [class.warning]="item.severity === 'warning'"
-                    [class.info]="item.severity === 'info'"
-                    [routerLink]="attentionLink(item.type)"
-                    [queryParams]="attentionQueryParams(item.type)"
-                  >
-                    <i>{{ attentionIcon(item.type) }}</i>
-                    <div>
-                      <strong>{{ item.title }}</strong>
-                      <span>{{ item.description }}</span>
+            </header>
+
+            @if (data.attention.length) {
+              <div class="attention-list">
+                @for (item of data.attention; track item.type) {
+                  @if (canNavigateAttention(item.type)) {
+                    <a
+                      class="attention-row"
+                      [class.warning]="item.severity === 'warning'"
+                      [class.info]="item.severity === 'info'"
+                      [routerLink]="attentionLink(item.type)"
+                      [queryParams]="attentionQueryParams(item.type)"
+                    >
+                      <div>
+                        <strong>{{ item.title }}</strong>
+                        <span>{{ item.description }}</span>
+                      </div>
+                      <b>{{ item.count }}</b>
+                    </a>
+                  } @else {
+                    <div
+                      class="attention-row static"
+                      [class.warning]="item.severity === 'warning'"
+                      [class.info]="item.severity === 'info'"
+                    >
+                      <div>
+                        <strong>{{ item.title }}</strong>
+                        <span>{{ item.description }}</span>
+                      </div>
+                      <b>{{ item.count }}</b>
                     </div>
-                    <b>{{ item.count }}</b>
-                    <em>&gt;</em>
-                  </a>
-                } @else {
-                  <div
-                    class="attention-row static"
-                    [class.warning]="item.severity === 'warning'"
-                    [class.info]="item.severity === 'info'"
-                  >
-                    <i>{{ attentionIcon(item.type) }}</i>
-                    <div>
-                      <strong>{{ item.title }}</strong>
-                      <span>{{ item.description }}</span>
-                    </div>
-                    <b>{{ item.count }}</b>
-                  </div>
+                  }
                 }
-              }
-            </div>
+              </div>
+            } @else {
+              <app-empty-state
+                title="No items require attention"
+                message="Operational attention items will appear here when the platform reports them."
+              />
+            }
+
             @if (canViewTenants()) {
-              <a routerLink="/admin/tenants">View all tenants <span>-></span></a>
+              <a class="panel-link" routerLink="/admin/tenants">View all tenants</a>
             }
           </article>
         </section>
 
         <section class="lower-grid">
-          <article class="panel activity-panel">
-            <div class="panel-title">
+          <article class="panel">
+            <header class="panel-head">
               <div>
                 <h2>Recent Tenants</h2>
               </div>
-            </div>
-            @if (data.recentTenants.length) {
-              @for (tenant of data.recentTenants; track tenant.id) {
-                <div class="activity-row">
-                  <i>+</i>
-                  <span
-                    ><strong>{{ tenant.name }}</strong> ({{ tenant.code }}) — {{ tenant.status }}</span
-                  >
-                  <time>{{ tenant.createdAt | date: 'short' }}</time>
-                </div>
+              @if (canViewTenants()) {
+                <a class="panel-link tight" routerLink="/admin/tenants">View all</a>
               }
+            </header>
+
+            @if (data.recentTenants.length) {
+              <div class="data-table-container">
+                <table class="data-table recent-table">
+                  <thead>
+                    <tr>
+                      <th>Tenant</th>
+                      <th>Status</th>
+                      <th>Created</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (tenant of data.recentTenants; track tenant.id) {
+                      <tr>
+                        <td>
+                          @if (canViewTenants()) {
+                            <a class="tenant-link" [routerLink]="['/admin/tenants', tenant.id]">
+                              <strong>{{ tenant.name }}</strong>
+                              <span>{{ tenant.code }}</span>
+                            </a>
+                          } @else {
+                            <strong>{{ tenant.name }}</strong>
+                            <span class="muted">{{ tenant.code }}</span>
+                          }
+                        </td>
+                        <td>
+                          <app-status-badge [variant]="mapStatusVariant(tenant.status)">
+                            {{ tenant.status }}
+                          </app-status-badge>
+                        </td>
+                        <td>
+                          <time>{{ tenant.createdAt | date: 'short' }}</time>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
             } @else {
-              <div class="empty-inline">No recent tenants have been recorded yet.</div>
+              <p class="empty-inline">No recent tenants have been recorded yet.</p>
             }
           </article>
 
-          <article class="panel snapshot-panel">
-            <div class="panel-title">
+          <article class="panel">
+            <header class="panel-head">
               <div>
                 <h2>Tenant Status Snapshot</h2>
               </div>
-            </div>
-            <div class="snapshot-content">
-              <div class="donut" [style.background]="donutBackground(data.tenantStatusSnapshot.items)">
-                <div>
-                  <strong>{{ data.tenantStatusSnapshot.total }}</strong>
-                  <span>Total</span>
-                </div>
-              </div>
-              <div class="status-list">
-                @for (item of data.tenantStatusSnapshot.items; track item.status; let index = $index) {
-                  <div>
-                    <i [class]="'status-' + index"></i>
+            </header>
+            <p class="snapshot-total">
+              Total <strong>{{ data.tenantStatusSnapshot.total }}</strong>
+            </p>
+            @if (data.tenantStatusSnapshot.items.length) {
+              <ul class="status-list">
+                @for (item of data.tenantStatusSnapshot.items; track item.status) {
+                  <li>
                     <span>{{ item.status }}</span>
                     <strong>{{ item.count }}</strong>
                     <b>{{ item.percentage }}%</b>
-                  </div>
+                    <div class="bar" aria-hidden="true">
+                      <i [style.width.%]="item.percentage"></i>
+                    </div>
+                  </li>
                 }
-              </div>
-            </div>
+              </ul>
+            } @else {
+              <p class="empty-inline compact">No tenant status distribution yet.</p>
+            }
           </article>
         </section>
 
         @if (data.subscriptionSnapshot; as subscriptionSnapshot) {
-          <section class="snapshot-section">
-            <article class="panel snapshot-panel subscription-snapshot">
-              <div class="panel-title">
-                <div>
-                  <h2>Subscription Status Snapshot</h2>
-                </div>
+          <article class="panel">
+            <header class="panel-head">
+              <div>
+                <h2>Subscription Status Snapshot</h2>
               </div>
-              <div class="snapshot-content">
-                <div class="donut" [style.background]="donutBackground(subscriptionSnapshot.items)">
-                  <div>
-                    <strong>{{ subscriptionSnapshot.total }}</strong>
-                    <span>Total</span>
+            </header>
+            <p class="snapshot-total">
+              Total <strong>{{ subscriptionSnapshot.total }}</strong>
+            </p>
+            <ul class="status-list">
+              @for (item of subscriptionSnapshot.items; track item.status) {
+                <li>
+                  <span>{{ item.status }}</span>
+                  <strong>{{ item.count }}</strong>
+                  <b>{{ item.percentage }}%</b>
+                  <div class="bar" aria-hidden="true">
+                    <i [style.width.%]="item.percentage"></i>
                   </div>
-                </div>
-                <div class="status-list">
-                  @for (item of subscriptionSnapshot.items; track item.status; let index = $index) {
-                    <div>
-                      <i [class]="'status-' + index"></i>
-                      <span>{{ item.status }}</span>
-                      <strong>{{ item.count }}</strong>
-                      <b>{{ item.percentage }}%</b>
-                    </div>
-                  }
-                </div>
-              </div>
-            </article>
-          </section>
+                </li>
+              }
+            </ul>
+          </article>
         }
 
         @if (data.footprint; as footprint) {
-          <section class="footprint-section">
-            <article class="panel footprint-panel">
-              <div class="panel-title">
-                <div>
-                  <h2>Platform Footprint</h2>
-                  <p>Operational scale across tenants and platform staff.</p>
-                </div>
+          <article class="panel">
+            <header class="panel-head">
+              <div>
+                <h2>Platform Footprint</h2>
+                <p>Operational scale across tenants and platform staff.</p>
               </div>
-              <div class="footprint-grid">
-                <div>
-                  <span>Outlets</span>
-                  <strong>{{ footprint.totalOutlets }}</strong>
-                </div>
-                <div>
-                  <span>Tills</span>
-                  <strong>{{ footprint.totalTills }}</strong>
-                </div>
-                <div>
-                  <span>Tenant Users</span>
-                  <strong>{{ footprint.totalTenantUsers }}</strong>
-                </div>
-                @if (footprint.totalPlatformUsers !== null) {
-                  <div>
-                    <span>Platform Users</span>
-                    <strong>{{ footprint.totalPlatformUsers }}</strong>
-                  </div>
-                }
+            </header>
+            <div class="footprint-grid">
+              <div>
+                <span class="kpi-label">Outlets</span>
+                <strong>{{ footprint.totalOutlets }}</strong>
               </div>
-            </article>
-          </section>
+              <div>
+                <span class="kpi-label">Tills</span>
+                <strong>{{ footprint.totalTills }}</strong>
+              </div>
+              <div>
+                <span class="kpi-label">Tenant Users</span>
+                <strong>{{ footprint.totalTenantUsers }}</strong>
+              </div>
+              @if (footprint.totalPlatformUsers !== null) {
+                <div>
+                  <span class="kpi-label">Platform Users</span>
+                  <strong>{{ footprint.totalPlatformUsers }}</strong>
+                </div>
+              }
+            </div>
+          </article>
         }
       }
     </section>
   `,
   styles: `
     :host {
-      color: #14213d;
+      color: var(--text-primary);
       display: block;
     }
-    * {
-      box-sizing: border-box;
-    }
-    .dashboard-page {
+
+    .dashboard-page,
+    .kpi-grid,
+    .main-grid,
+    .lower-grid,
+    .footprint-grid,
+    .status-list,
+    .attention-list {
       display: grid;
-      gap: 1rem;
+      gap: var(--space-4);
     }
-    .page-heading {
-      align-items: flex-start;
-      display: flex;
-      gap: 1rem;
-      justify-content: space-between;
-    }
-    .page-heading h1 {
-      color: #101a38;
-      font-size: clamp(1.55rem, 2.4vw, 2rem);
-      margin: 0;
-    }
-    .page-heading p,
-    .panel-title p,
-    .attention-heading p {
-      color: #667085;
-      margin: 0.45rem 0 0;
-    }
+
+    .dashboard-page { gap: var(--space-5); }
+
     .last-updated {
-      color: #8290a7;
+      color: var(--text-muted);
       font-size: 0.78rem;
-      margin-top: 0.35rem !important;
+      margin: calc(var(--space-3) * -1) 0 0;
     }
-    .heading-actions button {
-      background: #fff;
-      border: 1px solid #dde5ef;
-      border-radius: 8px;
-      color: #344054;
-      cursor: pointer;
-      font-size: 0.78rem;
-      font-weight: 700;
-      padding: 0.55rem 0.85rem;
-    }
-    .heading-actions button:disabled {
-      cursor: not-allowed;
-      opacity: 0.65;
-    }
-    .section-errors-banner {
-      background: #fff8eb;
-      border: 1px solid #f5d08a;
-      border-radius: 10px;
-      color: #8a6100;
-      font-size: 0.82rem;
-      padding: 0.75rem 1rem;
-    }
-    .kpi-grid {
-      display: grid;
-      gap: 0.85rem;
-      grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
-    }
-    .kpi-card,
-    .panel,
-    .state-card {
-      background: #fff;
-      border: 1px solid #e5eaf2;
-      border-radius: 13px;
-      box-shadow: 0 7px 22px rgba(31, 51, 86, 0.045);
-    }
-    .kpi-card {
+
+    .banner {
       align-items: center;
-      display: grid;
-      gap: 0.55rem 0.7rem;
-      grid-template-columns: auto 1fr;
-      min-height: 8.8rem;
-      padding: 1rem;
-    }
-    .kpi-card > i {
-      align-items: center;
-      background: #eaf2ff;
-      border-radius: 50%;
-      color: #1768e5;
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-md);
       display: flex;
-      font-size: 0.75rem;
-      font-style: normal;
-      font-weight: 900;
-      height: 2.8rem;
-      justify-content: center;
-      width: 2.8rem;
+      gap: var(--space-3);
+      justify-content: space-between;
+      padding: var(--space-3) var(--space-4);
     }
-    .kpi-card div {
+
+    .banner.warn {
+      background: var(--status-warning-bg);
+      border-color: var(--status-warning);
+      color: var(--status-warning-text);
+    }
+
+    .banner.danger {
+      background: var(--status-danger-bg);
+      border-color: var(--status-danger);
+      color: var(--status-danger-text);
+    }
+
+    .banner div {
       display: grid;
-      gap: 0.35rem;
+      gap: var(--space-1);
+    }
+
+    .kpi-grid {
+      grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
+    }
+
+    .kpi,
+    .panel {
+      background: var(--bg-surface-primary);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-md);
+    }
+
+    .kpi {
+      display: grid;
+      gap: var(--space-2);
       min-width: 0;
+      padding: var(--space-4);
     }
-    .kpi-card span {
-      color: #596783;
-      font-size: 0.76rem;
+
+    .kpi-label,
+    .muted,
+    .empty-inline,
+    .legend span,
+    .status-list b,
+    .attention-row span,
+    .tenant-link span,
+    time {
+      color: var(--text-muted);
     }
-    .kpi-card strong {
-      color: #101a38;
-      font-size: clamp(1.15rem, 1.7vw, 1.48rem);
+
+    .kpi-label {
+      font-size: 0.75rem;
+    }
+
+    .kpi-value,
+    .summary-value,
+    .footprint-grid strong {
+      color: var(--text-primary);
+      font-size: 1.25rem;
       overflow-wrap: anywhere;
     }
-    .kpi-card small {
-      color: #13a653;
+
+    .health-row {
+      align-items: center;
+      display: flex;
+      font-size: 1rem;
+    }
+
+    .kpi-meta {
+      color: var(--status-success-text);
       font-size: 0.72rem;
-      font-weight: 800;
-      grid-column: 1 / -1;
+      font-weight: 600;
     }
-    .kpi-card small.negative {
-      color: #ef4444;
-    }
-    .kpi-card small.neutral {
-      color: #667085;
-    }
-    .kpi-card.violet > i {
-      background: #f0eaff;
-      color: #7047eb;
-    }
-    .kpi-card.green > i,
-    .kpi-card.health > i {
-      background: #e8f8ed;
-      color: #18a44b;
-    }
-    .kpi-card.orange > i {
-      background: #fff1e6;
-      color: #ff7a18;
-    }
-    .kpi-card.health strong,
-    .kpi-card.health small {
-      color: #18a44b;
-    }
-    .kpi-card.health.degraded strong,
-    .kpi-card.health.degraded small {
-      color: #f97316;
-    }
-    .kpi-card.health.critical strong,
-    .kpi-card.health.critical small {
-      color: #ef4444;
-    }
-    .kpi-card.health.unknown strong,
-    .kpi-card.health.unknown small {
-      color: #667085;
-    }
+
+    .kpi-meta.negative { color: var(--status-danger-text); }
+    .kpi-meta.neutral { color: var(--text-muted); font-weight: 500; }
+
     .main-grid {
-      display: grid;
-      gap: 1rem;
-      grid-template-columns: minmax(0, 1.65fr) minmax(19rem, 1fr);
+      grid-template-columns: minmax(0, 1.65fr) minmax(17rem, 1fr);
     }
+
     .lower-grid {
-      display: grid;
-      gap: 1rem;
       grid-template-columns: 1.15fr 1fr;
     }
-    .snapshot-section,
-    .footprint-section {
-      display: grid;
-      gap: 1rem;
-    }
-    .panel {
-      min-width: 0;
-      padding: 1rem;
-    }
-    .panel-title {
+
+    .panel { min-width: 0; padding: var(--space-4); }
+
+    .panel-head {
       align-items: flex-start;
       display: flex;
+      gap: var(--space-3);
       justify-content: space-between;
     }
-    .panel-title h2,
-    .attention-heading h2 {
+
+    .panel-head h2 {
       font-size: 1rem;
       margin: 0;
     }
-    .panel-title p,
-    .attention-heading p {
+
+    .panel-head p {
+      color: var(--text-secondary);
       font-size: 0.78rem;
+      margin: var(--space-1) 0 0;
     }
-    .panel-title > span {
-      border: 1px solid #dde5ef;
-      border-radius: 8px;
-      color: #344054;
-      font-size: 0.78rem;
-      font-weight: 700;
-      padding: 0.55rem 0.7rem;
+
+    .chip {
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-md);
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: var(--space-2) var(--space-3);
+      white-space: nowrap;
     }
+
     .summary-row {
-      border: 1px solid #e6ebf3;
-      border-radius: 10px;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
       display: grid;
+      gap: var(--space-3);
       grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
-      margin-top: 1rem;
-      padding: 0.85rem 0;
+      margin-top: var(--space-4);
+      padding: var(--space-3);
     }
+
     .summary-row > div {
       display: grid;
-      gap: 0.35rem;
-      padding: 0 1rem;
-      text-align: center;
+      gap: var(--space-1);
     }
-    .summary-row > div + div {
-      border-left: 1px solid #dde4ee;
-    }
-    .summary-row span {
-      color: #344054;
-      font-size: 0.72rem;
-    }
-    .summary-row strong {
-      font-size: 1.32rem;
-    }
-    .summary-row small {
-      color: #16a34a;
-      font-size: 0.75rem;
-      font-weight: 800;
-    }
-    .summary-row small.neutral {
-      color: #667085;
-    }
-    .health-summary section {
-      align-items: center;
-      display: flex;
-      gap: 0.7rem;
-      justify-content: center;
-    }
-    .health-summary section > b {
-      align-items: center;
-      border: 5px solid #1bb55c;
-      border-radius: 50%;
-      display: flex;
-      height: 3.5rem;
-      justify-content: center;
-      width: 3.5rem;
-    }
-    .health-summary p {
-      display: grid;
-      gap: 0.2rem;
-      margin: 0;
-      text-align: left;
-    }
-    .health-summary p strong {
-      color: #18a44b;
-      font-size: 1rem;
-    }
-    .health-summary em {
-      color: #f97316;
-      font-style: normal;
-      margin-left: 0.35rem;
-    }
-    .chart-wrap {
-      margin-top: 0.75rem;
-    }
+
+    .chart-wrap { margin-top: var(--space-3); }
+
     svg {
       display: block;
-      height: 13rem;
+      height: 12rem;
       width: 100%;
     }
+
     svg line {
-      stroke: #e8edf4;
+      stroke: var(--border-default);
       stroke-width: 1;
     }
+
     svg polyline {
       fill: none;
       stroke-linecap: round;
       stroke-linejoin: round;
-      stroke-width: 3;
+      stroke-width: 2.5;
     }
-    .tenant-line {
-      stroke: #1768e5;
-    }
-    .subscription-line {
-      stroke: #7148ef;
-    }
-    .mrr-line {
-      stroke: #16a34a;
-    }
+
+    .tenant-line { stroke: var(--primary); }
+    .subscription-line { stroke: var(--status-info); }
+    .mrr-line { stroke: var(--status-success); }
+
     .legend {
       display: flex;
       flex-wrap: wrap;
-      gap: 1.5rem;
+      gap: var(--space-4);
       justify-content: center;
+      margin-top: var(--space-2);
     }
+
     .legend span {
-      color: #667085;
       font-size: 0.72rem;
     }
+
     .legend span::before {
-      border-radius: 99px;
+      border-radius: var(--radius-pill);
       content: '';
       display: inline-block;
       height: 3px;
-      margin-right: 0.4rem;
+      margin-right: var(--space-2);
       vertical-align: middle;
-      width: 1.35rem;
+      width: 1.1rem;
     }
-    .tenant-dot::before {
-      background: #1768e5;
-    }
-    .subscription-dot::before {
-      background: #7148ef;
-    }
-    .mrr-dot::before {
-      background: #16a34a;
-    }
-    .attention-heading {
-      align-items: center;
-      display: flex;
-      gap: 0.75rem;
-    }
-    .attention-heading > i {
-      align-items: center;
-      background: #fff0f0;
-      border-radius: 10px;
-      color: #ef4444;
-      display: flex;
-      font-style: normal;
-      font-weight: 900;
-      height: 2.7rem;
-      justify-content: center;
-      width: 2.7rem;
-    }
+
+    .tenant-dot::before { background: var(--primary); }
+    .subscription-dot::before { background: var(--status-info); }
+    .mrr-dot::before { background: var(--status-success); }
+
     .attention-list {
-      border: 1px solid #e6ebf3;
-      border-radius: 10px;
-      margin-top: 1rem;
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-md);
+      gap: 0;
+      margin-top: var(--space-4);
       overflow: hidden;
     }
+
     .attention-row {
       align-items: center;
       color: inherit;
       display: grid;
-      gap: 0.65rem;
-      grid-template-columns: auto minmax(0, 1fr) auto auto;
-      min-height: 4.15rem;
-      padding: 0.7rem;
+      gap: var(--space-3);
+      grid-template-columns: minmax(0, 1fr) auto;
+      padding: var(--space-3);
       text-decoration: none;
     }
-    .attention-row.static {
-      grid-template-columns: auto minmax(0, 1fr) auto;
-    }
+
     .attention-row + .attention-row {
-      border-top: 1px solid #e6ebf3;
+      border-top: 1px solid var(--border-subtle);
     }
-    .attention-row > i {
-      align-items: center;
-      background: #fff0f0;
-      border-radius: 9px;
-      color: #ef4444;
-      display: flex;
-      font-size: 0.65rem;
-      font-style: normal;
-      font-weight: 900;
-      height: 2rem;
-      justify-content: center;
-      width: 2rem;
+
+    .attention-row:focus-visible {
+      outline: 2px solid var(--border-focus);
+      outline-offset: -2px;
     }
-    .attention-row.warning > i {
-      background: #fff4e8;
-      color: #f97316;
-    }
-    .attention-row.info > i {
-      background: #eeeaff;
-      color: #7047eb;
-    }
+
     .attention-row div {
       display: grid;
-      gap: 0.18rem;
+      gap: 0.15rem;
     }
-    .attention-row strong {
-      font-size: 0.78rem;
-    }
-    .attention-row span {
-      color: #667085;
-      font-size: 0.68rem;
-    }
+
+    .attention-row strong { font-size: 0.8125rem; }
+    .attention-row span { font-size: 0.72rem; }
+
     .attention-row > b {
       align-items: center;
-      background: #fff0f0;
-      border-radius: 50%;
-      color: #ef4444;
-      display: flex;
-      font-size: 0.72rem;
-      height: 1.8rem;
-      justify-content: center;
-      width: 1.8rem;
-    }
-    .attention-row > em {
-      color: #8290a7;
-      font-size: 1.4rem;
-      font-style: normal;
-    }
-    .attention-panel > a:not(.attention-row) {
-      color: #0b5cff;
-      display: inline-block;
+      background: var(--status-danger-bg);
+      border-radius: var(--radius-pill);
+      color: var(--status-danger-text);
+      display: inline-flex;
       font-size: 0.75rem;
-      font-weight: 800;
-      margin-top: 0.75rem;
+      justify-content: center;
+      min-width: 1.75rem;
+      padding: 0.2rem 0.45rem;
+    }
+
+    .attention-row.warning > b {
+      background: var(--status-warning-bg);
+      color: var(--status-warning-text);
+    }
+
+    .attention-row.info > b {
+      background: var(--status-info-bg);
+      color: var(--status-info-text);
+    }
+
+    .panel-link {
+      color: var(--primary);
+      display: inline-block;
+      font-size: 0.78rem;
+      font-weight: 600;
+      margin-top: var(--space-3);
       text-decoration: none;
     }
-    .activity-row {
-      align-items: center;
-      border-bottom: 1px solid #edf0f5;
+
+    .panel-link.tight { margin-top: 0; }
+
+    .panel-link:focus-visible,
+    .tenant-link:focus-visible {
+      outline: 2px solid var(--border-focus);
+      outline-offset: 2px;
+    }
+
+    .recent-table { min-width: 28rem; }
+
+    .tenant-link {
+      color: inherit;
       display: grid;
-      gap: 0.7rem;
-      grid-template-columns: auto 1fr auto;
-      min-height: 2.75rem;
+      gap: 0.1rem;
+      text-decoration: none;
     }
-    .activity-row i {
-      align-items: center;
-      background: #eaf2ff;
-      border-radius: 50%;
-      color: #0b5cff;
-      display: flex;
-      font-style: normal;
-      height: 1.7rem;
-      justify-content: center;
-      width: 1.7rem;
+
+    .tenant-link:hover strong { color: var(--primary); }
+
+    .snapshot-total {
+      color: var(--text-secondary);
+      font-size: 0.8125rem;
+      margin: var(--space-3) 0;
     }
-    .activity-row span,
-    .activity-row time {
-      font-size: 0.75rem;
-    }
-    .activity-row time {
-      color: #667085;
-    }
-    .snapshot-content {
-      align-items: center;
-      display: grid;
-      gap: 1.5rem;
-      grid-template-columns: 11rem 1fr;
-      padding: 1rem;
-    }
-    .donut {
-      align-items: center;
-      border-radius: 50%;
-      display: flex;
-      height: 10rem;
-      justify-content: center;
-      width: 10rem;
-    }
-    .donut > div {
-      align-items: center;
-      background: #fff;
-      border-radius: 50%;
-      display: flex;
-      flex-direction: column;
-      height: 6rem;
-      justify-content: center;
-      width: 6rem;
-    }
-    .donut strong {
-      font-size: 1.6rem;
-    }
-    .donut span {
-      color: #667085;
-      font-size: 0.75rem;
-    }
+
     .status-list {
+      gap: var(--space-3);
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .status-list li {
       display: grid;
-      gap: 0.85rem;
+      gap: var(--space-2);
+      grid-template-columns: 1fr auto auto;
+      grid-template-rows: auto auto;
     }
-    .status-list div {
-      align-items: center;
-      display: grid;
-      gap: 0.6rem;
-      grid-template-columns: auto 1fr auto auto;
-    }
-    .status-list i {
-      background: #16a34a;
-      border-radius: 50%;
-      height: 0.65rem;
-      width: 0.65rem;
-    }
-    .status-list .status-1 {
-      background: #1768e5;
-    }
-    .status-list .status-2 {
-      background: #f97316;
-    }
-    .status-list .status-3 {
-      background: #ef4444;
-    }
-    .status-list .status-4 {
-      background: #94a3b8;
-    }
+
     .status-list span,
     .status-list strong,
     .status-list b {
-      font-size: 0.76rem;
+      font-size: 0.78rem;
     }
-    .status-list b {
-      color: #667085;
-      min-width: 3rem;
-      text-align: right;
+
+    .status-list .bar {
+      background: var(--bg-surface-secondary);
+      border-radius: var(--radius-pill);
+      grid-column: 1 / -1;
+      height: 0.35rem;
+      overflow: hidden;
     }
+
+    .status-list .bar i {
+      background: var(--primary);
+      display: block;
+      height: 100%;
+    }
+
     .footprint-grid {
-      display: grid;
-      gap: 0.85rem;
-      grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
-      margin-top: 0.75rem;
+      grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+      margin-top: var(--space-3);
     }
+
     .footprint-grid > div {
-      background: #f8fafc;
-      border: 1px solid #e6ebf3;
-      border-radius: 10px;
+      background: var(--bg-surface-secondary);
+      border-radius: var(--radius-md);
       display: grid;
-      gap: 0.35rem;
-      padding: 0.85rem 1rem;
+      gap: var(--space-1);
+      padding: var(--space-3);
     }
-    .footprint-grid span {
-      color: #667085;
-      font-size: 0.72rem;
-    }
-    .footprint-grid strong {
-      color: #101a38;
-      font-size: 1.25rem;
-    }
+
     .empty-inline {
-      color: #667085;
       font-size: 0.82rem;
-      padding: 2rem 0;
+      margin: 0;
+      padding: var(--space-5) 0;
       text-align: center;
     }
-    .empty-inline.compact {
-      padding: 0.5rem 0;
+
+    .empty-inline.compact { padding: var(--space-2) 0; text-align: left; }
+
+    @media (max-width: 1100px) {
+      .main-grid { grid-template-columns: 1fr; }
     }
-    .state-card {
-      display: grid;
-      gap: 0.75rem;
-      padding: 2rem;
-      text-align: center;
-    }
-    .state-card.error,
-    .state-card.refresh-error {
-      color: #b42318;
-    }
-    .state-card button {
-      background: #0b5cff;
-      border: 0;
-      border-radius: 8px;
-      color: #fff;
-      cursor: pointer;
-      justify-self: center;
-      padding: 0.7rem 1rem;
-    }
-    @media (max-width: 1180px) {
-      .main-grid {
-        grid-template-columns: 1fr;
-      }
-    }
+
     @media (max-width: 820px) {
-      .lower-grid {
-        grid-template-columns: 1fr 1fr;
-      }
-      .snapshot-content {
-        grid-template-columns: 1fr;
-        justify-items: center;
-      }
+      .lower-grid { grid-template-columns: 1fr; }
     }
-    @media (max-width: 560px) {
-      .lower-grid {
-        grid-template-columns: 1fr;
-      }
-      .summary-row {
-        grid-template-columns: 1fr;
-      }
-      .summary-row > div {
-        padding: 0.8rem;
-      }
-      .summary-row > div + div {
-        border-left: 0;
-        border-top: 1px solid #dde4ee;
-      }
-      .panel {
-        padding: 0.8rem;
-      }
-      .page-heading {
-        flex-direction: column;
-      }
+
+    @media (max-width: 760px) {
+      .summary-row { grid-template-columns: 1fr; }
+      .banner { align-items: flex-start; flex-direction: column; }
     }
   `
 })
@@ -1107,19 +940,35 @@ export class PlatformDashboardPage {
     }
   }
 
-  attentionIcon(type: string): string {
-    return (
-      {
-        payment_failures: 'PF',
-        expiring_subscriptions: 'EX',
-        suspended_tenants: 'ST',
-        pending_activation: 'PA',
-        setup_pending: 'SP',
-        past_due_subscriptions: 'PD',
-        pending_billing: 'PB',
-        support_tickets: 'TK'
-      } as Record<string, string>
-    )[type] ?? '!';
+  healthVariant(status: string | null | undefined): 'success' | 'info' | 'warning' | 'danger' | 'neutral' {
+    switch (status?.toUpperCase()) {
+      case 'HEALTHY':
+        return 'success';
+      case 'DEGRADED':
+        return 'warning';
+      case 'CRITICAL':
+        return 'danger';
+      default:
+        return 'neutral';
+    }
+  }
+
+  mapStatusVariant(status: string | null | undefined): 'success' | 'info' | 'warning' | 'danger' | 'neutral' {
+    const badgeClass = tenantLifecycleBadgeClass({ status: status ?? undefined });
+    switch (badgeClass) {
+      case 'active':
+        return 'success';
+      case 'pending_activation':
+      case 'draft':
+        return 'info';
+      case 'suspended':
+      case 'pending_payment':
+        return 'warning';
+      case 'cancelled':
+        return 'danger';
+      default:
+        return 'neutral';
+    }
   }
 
   attentionLink(type: string): string {
@@ -1155,17 +1004,5 @@ export class PlatformDashboardPage {
         return `${x.toFixed(1)},${y.toFixed(1)}`;
       })
       .join(' ');
-  }
-
-  donutBackground(items: TenantStatusItem[]): string {
-    const colors = ['#16a34a', '#1768e5', '#f97316', '#ef4444', '#94a3b8'];
-    let cursor = 0;
-    const stops = items.map((item, index) => {
-      const start = cursor;
-      cursor += item.percentage;
-      return `${colors[index] ?? '#94a3b8'} ${start}% ${cursor}%`;
-    });
-
-    return stops.length ? `conic-gradient(${stops.join(', ')})` : '#e5e7eb';
   }
 }
