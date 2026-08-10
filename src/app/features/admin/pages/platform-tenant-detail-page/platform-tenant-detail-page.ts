@@ -14,268 +14,433 @@ import {
   PlatformTenantEntitlementOptions,
   PlatformTenantEntitlementPlanOption
 } from '../../models/platform-tenant-entitlements.model';
-import { PlatformTenantDetail, UpdatePlatformTenantRequest, PlatformTenantAuditLogListResponse } from '../../models/platform-tenant.model';
+import {
+  PlatformTenantAuditLogListResponse,
+  PlatformTenantDetail,
+  UpdatePlatformTenantRequest
+} from '../../models/platform-tenant.model';
 import { PlatformTenantApiService } from '../../services/platform-tenant-api.service';
-import { tenantLifecycleBadgeClass, tenantLifecycleLabel, resolveTenantLifecycle } from '../../utils/tenant-lifecycle.util';
+import {
+  resolveTenantLifecycle,
+  tenantLifecycleBadgeClass,
+  tenantLifecycleLabel
+} from '../../utils/tenant-lifecycle.util';
+
+import { ConfirmationDialog } from '../../../../shared/components/confirmation-dialog/confirmation-dialog';
+import { EmptyState } from '../../../../shared/components/empty-state/empty-state';
+import { ErrorState } from '../../../../shared/components/error-state/error-state';
+import { LoadingSkeleton } from '../../../../shared/components/loading-skeleton/loading-skeleton';
+import { BreadcrumbItem, PageHeader } from '../../../../shared/components/page-header/page-header';
+import { Button } from '../../../../shared/ui/button/button';
+import { FormField } from '../../../../shared/ui/form-field/form-field';
+import { StatusBadge } from '../../../../shared/ui/status-badge/status-badge';
 
 @Component({
   selector: 'app-platform-tenant-detail-page',
   standalone: true,
-  imports: [DatePipe, FormsModule, RouterLink],
+  imports: [
+    DatePipe,
+    FormsModule,
+    RouterLink,
+    PageHeader,
+    Button,
+    StatusBadge,
+    FormField,
+    LoadingSkeleton,
+    ErrorState,
+    EmptyState,
+    ConfirmationDialog
+  ],
   template: `
     <section class="tenant-detail-page">
       @if (successMessage()) {
         <div class="toast success" role="status">{{ successMessage() }}</div>
       }
 
-      <header class="page-heading">
-        <div class="title-block">
-          <nav class="breadcrumb" aria-label="Breadcrumb">
-            <a routerLink="/admin/tenants">Tenants</a>
-            <span aria-hidden="true">/</span>
-            <span class="current">Detail</span>
-          </nav>
-          @if (tenant(); as data) {
-            <h1>{{ data.name }}</h1>
-            <p>{{ data.code }} · {{ data.operatingMode }}</p>
-          } @else {
-            <h1>Tenant Detail</h1>
-            <p>Loading tenant profile from the backend...</p>
-          }
-          <span class="title-accent" aria-hidden="true"></span>
-        </div>
-
+      <app-page-header
+        [title]="tenant()?.name || 'Tenant Detail'"
+        [description]="headerDescription()"
+        [breadcrumbs]="breadcrumbItems()"
+      >
         @if (tenant(); as data) {
-          <div class="page-actions">
-            @if (data.canUpdate && canUpdate()) {
-              <button type="button" class="btn secondary" [disabled]="isActionPending()" (click)="toggleEditTenant()">
-                {{ editMode() ? 'Cancel Edit' : 'Edit Tenant' }}
-              </button>
+          <div class="header-meta">
+            <app-status-badge [variant]="mapStatusVariant(statusClass(data))">
+              {{ statusLabel(data) }}
+            </app-status-badge>
+          </div>
+          <div class="header-actions" role="group" aria-label="Tenant actions">
+            @if (editMode()) {
+              <app-button variant="secondary" [disabled]="isActionPending()" (click)="cancelEditTenant()">
+                Cancel
+              </app-button>
+            } @else if (data.canUpdate && canUpdate()) {
+              <app-button variant="primary" [disabled]="isActionPending()" (click)="toggleEditTenant()">
+                Edit Profile
+              </app-button>
             }
-            @if (showActivate(data)) {
-              <button type="button" class="btn success" [disabled]="isActionPending()" (click)="activateTenant()">
+            @if (!editMode() && showActivate(data)) {
+              <app-button
+                [variant]="data.canUpdate && canUpdate() ? 'secondary' : 'primary'"
+                [disabled]="isActionPending()"
+                (click)="activateTenant()"
+              >
                 {{ isActionPending() ? 'Activating...' : 'Activate Tenant' }}
-              </button>
+              </app-button>
             }
-            @if (showReactivate(data)) {
-              <button type="button" class="btn success" [disabled]="isActionPending()" (click)="reactivateTenant()">
+            @if (!editMode() && showReactivate(data)) {
+              <app-button
+                [variant]="data.canUpdate && canUpdate() ? 'secondary' : 'primary'"
+                [disabled]="isActionPending()"
+                (click)="reactivateTenant()"
+              >
                 {{ isActionPending() ? 'Reactivating...' : 'Reactivate Tenant' }}
-              </button>
+              </app-button>
             }
-            @if (showSuspend(data)) {
-              <button type="button" class="btn danger" [disabled]="isActionPending()" (click)="suspendTenant()">
-                {{ isActionPending() ? 'Suspending...' : 'Suspend Tenant' }}
-              </button>
+            @if (!editMode() && showSuspend(data)) {
+              <app-button variant="destructive" [disabled]="isActionPending()" (click)="confirmSuspend()">
+                Suspend Tenant
+              </app-button>
             }
           </div>
         }
-      </header>
+      </app-page-header>
 
       @if (isLoading()) {
-        <div class="state-card card">Loading tenant detail from the backend...</div>
+        <div class="skeleton-wrap" aria-busy="true" aria-label="Loading tenant detail">
+          <app-loading-skeleton [rows]="5" />
+        </div>
       } @else if (errorMessage()) {
-        <div class="state-card card error">
-          <strong>Tenant detail could not be loaded</strong>
-          <span>{{ errorMessage() }}</span>
-          <button type="button" class="btn primary" (click)="reload()">Try again</button>
-        </div>
-      } @else if (actionError()) {
-        <div class="state-card card error">
-          <strong>Tenant lifecycle action failed</strong>
-          <span>{{ actionError() }}</span>
-          @if (isConflictError()) {
-            <button type="button" class="btn primary" (click)="reload()">Reload Latest Data</button>
-          }
-        </div>
-      }
-
-      @if (hasAuditViewPermission()) {
-        <nav class="detail-tabs" aria-label="Tenant detail navigation">
-          <button type="button" class="tab-btn" [class.active]="activeTab() === 'details'" (click)="activeTab.set('details')">Details</button>
-          <button type="button" class="tab-btn" [class.active]="activeTab() === 'audit'" (click)="switchTab('audit')">Audit History</button>
-        </nav>
+        <app-error-state
+          title="Tenant detail could not be loaded"
+          [message]="errorMessage()!"
+          [hasRetry]="true"
+          (retry)="reload()"
+        />
+      } @else if (actionError() && !editMode()) {
+        <app-error-state
+          title="Tenant lifecycle action failed"
+          [message]="actionError()!"
+          [hasRetry]="isConflictError()"
+          (retry)="reload()"
+        />
       }
 
       @if (tenant(); as data) {
+        @if (hasAuditViewPermission()) {
+          <nav class="detail-tabs" aria-label="Tenant detail navigation" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              id="tab-details"
+              class="tab-btn"
+              [class.active]="activeTab() === 'details'"
+              [attr.aria-selected]="activeTab() === 'details'"
+              aria-controls="panel-details"
+              (click)="activeTab.set('details')"
+            >
+              Details
+            </button>
+            <button
+              type="button"
+              role="tab"
+              id="tab-audit"
+              class="tab-btn"
+              [class.active]="activeTab() === 'audit'"
+              [attr.aria-selected]="activeTab() === 'audit'"
+              aria-controls="panel-audit"
+              (click)="switchTab('audit')"
+            >
+              Audit History
+            </button>
+          </nav>
+        }
+
         @if (activeTab() === 'details') {
-          @if (data.setupProgressPercent != null) {
-            <article class="card setup-checklist-card">
-              <header class="setup-header">
-                <h2>Setup Progress</h2>
-                <strong>{{ data.setupProgressPercent }}%</strong>
-              </header>
-              <p>Mandatory onboarding checklist. Outlets and tills remain optional.</p>
-              <div class="setup-columns">
-                <div>
-                  <h3>Completed</h3>
-                  @if (data.setupCompletedSteps?.length) {
-                    <ul>
-                      @for (step of data.setupCompletedSteps; track step) {
-                        <li>{{ formatSetupStep(step) }}</li>
-                      }
-                    </ul>
-                  } @else {
-                    <span>No mandatory steps completed yet.</span>
-                  }
-                </div>
-                <div>
-                  <h3>Missing</h3>
-                  @if (data.setupMissingSteps?.length) {
-                    <ul>
-                      @for (step of data.setupMissingSteps; track step) {
-                        <li>{{ formatSetupStep(step) }}</li>
-                      }
-                    </ul>
-                  } @else {
-                    <span>All mandatory steps complete.</span>
-                  }
-                </div>
-              </div>
-              @if (data.continueSetupPath || (data.setupMissingSteps && data.setupMissingSteps.length > 0)) {
-                <div class="setup-cta" style="margin-top: 1rem;">
-                  <a class="btn primary" [routerLink]="data.continueSetupPath || ['/admin/tenants', data.id]">Continue Setup</a>
-                </div>
-              }
-            </article>
-          }
-          <section class="summary-grid">
-            <article class="summary-card card">
-              <span class="label">Lifecycle Status</span>
-              <span
-                class="status-badge"
-                [class]="statusClass(data)"
-                [attr.aria-label]="'Lifecycle status: ' + statusLabel(data)"
-              >{{ statusLabel(data) }}</span>
-            </article>
-            @if (hasBillingViewPermission()) {
-              <article class="summary-card card">
-                <span class="label">Billing Status</span>
-                <strong>{{ data.billingStatus }}</strong>
-              </article>
-            }
-            <article class="summary-card card">
-              <span class="label">Users</span>
-              <strong>{{ data.userCount }}</strong>
-            </article>
-            <article class="summary-card card">
-              <span class="label">Outlets</span>
-              <strong>{{ data.outletCount }}</strong>
-            </article>
-            <article class="summary-card card">
-              <span class="label">Tills</span>
-              <strong>{{ data.tillCount }}</strong>
-            </article>
-          </section>
-
-          <div class="detail-grid">
-            <article class="panel card">
-              <h2>Profile</h2>
-              @if (editMode()) {
-                <form class="edit-form" (ngSubmit)="saveTenantEdit()">
-                  <label>
-                    <span>Name</span>
-                    <input type="text" [ngModel]="editDraft().name" (ngModelChange)="updateEditField('name', $event)" name="name" />
-                  </label>
-                  <label>
-                    <span>Operating Mode</span>
-                    <input type="text" [ngModel]="editDraft().operatingMode" (ngModelChange)="updateEditField('operatingMode', $event)" name="operatingMode" />
-                  </label>
-                  <label>
-                    <span>Business Type</span>
-                    <input type="text" [ngModel]="editDraft().businessType" (ngModelChange)="updateEditField('businessType', $event)" name="businessType" />
-                  </label>
-                  <label>
-                    <span>Base Currency</span>
-                    <input type="text" [ngModel]="editDraft().baseCurrency" (ngModelChange)="updateEditField('baseCurrency', $event)" name="baseCurrency" />
-                  </label>
-                  <label>
-                    <span>Timezone</span>
-                    <input type="text" [ngModel]="editDraft().defaultTimezone" (ngModelChange)="updateEditField('defaultTimezone', $event)" name="defaultTimezone" />
-                  </label>
-                  <label>
-                    <span>Locale</span>
-                    <input type="text" [ngModel]="editDraft().defaultLocale" (ngModelChange)="updateEditField('defaultLocale', $event)" name="defaultLocale" />
-                  </label>
-                  <label>
-                    <span>Billing Status</span>
-                    <input type="text" [ngModel]="editDraft().billingStatus" (ngModelChange)="updateEditField('billingStatus', $event)" name="billingStatus" />
-                  </label>
-                  <div class="edit-actions">
-                    <button type="button" class="btn ghost" [disabled]="isActionPending()" (click)="cancelEditTenant()">Cancel</button>
-                    <button type="submit" class="btn primary" [disabled]="isActionPending()">{{ isActionPending() ? 'Saving...' : 'Save Tenant' }}</button>
+          <div id="panel-details" role="tabpanel" aria-labelledby="tab-details">
+            @if (data.setupProgressPercent != null) {
+              <section class="setup-section" aria-labelledby="setup-heading">
+                <header class="setup-header">
+                  <div>
+                    <h2 id="setup-heading">Setup Progress</h2>
+                    <p class="section-note">Mandatory onboarding checklist. Outlets and tills remain optional.</p>
                   </div>
-                </form>
-              } @else {
-                <dl>
-                  <div><dt>Tenant Code</dt><dd>{{ data.code }}</dd></div>
-                  <div><dt>Operating Mode</dt><dd>{{ data.operatingMode }}</dd></div>
-                  <div><dt>Business Type</dt><dd>{{ data.businessType || '—' }}</dd></div>
-                  <div><dt>Base Currency</dt><dd>{{ data.baseCurrency }}</dd></div>
-                  <div><dt>Timezone</dt><dd>{{ data.defaultTimezone }}</dd></div>
-                  <div><dt>Locale</dt><dd>{{ data.defaultLocale }}</dd></div>
-                  <div><dt>Created On</dt><dd>{{ data.createdOn | date: 'medium' }}</dd></div>
-                  <div><dt>Last Activity</dt><dd>{{ data.lastActivityAt ? (data.lastActivityAt | date: 'medium') : '—' }}</dd></div>
-                </dl>
-              }
-            </article>
+                  <strong class="progress-percent" aria-label="Setup progress percent">
+                    {{ data.setupProgressPercent }}%
+                  </strong>
+                </header>
 
-            @if (hasSubscriptionViewPermission()) {
-              <article class="panel card">
-                <h2>Subscription</h2>
-                @if (data.subscription) {
-                  <dl>
-                    <div><dt>Plan</dt><dd>{{ data.subscription.planName }}</dd></div>
-                    <div><dt>Plan Code</dt><dd>{{ data.subscription.planCode }}</dd></div>
-                    <div><dt>Subscription Status</dt><dd>{{ data.subscription.subscriptionStatus }}</dd></div>
-                  </dl>
-                } @else {
-                  <p class="muted">No subscription plan is assigned to this tenant.</p>
+                <div class="setup-columns">
+                  <div>
+                    <h3>Completed</h3>
+                    @if (data.setupCompletedSteps?.length) {
+                      <ul class="checklist-list completed">
+                        @for (step of data.setupCompletedSteps; track step) {
+                          <li>
+                            <svg viewBox="0 0 24 24" class="check-icon" aria-hidden="true">
+                              <path d="M20 6L9 17l-5-5" />
+                            </svg>
+                            <span>{{ formatSetupStep(step) }}</span>
+                          </li>
+                        }
+                      </ul>
+                    } @else {
+                      <span class="checklist-muted">No mandatory steps completed yet.</span>
+                    }
+                  </div>
+                  <div>
+                    <h3>Missing</h3>
+                    @if (data.setupMissingSteps?.length) {
+                      <ul class="checklist-list missing">
+                        @for (step of data.setupMissingSteps; track step) {
+                          <li>
+                            <svg viewBox="0 0 24 24" class="cross-icon" aria-hidden="true">
+                              <path d="M18 6L6 18M6 6l12 12" />
+                            </svg>
+                            <span>{{ formatSetupStep(step) }}</span>
+                          </li>
+                        }
+                      </ul>
+                    } @else {
+                      <span class="checklist-muted">All mandatory steps complete.</span>
+                    }
+                  </div>
+                </div>
+
+                @if (data.continueSetupPath || (data.setupMissingSteps && data.setupMissingSteps.length > 0)) {
+                  <div class="setup-cta">
+                    <a class="continue-link" [routerLink]="data.continueSetupPath || ['/admin/tenants', data.id]">
+                      Continue Setup
+                    </a>
+                  </div>
                 }
-              </article>
+              </section>
             }
 
-            <article class="panel card">
-              <div class="panel-heading">
-                <h2>Entitlements</h2>
-                @if (data.canManageEntitlements && canManageEntitlements()) {
-                  <button type="button" class="btn secondary" (click)="openEntitlementEditor()">Edit Entitlements</button>
-                }
-              </div>
-              <p class="section-note">Enabled features returned by the tenant detail API.</p>
-              @if (data.enabledFeatureCodes.length) {
-                <ul class="feature-list">
-                  @for (code of data.enabledFeatureCodes; track code) {
-                    <li>
-                      <span>{{ featureLabelForCode(code) }}</span>
-                      <code class="feature-code">{{ code }}</code>
-                    </li>
-                  }
-                </ul>
-              } @else {
-                <p class="muted">No features are enabled for this tenant.</p>
+            <section class="summary-grid" aria-label="Tenant summary">
+              @if (hasBillingViewPermission()) {
+                <article class="summary-card">
+                  <span class="label">Billing Status</span>
+                  <strong class="summary-val">{{ data.billingStatus }}</strong>
+                </article>
               }
-            </article>
+              <article class="summary-card">
+                <span class="label">Users</span>
+                <strong class="summary-val">{{ data.userCount }}</strong>
+              </article>
+              <article class="summary-card">
+                <span class="label">Outlets</span>
+                <strong class="summary-val">{{ data.outletCount }}</strong>
+              </article>
+              @if (data.setupProgressPercent != null) {
+                <article class="summary-card">
+                  <span class="label">Setup Status</span>
+                  <strong class="summary-val">{{ data.setupProgressPercent }}%</strong>
+                </article>
+              } @else {
+                <article class="summary-card">
+                  <span class="label">Tills</span>
+                  <strong class="summary-val">{{ data.tillCount }}</strong>
+                </article>
+              }
+            </section>
+
+            <div class="detail-grid">
+              <section class="panel" aria-labelledby="profile-heading">
+                <h2 id="profile-heading">Tenant Profile</h2>
+                @if (editMode()) {
+                  <form class="edit-form" (ngSubmit)="saveTenantEdit()">
+                    @if (actionError()) {
+                      <p class="inline-error" role="alert">{{ actionError() }}</p>
+                    }
+                    <app-form-field
+                      id="tenant-name"
+                      label="Name"
+                      [required]="true"
+                      [error]="actionError() === 'Tenant name is required.' ? 'Tenant name is required.' : null"
+                    >
+                      <input
+                        id="tenant-name"
+                        type="text"
+                        [ngModel]="editDraft().name"
+                        (ngModelChange)="updateEditField('name', $event)"
+                        name="name"
+                        [attr.aria-invalid]="actionError() === 'Tenant name is required.' ? true : null"
+                      />
+                    </app-form-field>
+                    <app-form-field id="operating-mode" label="Operating Mode">
+                      <input
+                        id="operating-mode"
+                        type="text"
+                        [ngModel]="editDraft().operatingMode"
+                        (ngModelChange)="updateEditField('operatingMode', $event)"
+                        name="operatingMode"
+                      />
+                    </app-form-field>
+                    <app-form-field id="business-type" label="Business Type">
+                      <input
+                        id="business-type"
+                        type="text"
+                        [ngModel]="editDraft().businessType"
+                        (ngModelChange)="updateEditField('businessType', $event)"
+                        name="businessType"
+                      />
+                    </app-form-field>
+                    <app-form-field id="base-currency" label="Base Currency">
+                      <input
+                        id="base-currency"
+                        type="text"
+                        [ngModel]="editDraft().baseCurrency"
+                        (ngModelChange)="updateEditField('baseCurrency', $event)"
+                        name="baseCurrency"
+                      />
+                    </app-form-field>
+                    <app-form-field id="timezone" label="Timezone">
+                      <input
+                        id="timezone"
+                        type="text"
+                        [ngModel]="editDraft().defaultTimezone"
+                        (ngModelChange)="updateEditField('defaultTimezone', $event)"
+                        name="defaultTimezone"
+                      />
+                    </app-form-field>
+                    <app-form-field id="locale" label="Locale">
+                      <input
+                        id="locale"
+                        type="text"
+                        [ngModel]="editDraft().defaultLocale"
+                        (ngModelChange)="updateEditField('defaultLocale', $event)"
+                        name="defaultLocale"
+                      />
+                    </app-form-field>
+                    <app-form-field id="billing-status" label="Billing Status">
+                      <input
+                        id="billing-status"
+                        type="text"
+                        [ngModel]="editDraft().billingStatus"
+                        (ngModelChange)="updateEditField('billingStatus', $event)"
+                        name="billingStatus"
+                      />
+                    </app-form-field>
+                    <div class="edit-actions">
+                      <app-button variant="secondary" [disabled]="isActionPending()" (click)="cancelEditTenant()">
+                        Cancel
+                      </app-button>
+                      <app-button type="submit" variant="primary" [disabled]="isActionPending()">
+                        {{ isActionPending() ? 'Saving...' : 'Save' }}
+                      </app-button>
+                    </div>
+                  </form>
+                } @else {
+                  <dl class="profile-list">
+                    <div>
+                      <dt>Tenant Code</dt>
+                      <dd>{{ data.code }}</dd>
+                    </div>
+                    <div>
+                      <dt>Operating Mode</dt>
+                      <dd>{{ data.operatingMode }}</dd>
+                    </div>
+                    <div>
+                      <dt>Business Type</dt>
+                      <dd>{{ data.businessType || '—' }}</dd>
+                    </div>
+                    <div>
+                      <dt>Base Currency</dt>
+                      <dd>{{ data.baseCurrency }}</dd>
+                    </div>
+                    <div>
+                      <dt>Timezone</dt>
+                      <dd>{{ data.defaultTimezone }}</dd>
+                    </div>
+                    <div>
+                      <dt>Locale</dt>
+                      <dd>{{ data.defaultLocale }}</dd>
+                    </div>
+                    <div>
+                      <dt>Created On</dt>
+                      <dd>{{ data.createdOn | date: 'medium' }}</dd>
+                    </div>
+                    <div>
+                      <dt>Last Activity</dt>
+                      <dd>{{ data.lastActivityAt ? (data.lastActivityAt | date: 'medium') : '—' }}</dd>
+                    </div>
+                  </dl>
+                }
+              </section>
+
+              @if (hasSubscriptionViewPermission()) {
+                <section class="panel" aria-labelledby="subscription-heading">
+                  <h2 id="subscription-heading">Subscription</h2>
+                  @if (data.subscription) {
+                    <dl class="profile-list">
+                      <div>
+                        <dt>Plan</dt>
+                        <dd>{{ data.subscription.planName }}</dd>
+                      </div>
+                      <div>
+                        <dt>Plan Code</dt>
+                        <dd>{{ data.subscription.planCode }}</dd>
+                      </div>
+                      <div>
+                        <dt>Subscription Status</dt>
+                        <dd>{{ data.subscription.subscriptionStatus }}</dd>
+                      </div>
+                    </dl>
+                  } @else {
+                    <p class="muted">No subscription plan is assigned to this tenant.</p>
+                  }
+                </section>
+              }
+
+              <section class="panel" aria-labelledby="entitlements-heading">
+                <div class="panel-heading">
+                  <h2 id="entitlements-heading">Entitlements</h2>
+                  @if (data.canManageEntitlements && canManageEntitlements()) {
+                    <app-button variant="secondary" size="compact" (click)="openEntitlementEditor()">
+                      Edit Entitlements
+                    </app-button>
+                  }
+                </div>
+                <p class="section-note">Enabled features returned by the tenant detail API.</p>
+                @if (data.enabledFeatureCodes.length) {
+                  <ul class="feature-list">
+                    @for (code of data.enabledFeatureCodes; track code) {
+                      <li>
+                        <span>{{ featureLabelForCode(code) }}</span>
+                        <code class="feature-code">{{ code }}</code>
+                      </li>
+                    }
+                  </ul>
+                } @else {
+                  <p class="muted">No features are enabled for this tenant.</p>
+                }
+              </section>
+            </div>
           </div>
         } @else if (activeTab() === 'audit') {
-          <section class="card audit-panel" style="padding: 1.25rem;">
-            <h2>Audit History</h2>
+          <section id="panel-audit" class="audit-panel" role="tabpanel" aria-labelledby="tab-audit">
+            <h2 id="audit-heading">Audit History</h2>
             @if (auditLogsLoading()) {
-              <div class="state-card">Loading tenant audit logs...</div>
-            } @else if (auditLogsError()) {
-              <div class="state-card error">
-                <span>{{ auditLogsError() }}</span>
-                <button type="button" class="btn primary" (click)="loadAuditLogs()">Try again</button>
+              <div class="skeleton-wrap" aria-busy="true" aria-label="Loading audit history">
+                <app-loading-skeleton [rows]="4" />
               </div>
+            } @else if (auditLogsError()) {
+              <app-error-state
+                title="Audit logs could not be loaded"
+                [message]="auditLogsError()!"
+                [hasRetry]="true"
+                (retry)="loadAuditLogs()"
+              />
             } @else if (auditLogs(); as logData) {
               @if (logData.items.length) {
-                <div class="table-wrap">
-                  <table>
+                <div class="data-table-container">
+                  <table class="data-table">
                     <thead>
                       <tr>
-                        <th>Occurred At</th>
-                        <th>Actor</th>
-                        <th>Action</th>
-                        <th>Summary</th>
+                        <th scope="col">Timestamp</th>
+                        <th scope="col">Actor</th>
+                        <th scope="col">Action</th>
+                        <th scope="col">Details</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -290,15 +455,30 @@ import { tenantLifecycleBadgeClass, tenantLifecycleLabel, resolveTenantLifecycle
                     </tbody>
                   </table>
                 </div>
-                <footer class="pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem;">
-                  <span>Page {{ logData.pageNumber }} of {{ logData.totalPages || 1 }}</span>
-                  <div class="pagination-controls" style="display: flex; gap: 0.5rem;">
-                    <button type="button" class="btn secondary" [disabled]="logData.pageNumber <= 1" (click)="changeAuditPage(logData.pageNumber - 1)">Previous</button>
-                    <button type="button" class="btn secondary" [disabled]="logData.pageNumber >= logData.totalPages" (click)="changeAuditPage(logData.pageNumber + 1)">Next</button>
+
+                <footer class="pagination">
+                  <span class="range-label">Page {{ logData.pageNumber }} of {{ logData.totalPages || 1 }}</span>
+                  <div class="pagination-controls">
+                    <app-button
+                      variant="secondary"
+                      size="compact"
+                      [disabled]="logData.pageNumber <= 1"
+                      (click)="changeAuditPage(logData.pageNumber - 1)"
+                    >
+                      Previous
+                    </app-button>
+                    <app-button
+                      variant="secondary"
+                      size="compact"
+                      [disabled]="logData.pageNumber >= logData.totalPages"
+                      (click)="changeAuditPage(logData.pageNumber + 1)"
+                    >
+                      Next
+                    </app-button>
                   </div>
                 </footer>
               } @else {
-                <p class="muted">No audit history recorded for this tenant.</p>
+                <app-empty-state title="No audit history" message="No audit history recorded for this tenant." />
               }
             }
           </section>
@@ -306,8 +486,8 @@ import { tenantLifecycleBadgeClass, tenantLifecycleLabel, resolveTenantLifecycle
       }
 
       @if (editorOpen()) {
-        <div class="editor-backdrop" (click)="closeEntitlementEditor()"></div>
-        <aside class="editor-panel card" role="dialog" aria-modal="true" aria-label="Edit tenant entitlements">
+        <div class="editor-backdrop" (click)="closeEntitlementEditor()" role="presentation"></div>
+        <aside class="editor-panel" role="dialog" aria-modal="true" aria-label="Edit tenant entitlements">
           <header class="editor-header">
             <div>
               <h2>Edit Entitlements</h2>
@@ -324,7 +504,7 @@ import { tenantLifecycleBadgeClass, tenantLifecycleLabel, resolveTenantLifecycle
             <div class="editor-state error" role="alert">
               <strong>Entitlement options could not be loaded</strong>
               <span>{{ editorError() }}</span>
-              <button type="button" class="btn primary" (click)="openEntitlementEditor()">Try again</button>
+              <app-button variant="primary" (click)="openEntitlementEditor()">Try again</app-button>
             </div>
           } @else if (entitlementOptions(); as options) {
             @if (editorValidationError()) {
@@ -341,9 +521,9 @@ import { tenantLifecycleBadgeClass, tenantLifecycleLabel, resolveTenantLifecycle
               </div>
             } @else {
               <div class="editor-form">
-                <label>
-                  <span>Subscription Plan *</span>
+                <app-form-field id="select-plan" label="Subscription Plan" [required]="true">
                   <select
+                    id="select-plan"
                     [ngModel]="selectedPlanId()"
                     (ngModelChange)="onPlanChange($event)"
                     [disabled]="editorSaving()"
@@ -352,7 +532,7 @@ import { tenantLifecycleBadgeClass, tenantLifecycleLabel, resolveTenantLifecycle
                       <option [value]="plan.id">{{ plan.name }} ({{ plan.code }})</option>
                     }
                   </select>
-                </label>
+                </app-form-field>
 
                 @if (selectedPlan(); as plan) {
                   <fieldset class="features-fieldset">
@@ -389,194 +569,270 @@ import { tenantLifecycleBadgeClass, tenantLifecycleLabel, resolveTenantLifecycle
                 }
 
                 <footer class="editor-actions">
-                  <button type="button" class="btn ghost" [disabled]="editorSaving()" (click)="closeEntitlementEditor()">
+                  <app-button variant="secondary" [disabled]="editorSaving()" (click)="closeEntitlementEditor()">
                     Cancel
-                  </button>
-                  <button type="button" class="btn primary" [disabled]="editorSaving()" (click)="saveEntitlements()">
+                  </app-button>
+                  <app-button variant="primary" [disabled]="editorSaving()" (click)="saveEntitlements()">
                     {{ editorSaving() ? 'Saving...' : 'Save Entitlements' }}
-                  </button>
+                  </app-button>
                 </footer>
               </div>
             }
           }
         </aside>
       }
+
+      <app-confirmation-dialog
+        [isOpen]="isConfirmDialogOpen()"
+        title="Suspend Tenant"
+        message="Are you sure you want to suspend this tenant? This will disable outlet operations and suspend subscription billing."
+        confirmLabel="Suspend"
+        cancelLabel="Cancel"
+        loadingLabel="Suspending..."
+        variant="destructive"
+        [isLoading]="isActionPending() && isConfirmDialogOpen()"
+        (confirm)="onSuspendConfirmed()"
+        (cancel)="onSuspendCancelled()"
+      />
     </section>
   `,
   styles: `
-    :host { color: #14213d; display: block; }
-    * { box-sizing: border-box; }
+    :host {
+      color: var(--text-primary, #0f172a);
+      display: block;
+    }
 
-    .tenant-detail-page { display: grid; gap: 1.15rem; }
+    * {
+      box-sizing: border-box;
+    }
 
-    .page-heading {
+    .tenant-detail-page {
+      display: grid;
+      gap: var(--space-5, 1.5rem);
+    }
+
+    .header-meta,
+    .header-actions {
+      align-items: center;
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2, 0.5rem);
+    }
+
+    .skeleton-wrap {
+      padding: var(--space-2, 0.5rem) 0;
+    }
+
+    .setup-section {
+      border-bottom: 1px solid var(--border-subtle, #f1f5f9);
+      display: grid;
+      gap: var(--space-3, 0.75rem);
+      padding-bottom: var(--space-5, 1.5rem);
+    }
+
+    .setup-header {
       align-items: flex-start;
       display: flex;
-      gap: 1.25rem;
+      gap: var(--space-4, 1rem);
       justify-content: space-between;
     }
 
-    .breadcrumb {
-      align-items: center;
-      color: #667085;
-      display: flex;
-      font-size: 0.78rem;
-      gap: 0.45rem;
-      margin-bottom: 0.45rem;
-    }
-
-    .breadcrumb a { color: #0b5cff; text-decoration: none; }
-    .breadcrumb .current { color: #344054; font-weight: 700; }
-
-    .title-block h1 {
-      color: #101a38;
-      font-size: clamp(1.55rem, 2.4vw, 2rem);
+    .setup-header h2,
+    .panel h2,
+    .audit-panel h2 {
+      color: var(--text-primary, #0f172a);
+      font-size: 1rem;
+      font-weight: 700;
       margin: 0;
     }
 
-    .title-block p { color: #667085; font-size: 0.92rem; margin: 0.4rem 0 0; }
-
-    .title-accent {
-      background: linear-gradient(90deg, #0b5cff, #5b8dff);
-      border-radius: 99px;
-      display: block;
-      height: 3px;
-      margin-top: 0.75rem;
-      width: 2.75rem;
+    .progress-percent {
+      color: var(--primary, #0b5cff);
+      font-size: 1.25rem;
+      line-height: 1;
     }
 
-    .page-actions { display: flex; flex-wrap: wrap; gap: 0.7rem; }
+    .setup-columns {
+      display: grid;
+      gap: var(--space-5, 1.5rem);
+      grid-template-columns: 1fr 1fr;
+    }
 
-    .btn {
+    .setup-columns h3 {
+      color: var(--text-muted, #64748b);
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+      margin: 0 0 var(--space-2, 0.5rem);
+      text-transform: uppercase;
+    }
+
+    .checklist-list {
+      display: grid;
+      gap: var(--space-2, 0.5rem);
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .checklist-list li {
       align-items: center;
-      border-radius: 10px;
-      cursor: pointer;
-      display: inline-flex;
-      font-size: 0.84rem;
-      font-weight: 700;
-      min-height: 2.65rem;
-      padding: 0 1rem;
+      display: flex;
+      font-size: 0.875rem;
+      gap: var(--space-2, 0.5rem);
     }
 
-    .btn.primary { background: #0b5cff; border: 0; color: #fff; }
-    .btn.secondary { background: #fff; border: 1px solid #d0d5dd; color: #344054; }
-    .btn.ghost { background: #fff; border: 1px solid #d0d5dd; color: #344054; }
-    .btn.success { background: #16a34a; border: 0; color: #fff; }
-    .btn.danger { background: #ef4444; border: 0; color: #fff; }
-    .btn:disabled { cursor: not-allowed; opacity: 0.55; }
+    .checklist-list.completed li {
+      color: var(--status-success-text, #047857);
+    }
 
-    .card {
-      background: #fff;
-      border: 1px solid #e5eaf2;
-      border-radius: 12px;
-      box-shadow: 0 1px 3px rgba(16, 24, 40, 0.04), 0 8px 24px rgba(16, 24, 40, 0.06);
+    .checklist-list.missing li {
+      color: var(--status-danger-text, #b91c1c);
+    }
+
+    .check-icon,
+    .cross-icon {
+      fill: none;
+      height: 1rem;
+      stroke: currentColor;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 2.5;
+      width: 1rem;
+    }
+
+    .checklist-muted {
+      color: var(--text-disabled, #94a3b8);
+      font-size: 0.875rem;
+    }
+
+    .setup-cta {
+      margin-top: var(--space-1, 0.25rem);
+    }
+
+    .continue-link {
+      align-items: center;
+      background: var(--primary, #0b5cff);
+      border-radius: var(--radius-md, 8px);
+      color: var(--text-inverse, #fff);
+      display: inline-flex;
+      font-size: 0.875rem;
+      font-weight: 600;
+      min-height: var(--control-height-compact, 2rem);
+      padding: 0 var(--space-4, 1rem);
+      text-decoration: none;
+    }
+
+    .continue-link:focus-visible {
+      box-shadow: var(--shadow-focus);
+      outline: none;
     }
 
     .summary-grid {
       display: grid;
-      gap: 0.85rem;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: var(--space-3, 0.75rem);
+      grid-template-columns: repeat(4, minmax(0, 1fr));
     }
 
     .summary-card {
+      background: var(--bg-surface-secondary, #f8fafc);
+      border: 1px solid var(--border-subtle, #f1f5f9);
+      border-radius: var(--radius-md, 8px);
       display: grid;
-      gap: 0.45rem;
-      padding: 1rem;
+      gap: 0.35rem;
+      padding: 0.85rem 1rem;
     }
 
     .summary-card .label {
-      color: #667085;
+      color: var(--text-muted, #64748b);
       font-size: 0.72rem;
       font-weight: 700;
       letter-spacing: 0.05em;
       text-transform: uppercase;
     }
 
-    .summary-card strong { color: #101a38; font-size: 1.35rem; }
+    .summary-val {
+      color: var(--text-primary, #0f172a);
+      font-size: 1.2rem;
+    }
 
     .detail-grid {
       display: grid;
-      gap: 1rem;
+      gap: var(--space-5, 1.5rem);
       grid-template-columns: repeat(3, minmax(0, 1fr));
+      margin-top: var(--space-2, 0.5rem);
     }
 
-    .panel { padding: 1.1rem; }
+    .panel {
+      border-top: 1px solid var(--border-subtle, #f1f5f9);
+      display: grid;
+      gap: var(--space-3, 0.75rem);
+      padding-top: var(--space-4, 1rem);
+    }
 
     .panel-heading {
       align-items: center;
       display: flex;
       gap: 0.75rem;
       justify-content: space-between;
-      margin-bottom: 0.85rem;
     }
 
-    .panel h2, .panel-heading h2 {
-      color: #101a38;
-      font-size: 1rem;
-      margin: 0;
-    }
-
-    dl {
+    .profile-list {
       display: grid;
       gap: 0.75rem;
       margin: 0;
     }
 
-    dl div {
+    .profile-list div {
       display: grid;
       gap: 0.2rem;
     }
 
-    dt {
-      color: #667085;
+    .profile-list dt {
+      color: var(--text-muted, #64748b);
       font-size: 0.72rem;
       font-weight: 700;
       letter-spacing: 0.04em;
       text-transform: uppercase;
     }
 
-    dd { color: #344054; font-size: 0.88rem; margin: 0; }
+    .profile-list dd {
+      color: var(--text-secondary, #475569);
+      font-size: 0.88rem;
+      margin: 0;
+    }
 
     .edit-form {
       display: grid;
-      gap: 0.65rem;
-    }
-
-    .edit-form label {
-      display: grid;
-      gap: 0.35rem;
-    }
-
-    .edit-form label > span {
-      color: #667085;
-      font-size: 0.72rem;
-      font-weight: 700;
-      text-transform: uppercase;
-    }
-
-    .edit-form input {
-      border: 1px solid #d0d5dd;
-      border-radius: 10px;
-      min-height: 2.4rem;
-      padding: 0 0.7rem;
+      gap: var(--space-3, 0.75rem);
     }
 
     .edit-actions {
       display: flex;
-      gap: 0.55rem;
+      gap: var(--space-2, 0.5rem);
       justify-content: flex-end;
-      margin-top: 0.4rem;
+      margin-top: 0.25rem;
     }
 
-    .section-note, .muted {
-      color: #667085;
+    .inline-error {
+      background: var(--status-danger-bg, #fef2f2);
+      border: 1px solid var(--status-danger-border, #fecdca);
+      border-radius: var(--radius-md, 8px);
+      color: var(--status-danger-text, #b91c1c);
       font-size: 0.82rem;
-      margin: 0 0 0.85rem;
+      margin: 0;
+      padding: 0.65rem 0.75rem;
+    }
+
+    .section-note,
+    .muted {
+      color: var(--text-secondary, #475569);
+      font-size: 0.82rem;
+      margin: 0;
     }
 
     .feature-list {
       display: grid;
-      gap: 0.65rem;
+      gap: var(--space-2, 0.5rem);
       list-style: none;
       margin: 0;
       padding: 0;
@@ -584,58 +840,121 @@ import { tenantLifecycleBadgeClass, tenantLifecycleLabel, resolveTenantLifecycle
 
     .feature-list li {
       align-items: center;
-      background: #ecfdf5;
-      border: 1px solid #bbf7d0;
-      border-radius: 10px;
+      background: var(--bg-surface-secondary, #f8fafc);
+      border: 1px solid var(--border-subtle, #f1f5f9);
+      border-radius: var(--radius-md, 8px);
       display: flex;
       justify-content: space-between;
-      padding: 0.75rem 0.85rem;
+      padding: 0.7rem 0.85rem;
     }
 
-    .feature-list span { color: #344054; font-size: 0.84rem; font-weight: 600; }
+    .feature-list span {
+      color: var(--text-primary, #344054);
+      font-size: 0.84rem;
+      font-weight: 600;
+    }
 
     .feature-code {
-      background: #f8fafc;
+      background: var(--bg-surface-primary, #fff);
       border-radius: 6px;
-      color: #475569;
+      color: var(--text-secondary, #475569);
       font-size: 0.72rem;
       padding: 0.2rem 0.45rem;
     }
 
-    .status-badge {
-      border-radius: 999px;
-      display: inline-block;
-      font-size: 0.78rem;
-      font-weight: 700;
-      padding: 0.35rem 0.75rem;
-      width: fit-content;
+    .detail-tabs {
+      border-bottom: 1px solid var(--border-default, #e2e8f0);
+      display: flex;
+      gap: var(--space-1, 0.25rem);
     }
 
-    .status-badge.active { background: #dcfce7; color: #15803d; }
-    .status-badge.suspended { background: #ffedd5; color: #c2410c; }
-    .status-badge.draft { background: #e2e8f0; color: #475569; }
-    .status-badge.pending_payment { background: #fef3c7; color: #b45309; }
-    .status-badge.pending_activation { background: #dbeafe; color: #1d4ed8; }
-    .status-badge.cancelled { background: #fee2e2; color: #b91c1c; }
-    .status-badge.unknown { background: #f2f4f7; color: #667085; }
-
-    .state-card {
-      display: grid;
-      gap: 0.75rem;
-      padding: 2rem;
-      text-align: center;
+    .tab-btn {
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--text-secondary, #475569);
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 600;
+      margin-bottom: -1px;
+      padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
     }
 
-    .state-card.error { color: #b42318; }
+    .tab-btn:hover {
+      color: var(--text-primary, #0f172a);
+    }
+
+    .tab-btn.active {
+      border-bottom-color: var(--primary, #0b5cff);
+      color: var(--primary, #0b5cff);
+    }
+
+    .tab-btn:focus-visible {
+      box-shadow: var(--shadow-focus);
+      outline: none;
+    }
 
     .toast {
-      background: #ecfdf5;
-      border: 1px solid #bbf7d0;
-      border-radius: 10px;
-      color: #15803d;
+      background: var(--status-success-bg, #ecfdf5);
+      border: 1px solid var(--status-success-border, #bbf7d0);
+      border-radius: var(--radius-md, 8px);
+      color: var(--status-success-text, #047857);
       font-size: 0.84rem;
       font-weight: 700;
       padding: 0.75rem 1rem;
+    }
+
+    .audit-panel {
+      display: grid;
+      gap: var(--space-4, 1rem);
+    }
+
+    .data-table-container {
+      overflow-x: auto;
+    }
+
+    .data-table {
+      border-collapse: collapse;
+      min-width: 40rem;
+      width: 100%;
+    }
+
+    .data-table th,
+    .data-table td {
+      border-bottom: 1px solid var(--border-subtle, #f1f5f9);
+      font-size: 0.84rem;
+      padding: 0.75rem 0.5rem;
+      text-align: left;
+    }
+
+    .data-table th {
+      color: var(--text-muted, #64748b);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .data-table td {
+      color: var(--text-secondary, #475569);
+    }
+
+    .pagination {
+      align-items: center;
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-3, 0.75rem);
+      justify-content: space-between;
+    }
+
+    .range-label {
+      color: var(--text-muted, #64748b);
+      font-size: 0.82rem;
+    }
+
+    .pagination-controls {
+      display: flex;
+      gap: var(--space-2, 0.5rem);
     }
 
     .editor-backdrop {
@@ -646,6 +965,8 @@ import { tenantLifecycleBadgeClass, tenantLifecycleLabel, resolveTenantLifecycle
     }
 
     .editor-panel {
+      background: var(--bg-surface-primary, #fff);
+      border-left: 1px solid var(--border-default, #e2e8f0);
       display: grid;
       gap: 1rem;
       inset: 0 0 0 auto;
@@ -665,13 +986,13 @@ import { tenantLifecycleBadgeClass, tenantLifecycleLabel, resolveTenantLifecycle
     }
 
     .editor-header h2 {
-      color: #101a38;
+      color: var(--text-primary, #0f172a);
       font-size: 1.1rem;
       margin: 0;
     }
 
     .editor-header p {
-      color: #667085;
+      color: var(--text-secondary, #475569);
       font-size: 0.82rem;
       margin: 0.35rem 0 0;
     }
@@ -679,28 +1000,39 @@ import { tenantLifecycleBadgeClass, tenantLifecycleLabel, resolveTenantLifecycle
     .icon-close {
       background: transparent;
       border: 0;
-      color: #667085;
+      color: var(--text-secondary, #475569);
       cursor: pointer;
       font-size: 1.5rem;
       line-height: 1;
       padding: 0;
     }
 
+    .icon-close:focus-visible {
+      box-shadow: var(--shadow-focus);
+      outline: none;
+    }
+
     .editor-state {
+      color: var(--text-secondary, #475569);
       display: grid;
       gap: 0.65rem;
       padding: 1rem 0;
       text-align: center;
     }
 
-    .editor-state.error { color: #b42318; }
-    .editor-state.empty { color: #667085; }
+    .editor-state.error {
+      color: var(--status-danger, #ef4444);
+    }
+
+    .editor-state.empty {
+      color: var(--text-muted, #64748b);
+    }
 
     .editor-error {
-      background: #fef3f2;
-      border: 1px solid #fecdca;
-      border-radius: 10px;
-      color: #b42318;
+      background: var(--status-danger-bg, #fef2f2);
+      border: 1px solid var(--status-danger-border, #fecdca);
+      border-radius: var(--radius-md, 8px);
+      color: var(--status-danger-text, #b91c1c);
       font-size: 0.82rem;
       padding: 0.75rem 0.85rem;
     }
@@ -710,27 +1042,9 @@ import { tenantLifecycleBadgeClass, tenantLifecycleLabel, resolveTenantLifecycle
       gap: 1rem;
     }
 
-    .editor-form label {
-      display: grid;
-      gap: 0.4rem;
-    }
-
-    .editor-form label > span {
-      color: #344054;
-      font-size: 0.78rem;
-      font-weight: 700;
-    }
-
-    .editor-form select {
-      border: 1px solid #d0d5dd;
-      border-radius: 10px;
-      min-height: 2.65rem;
-      padding: 0 0.75rem;
-    }
-
     .features-fieldset {
-      border: 1px solid #e5eaf2;
-      border-radius: 10px;
+      border: 1px solid var(--border-default, #e2e8f0);
+      border-radius: var(--radius-md, 8px);
       display: grid;
       gap: 0.85rem;
       margin: 0;
@@ -738,14 +1052,14 @@ import { tenantLifecycleBadgeClass, tenantLifecycleLabel, resolveTenantLifecycle
     }
 
     .features-fieldset legend {
-      color: #101a38;
+      color: var(--text-primary, #0f172a);
       font-size: 0.88rem;
       font-weight: 700;
       padding: 0 0.25rem;
     }
 
     .module-block h3 {
-      color: #344054;
+      color: var(--text-secondary, #475569);
       font-size: 0.82rem;
       margin: 0 0 0.5rem;
     }
@@ -758,7 +1072,9 @@ import { tenantLifecycleBadgeClass, tenantLifecycleLabel, resolveTenantLifecycle
       padding: 0;
     }
 
-    .feature-options li.disabled { opacity: 0.45; }
+    .feature-options li.disabled {
+      opacity: 0.45;
+    }
 
     .feature-options label {
       align-items: flex-start;
@@ -772,25 +1088,44 @@ import { tenantLifecycleBadgeClass, tenantLifecycleLabel, resolveTenantLifecycle
       gap: 0.15rem;
     }
 
-    .feature-label strong { color: #344054; font-size: 0.84rem; }
-    .feature-label small { color: #667085; font-size: 0.72rem; }
+    .feature-label strong {
+      color: var(--text-secondary, #475569);
+      font-size: 0.84rem;
+    }
+
+    .feature-label small {
+      color: var(--text-muted, #64748b);
+      font-size: 0.72rem;
+    }
 
     .editor-actions {
       display: flex;
-      gap: 0.65rem;
+      gap: var(--space-3, 0.75rem);
       justify-content: flex-end;
       padding-top: 0.5rem;
     }
 
     @media (max-width: 1100px) {
-      .summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-      .detail-grid { grid-template-columns: 1fr 1fr; }
+      .summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .detail-grid {
+        grid-template-columns: 1fr 1fr;
+      }
     }
 
     @media (max-width: 760px) {
-      .page-heading { flex-direction: column; }
-      .summary-grid, .detail-grid { grid-template-columns: 1fr; }
-      .editor-panel { max-width: 100%; width: 100%; }
+      .summary-grid,
+      .detail-grid,
+      .setup-columns {
+        grid-template-columns: 1fr;
+      }
+
+      .editor-panel {
+        max-width: 100%;
+        width: 100%;
+      }
     }
   `
 })
@@ -818,6 +1153,8 @@ export class PlatformTenantDetailPage {
     billingStatus: ''
   });
 
+  readonly isConfirmDialogOpen = signal(false);
+
   readonly hasSubscriptionViewPermission = computed(() =>
     this.accessControl.hasPermission(platformPermissions.tenantSubscriptionsView)
   );
@@ -827,6 +1164,23 @@ export class PlatformTenantDetailPage {
   readonly hasAuditViewPermission = computed(() =>
     this.accessControl.hasPermission(platformPermissions.auditView)
   );
+
+  readonly breadcrumbItems = computed<BreadcrumbItem[]>(() => {
+    const tenant = this.tenant();
+    return [
+      { label: 'Tenants', path: '/admin/tenants' },
+      { label: tenant?.name || 'Detail' }
+    ];
+  });
+
+  readonly headerDescription = computed(() => {
+    const tenant = this.tenant();
+    if (!tenant) {
+      return 'Loading tenant profile...';
+    }
+
+    return `${tenant.code} · ${tenant.operatingMode}`;
+  });
 
   readonly activeTab = signal<'details' | 'audit'>('details');
   readonly auditLogs = signal<PlatformTenantAuditLogListResponse | null>(null);
@@ -1052,6 +1406,22 @@ export class PlatformTenantDetailPage {
     this.runLifecycleAction('suspend');
   }
 
+  confirmSuspend(): void {
+    this.isConfirmDialogOpen.set(true);
+  }
+
+  onSuspendConfirmed(): void {
+    this.suspendTenant();
+  }
+
+  onSuspendCancelled(): void {
+    if (this.isActionPending()) {
+      return;
+    }
+
+    this.isConfirmDialogOpen.set(false);
+  }
+
   showActivate(tenant: PlatformTenantDetail): boolean {
     if (!tenant.canActivate || !this.canActivate()) {
       return false;
@@ -1062,7 +1432,6 @@ export class PlatformTenantDetailPage {
       status: tenant.status
     }).value;
 
-    // Backend canActivate is authoritative; still hide clearly non-activatable UI states.
     if (
       lifecycle === TenantLifecycleStatuses.PendingPayment
       || lifecycle === TenantLifecycleStatuses.Active
@@ -1160,6 +1529,7 @@ export class PlatformTenantDetailPage {
     }
 
     this.editMode.set(false);
+    this.actionError.set(null);
   }
 
   updateEditField(field: keyof UpdatePlatformTenantRequest, value: string): void {
@@ -1217,6 +1587,23 @@ export class PlatformTenantDetailPage {
       lifecycleStatus: tenant.lifecycleStatus,
       status: tenant.status
     });
+  }
+
+  mapStatusVariant(badgeClass: string): 'success' | 'info' | 'warning' | 'danger' | 'neutral' {
+    switch (badgeClass) {
+      case 'active':
+        return 'success';
+      case 'pending_activation':
+      case 'draft':
+        return 'info';
+      case 'suspended':
+      case 'pending_payment':
+        return 'warning';
+      case 'cancelled':
+        return 'danger';
+      default:
+        return 'neutral';
+    }
   }
 
   formatSetupStep(step: string): string {
@@ -1332,6 +1719,7 @@ export class PlatformTenantDetailPage {
       next: (tenant) => {
         this.tenant.set(tenant);
         this.isActionPending.set(false);
+        this.isConfirmDialogOpen.set(false);
         this.successMessage.set(
           action === 'activate'
             ? 'Tenant activated successfully.'
@@ -1342,6 +1730,7 @@ export class PlatformTenantDetailPage {
       },
       error: (error) => {
         this.isActionPending.set(false);
+        this.isConfirmDialogOpen.set(false);
         this.actionError.set(this.apiError.toSafeMessage(error));
       }
     });
