@@ -42,12 +42,25 @@ describe('PlatformDashboardPage', () => {
     };
   });
 
-  it('shows a loading state while the API request is pending', async () => {
+  it('shows a loading skeleton while the API request is pending', async () => {
     api.getDashboard.mockReturnValue(new Subject().asObservable());
 
     const fixture = await createComponent();
+    const root = fixture.nativeElement as HTMLElement;
 
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Loading real platform data');
+    expect(root.querySelector('app-loading-skeleton')).toBeTruthy();
+    expect(root.textContent).not.toContain('Total Tenants');
+  });
+
+  it('renders PageHeader title and Refresh action', async () => {
+    api.getDashboard.mockReturnValue(of(createDashboard()));
+
+    const fixture = await createComponent();
+    const root = fixture.nativeElement as HTMLElement;
+
+    expect(root.querySelector('h1')?.textContent).toContain('Dashboard');
+    expect(root.textContent).toContain('Refresh');
+    expect(root.querySelector('app-page-header')).toBeTruthy();
   });
 
   it('renders KPI values returned by the backend response', async () => {
@@ -117,7 +130,6 @@ describe('PlatformDashboardPage', () => {
     expect(component.attentionLink('suspended_tenants')).toBe('/admin/tenants');
     expect(component.attentionQueryParams('pending_activation')).toEqual({ status: 'pending_activation' });
     expect(component.attentionQueryParams('setup_pending')).toEqual({ statusGroup: 'setup_pending' });
-    expect(component.attentionIcon('pending_activation')).toBe('PA');
     expect(component.attentionQueryParams('past_due_subscriptions')).toEqual({ billingStatus: 'PAST_DUE' });
     expect(component.attentionLink('pending_billing')).toBe('/admin/billing');
     expect(component.attentionQueryParams('pending_billing')).toBeNull();
@@ -146,6 +158,15 @@ describe('PlatformDashboardPage', () => {
 
     expect(row).toBeTruthy();
     expect(row?.getAttribute('href')).toBeNull();
+  });
+
+  it('shows attention empty state when there are no attention items', async () => {
+    api.getDashboard.mockReturnValue(of(createDashboard({ attention: [], kpis: { ...createDashboard().kpis, itemsRequiringAttention: 0 } })));
+
+    const fixture = await createComponent();
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+
+    expect(text).toContain('No items require attention');
   });
 
   it('shows clean empty states when backend data is empty', async () => {
@@ -187,6 +208,21 @@ describe('PlatformDashboardPage', () => {
     expect(text).toContain('Demo Tenant Alpha');
     expect(text).toContain('Refresh failed');
     expect(text).toContain('Dashboard failed safely');
+  });
+
+  it('invokes refresh without duplicate concurrent requests', async () => {
+    const subject = new Subject();
+    api.getDashboard.mockReturnValueOnce(of(createDashboard())).mockReturnValue(subject.asObservable());
+
+    const fixture = await createComponent();
+    expect(api.getDashboard).toHaveBeenCalledTimes(1);
+
+    fixture.componentInstance.refreshDashboard();
+    fixture.componentInstance.refreshDashboard();
+    fixture.detectChanges();
+
+    expect(api.getDashboard).toHaveBeenCalledTimes(2);
+    expect(fixture.componentInstance.isRefreshing()).toBe(true);
   });
 
   it('formats currency and change values without hard-coded LKR maps', async () => {
@@ -304,5 +340,15 @@ describe('PlatformDashboardPage', () => {
     expect(text).toContain('Total Tenants');
     expect(text).not.toContain('Exception');
     expect(text).not.toContain('SecretKey');
+  });
+
+  it('links recent tenants to tenant detail when permitted', async () => {
+    api.getDashboard.mockReturnValue(of(createDashboard()));
+
+    const fixture = await createComponent();
+    const link = (fixture.nativeElement as HTMLElement).querySelector('a.tenant-link') as HTMLAnchorElement | null;
+
+    expect(link).toBeTruthy();
+    expect(link?.getAttribute('href')).toContain('/admin/tenants/');
   });
 });
