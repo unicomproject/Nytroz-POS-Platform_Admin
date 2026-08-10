@@ -12,9 +12,9 @@ import { AuthApiService } from '../../services/auth-api.service';
   imports: [ReactiveFormsModule],
   template: `
     <main class="login-page">
-      <section class="brand-panel" aria-label="SCS-TIX Platform Administration">
+      <section class="brand-panel" aria-label="OneVerz Platform Administration">
         <div class="brand-content">
-          <a class="brand-mark" href="/" aria-label="SCS-TIX Platform Administration">
+          <a class="brand-mark" href="/" aria-label="OneVerz Platform Administration">
             <span class="shield" aria-hidden="true">
               <svg viewBox="0 0 32 38" role="img">
                 <path d="M16 2 29 7v10c0 8.6-5.1 15.5-13 19-7.9-3.5-13-10.4-13-19V7l13-5Z" />
@@ -23,7 +23,7 @@ import { AuthApiService } from '../../services/auth-api.service';
               </svg>
             </span>
             <span>
-              <strong>SCS-TIX</strong>
+              <strong>OneVerz</strong>
               <small>Platform Administration</small>
             </span>
           </a>
@@ -35,7 +35,7 @@ import { AuthApiService } from '../../services/auth-api.service';
             </h1>
             <div class="accent-line" aria-hidden="true"></div>
             <p>
-              SCS-TIX is the unified platform to manage tenants, subscriptions, operations and performance across all
+              OneVerz is the unified platform to manage tenants, subscriptions, operations and performance across all
               your venues.
             </p>
           </div>
@@ -173,7 +173,7 @@ import { AuthApiService } from '../../services/auth-api.service';
         </section>
 
         <footer class="auth-footer">
-          <span>&copy; 2025 SCS-TIX. All rights reserved.</span>
+          <span>&copy; 2025 OneVerz. All rights reserved.</span>
           <a href="/" (click)="$event.preventDefault()">Privacy Policy</a>
           <a href="/" (click)="$event.preventDefault()">Terms of Service</a>
           <span class="system-status"><i aria-hidden="true"></i> System Status: <strong>Online</strong></span>
@@ -496,8 +496,8 @@ import { AuthApiService } from '../../services/auth-api.service';
     }
 
     .input-shell:focus-within {
-      border-color: #0b5cff;
-      box-shadow: 0 0 0 4px rgba(11, 92, 255, 0.12);
+      border-color: var(--border-focus, #0b5cff);
+      box-shadow: var(--shadow-focus);
     }
 
     .input-shell svg {
@@ -585,11 +585,11 @@ import { AuthApiService } from '../../services/auth-api.service';
 
     .submit-button {
       align-items: center;
-      background: #0b5cff;
+      background: var(--primary, #0b5cff);
       border: 0;
-      border-radius: 8px;
-      box-shadow: 0 12px 24px rgba(11, 92, 255, 0.22);
-      color: #fff;
+      border-radius: var(--radius-md, 8px);
+      box-shadow: var(--shadow-md);
+      color: var(--text-inverse, #fff);
       cursor: pointer;
       display: inline-flex;
       font: inherit;
@@ -599,16 +599,17 @@ import { AuthApiService } from '../../services/auth-api.service';
       min-height: clamp(3.3rem, 6.9vh, 4rem);
       padding: 0 1.4rem;
       width: 100%;
+      transition: background-color 0.15s ease, box-shadow 0.15s ease;
     }
 
     .submit-button:hover,
     .submit-button:focus-visible {
-      background: #084fe1;
+      background: var(--primary-hover, #084fe1);
       outline: 0;
     }
 
     .submit-button:disabled {
-      background: #8fb2ff;
+      background: var(--text-disabled, #8fb2ff);
       box-shadow: none;
       cursor: not-allowed;
     }

@@ -21,7 +21,7 @@ import { Sidebar } from '../sidebar/sidebar';
   `,
   styles: `
     .admin-shell {
-      background: #f7f9fc;
+      background: var(--bg-page, #f8fafc);
       min-height: 100dvh;
       overflow-x: hidden;
     }
@@ -51,7 +51,7 @@ import { Sidebar } from '../sidebar/sidebar';
       min-width: 0;
       overflow-x: hidden;
       overflow-y: auto;
-      padding: 1.5rem 1.6rem 2rem;
+      padding: var(--space-5, 1.5rem) var(--space-5, 1.5rem) var(--space-6, 2rem);
       width: 100%;
     }
 

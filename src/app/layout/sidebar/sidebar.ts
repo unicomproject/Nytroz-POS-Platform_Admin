@@ -25,7 +25,7 @@ import { SidebarMenuIcon } from './sidebar-menu-icon';
           </svg>
         </span>
         <span class="brand-copy">
-          <strong>SCS-TIX</strong>
+          <strong>OneVerz</strong>
           <small>Platform Administration</small>
         </span>
       </a>
@@ -41,29 +41,24 @@ import { SidebarMenuIcon } from './sidebar-menu-icon';
             >
               <app-sidebar-menu-icon [icon]="item.icon" />
               <span class="menu-label">{{ item.label }}</span>
-              @if (item.hasSubmenu) {
-                <span class="menu-chevron" aria-hidden="true">›</span>
-              }
             </a>
           }
         }
       </nav>
 
       <div class="sidebar-footer">
-        <div class="user-card">
-          <div class="user-avatar">{{ userInitials() }}</div>
-          <div class="user-copy">
-            <strong>{{ authSession.currentUser()?.fullName ?? 'Admin User' }}</strong>
-            <span>Platform account</span>
-          </div>
-          <span class="user-chevron" aria-hidden="true">›</span>
-        </div>
-
-        <button class="logout-button" type="button" (click)="logout()">Sign out</button>
+        <button class="logout-button" type="button" (click)="logout()">
+          <svg class="logout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+          Sign out
+        </button>
 
         <div class="version-card">
           <div class="version-copy">
-            <strong>SCS TIX Platform</strong>
+            <strong>OneVerz Platform</strong>
             <span>Version 2.4.0</span>
           </div>
           <span class="version-art" aria-hidden="true">
@@ -84,15 +79,15 @@ import { SidebarMenuIcon } from './sidebar-menu-icon';
   `,
   styles: `
     .sidebar {
-      background: linear-gradient(180deg, #0a2f63 0%, #061a38 55%, #04152d 100%);
-      box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.04);
-      color: #e8eef5;
+      background: #0f172a;
+      border-right: 1px solid rgba(255, 255, 255, 0.05);
+      color: #cbd5e1;
       display: flex;
       flex-direction: column;
       height: 100%;
       min-height: 100vh;
       overflow: hidden;
-      padding: 1.35rem 0.85rem 1rem;
+      padding: var(--space-4, 1rem) var(--space-3, 0.75rem);
       width: 16.5rem;
     }
 
@@ -101,27 +96,27 @@ import { SidebarMenuIcon } from './sidebar-menu-icon';
       color: inherit;
       display: flex;
       flex-shrink: 0;
-      gap: 0.8rem;
-      margin-bottom: 1.35rem;
-      padding: 0 0.35rem;
+      gap: var(--space-3, 0.75rem);
+      margin-bottom: var(--space-5, 1.5rem);
+      padding: 0 var(--space-2, 0.5rem);
       text-decoration: none;
     }
 
     .brand-logo {
       align-items: center;
-      background: linear-gradient(145deg, #2f7bff, #0b5cff);
-      border-radius: 10px;
-      box-shadow: 0 8px 18px rgba(11, 92, 255, 0.28);
+      background: linear-gradient(145deg, #2f7bff, var(--primary, #0b5cff));
+      border-radius: var(--radius-md, 8px);
+      box-shadow: 0 4px 12px rgba(11, 92, 255, 0.25);
       color: #fff;
       display: flex;
-      height: 2.45rem;
+      height: 2.25rem;
       justify-content: center;
-      width: 2.45rem;
+      width: 2.25rem;
     }
 
     .brand-logo svg {
-      height: 1.35rem;
-      width: 1.35rem;
+      height: 1.25rem;
+      width: 1.25rem;
     }
 
     .brand-copy {
@@ -131,19 +126,20 @@ import { SidebarMenuIcon } from './sidebar-menu-icon';
 
     .brand-copy strong {
       color: #fff;
-      font-size: 1.02rem;
-      letter-spacing: 0.03em;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
     }
 
     .brand-copy small {
-      color: #9eb2cb;
-      font-size: 0.72rem;
+      color: var(--text-muted, #64748b);
+      font-size: 0.6875rem;
     }
 
     .menu {
       display: grid;
       flex: 1;
-      gap: 0.18rem;
+      gap: 0.25rem;
       min-height: 0;
     }
 
@@ -151,33 +147,34 @@ import { SidebarMenuIcon } from './sidebar-menu-icon';
       background: transparent;
       overflow-x: hidden;
       overflow-y: auto;
-      -ms-overflow-style: none;
       scrollbar-width: none;
     }
 
     .sidebar-scroll::-webkit-scrollbar {
       display: none;
-      height: 0;
-      width: 0;
     }
 
     .menu-item {
       align-items: center;
-      border-radius: 10px;
-      color: #d8e3ef;
+      border-radius: var(--radius-md, 8px);
+      color: #94a3b8;
       display: flex;
-      font-size: 0.88rem;
-      gap: 0.72rem;
-      min-height: 2.65rem;
-      padding: 0.62rem 0.72rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      gap: var(--space-3, 0.75rem);
+      min-height: 2.5rem;
+      padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
       text-decoration: none;
-      transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+      transition: background-color 0.15s ease, color 0.15s ease;
     }
 
-    .menu-item:hover,
+    .menu-item:hover {
+      background-color: rgba(255, 255, 255, 0.05);
+      color: #f8fafc;
+    }
+
     .menu-item.active {
-      background: linear-gradient(90deg, #0868e8 0%, #064ab9 100%);
-      box-shadow: 0 8px 18px rgba(3, 82, 190, 0.22);
+      background-color: var(--primary, #0b5cff);
       color: #fff;
     }
 
@@ -186,102 +183,55 @@ import { SidebarMenuIcon } from './sidebar-menu-icon';
       line-height: 1.2;
     }
 
-    .menu-chevron,
-    .user-chevron {
-      color: rgba(255, 255, 255, 0.72);
-      font-size: 1rem;
-      line-height: 1;
-      transform: rotate(90deg);
-    }
-
     .sidebar-footer {
-      display: grid;
+      display: flex;
+      flex-direction: column;
       flex-shrink: 0;
-      gap: 0.85rem;
-      margin-top: 1rem;
-      padding-top: 0.85rem;
-    }
-
-    .user-card {
-      align-items: center;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 12px;
-      display: flex;
-      gap: 0.7rem;
-      padding: 0.75rem 0.8rem;
-    }
-
-    .user-avatar {
-      align-items: center;
-      background: linear-gradient(145deg, #2f7bff, #0b5cff);
-      border-radius: 50%;
-      color: #fff;
-      display: flex;
-      flex: 0 0 2rem;
-      font-size: 0.78rem;
-      font-weight: 800;
-      height: 2rem;
-      justify-content: center;
-      width: 2rem;
-    }
-
-    .user-copy {
-      display: grid;
-      flex: 1;
-      gap: 0.08rem;
-      min-width: 0;
-    }
-
-    .user-copy strong,
-    .user-copy span {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .user-copy strong {
-      color: #fff;
-      font-size: 0.82rem;
-    }
-
-    .user-copy span {
-      color: #9eb2cb;
-      font-size: 0.68rem;
+      gap: var(--space-3, 0.75rem);
+      margin-top: var(--space-4, 1rem);
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      padding-top: var(--space-4, 1rem);
     }
 
     .logout-button {
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 10px;
-      color: #e8eef5;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: var(--radius-md, 8px);
+      color: #cbd5e1;
       cursor: pointer;
+      display: inline-flex;
       font: inherit;
-      font-size: 0.8rem;
-      font-weight: 700;
-      min-height: 2.35rem;
-      padding: 0.58rem 0.8rem;
-      text-align: left;
-      transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      gap: var(--space-2, 0.5rem);
+      min-height: 2.25rem;
+      padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+      transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
     }
 
     .logout-button:hover,
     .logout-button:focus-visible {
-      background: rgba(255, 255, 255, 0.12);
-      border-color: rgba(255, 255, 255, 0.18);
-      color: #fff;
+      background-color: rgba(239, 68, 68, 0.1);
+      border-color: rgba(239, 68, 68, 0.2);
+      color: var(--status-danger, #ef4444);
       outline: none;
+    }
+
+    .logout-icon {
+      height: 1rem;
+      width: 1rem;
     }
 
     .version-card {
       align-items: center;
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: var(--radius-md, 8px);
       display: flex;
-      gap: 0.65rem;
+      gap: var(--space-2, 0.5rem);
       justify-content: space-between;
-      padding: 0.75rem 0.85rem;
+      padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
     }
 
     .version-copy {
@@ -290,18 +240,18 @@ import { SidebarMenuIcon } from './sidebar-menu-icon';
     }
 
     .version-copy strong {
-      color: #fff;
-      font-size: 0.78rem;
+      color: #f8fafc;
+      font-size: 0.75rem;
     }
 
     .version-copy span {
-      color: #9eb2cb;
-      font-size: 0.68rem;
+      color: var(--text-muted, #64748b);
+      font-size: 0.6875rem;
     }
 
     .version-art svg {
-      height: 2.1rem;
-      width: 2.1rem;
+      height: 1.75rem;
+      width: 1.75rem;
     }
 
     @media (max-width: 820px) {
@@ -309,6 +259,8 @@ import { SidebarMenuIcon } from './sidebar-menu-icon';
         min-height: auto;
         position: static;
         width: 100%;
+        border-right: 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
       }
 
       .menu {
@@ -331,15 +283,6 @@ export class Sidebar {
         })
       )
       .filter((section) => section.items.length > 0)
-  );
-
-  readonly userInitials = computed(() =>
-    (this.authSession.currentUser()?.fullName ?? 'Admin User')
-      .split(' ')
-      .map((part) => part[0])
-      .join('')
-      .slice(0, 2)
-      .toUpperCase()
   );
 
   constructor(

@@ -169,7 +169,7 @@ describe('Sidebar', () => {
     const root = fixture.nativeElement as HTMLElement;
     expect(root.textContent).not.toContain('Collapse');
     expect(root.querySelector('.collapse-btn, [aria-label="Collapse sidebar"]')).toBeNull();
-    expect(root.textContent).toContain('SCS TIX Platform');
+    expect(root.textContent).toContain('OneVerz Platform');
     expect(root.textContent).toContain('Version 2.4.0');
   });
 });

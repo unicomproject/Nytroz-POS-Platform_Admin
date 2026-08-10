@@ -41,54 +41,26 @@ import { PlatformTenantSearchService } from '../../features/admin/services/platf
           <button class="system-status" type="button" aria-label="System status">
             <span class="status-dot" aria-hidden="true"></span>
             All Systems Operational
-            <span class="dropdown-caret" aria-hidden="true">▾</span>
-          </button>
-        } @else if (!isTenantListPage()) {
-          <div class="date-range" aria-label="Current dashboard date range">Last 30 days <span>v</span></div>
-        }
-
-        <button class="icon-btn notification" type="button" aria-label="Notifications">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M18 8a6 6 0 10-12 0c0 7-3 7-3 7h18s-3 0-3-7" />
-            <path d="M13.73 21a2 2 0 01-3.46 0" />
-          </svg>
-        </button>
-
-        @if (!isSubscriptionCreatePage()) {
-          <button class="icon-btn help" type="button" aria-label="Help">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="12" cy="12" r="9" />
-              <path d="M9.5 9a2.5 2.5 0 014.8 1c0 2-2.5 2-2.5 4" />
-              <circle cx="12" cy="17" r="0.5" fill="currentColor" stroke="none" />
-            </svg>
-          </button>
-          <button class="icon-btn settings" type="button" aria-label="Settings">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
-            </svg>
           </button>
         }
-
         <div class="avatar">{{ initials() }}</div>
         <div class="user-summary">
           <strong>{{ authSession.currentUser()?.fullName ?? 'Platform session required' }}</strong>
           <span>Platform account</span>
         </div>
-        <span class="dropdown-caret" aria-hidden="true">▾</span>
       </div>
     </header>
   `,
   styles: `
     .admin-header {
       align-items: center;
-      background: #fff;
-      border-bottom: 1px solid #e5eaf2;
+      background: var(--bg-surface-primary, #fff);
+      border-bottom: 1px solid var(--border-default, #e5eaf2);
       display: flex;
-      gap: 1rem;
+      gap: var(--space-4, 1rem);
       justify-content: space-between;
       min-height: 4.25rem;
-      padding: 0.85rem 1.6rem;
+      padding: 0.85rem var(--space-5, 1.6rem);
     }
 
     .header-spacer {
@@ -97,23 +69,24 @@ import { PlatformTenantSearchService } from '../../features/admin/services/platf
 
     .header-breadcrumb {
       align-items: center;
-      color: #667085;
+      color: var(--text-secondary, #667085);
       display: flex;
       font-size: 0.84rem;
       gap: 0.45rem;
     }
 
     .header-breadcrumb a {
-      color: #667085;
+      color: var(--text-secondary, #667085);
       text-decoration: none;
+      transition: color 0.15s ease;
     }
 
     .header-breadcrumb a:hover {
-      color: #344054;
+      color: var(--primary, #0b5cff);
     }
 
     .header-breadcrumb .current {
-      color: #101828;
+      color: var(--text-primary, #101828);
       font-weight: 700;
     }
 
@@ -126,28 +99,29 @@ import { PlatformTenantSearchService } from '../../features/admin/services/platf
     }
 
     .global-search input {
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 10px;
-      color: #344054;
+      background: var(--bg-surface-secondary, #f8fafc);
+      border: 1px solid var(--border-default, #e2e8f0);
+      border-radius: var(--radius-md, 10px);
+      color: var(--text-primary, #344054);
       font-size: 0.88rem;
-      min-height: 2.65rem;
+      min-height: var(--control-height-default, 2.65rem);
       padding: 0 2.75rem 0 1rem;
       width: 100%;
+      transition: border-color 0.15s ease, background-color 0.15s ease;
     }
 
     .global-search input::placeholder {
-      color: #98a2b3;
+      color: var(--text-muted, #98a2b3);
     }
 
     .global-search input:focus {
-      background: #fff;
-      border-color: #84adff;
+      background: var(--bg-surface-primary, #fff);
+      border-color: var(--border-focus, #0b5cff);
       outline: none;
     }
 
     .global-search svg {
-      color: #98a2b3;
+      color: var(--text-muted, #98a2b3);
       height: 1.1rem;
       pointer-events: none;
       position: absolute;
@@ -163,115 +137,67 @@ import { PlatformTenantSearchService } from '../../features/admin/services/platf
       align-items: center;
       display: flex;
       flex-shrink: 0;
-      gap: 0.65rem;
+      gap: var(--space-3, 0.65rem);
     }
 
     .system-status {
       align-items: center;
-      background: #fff;
-      border: 1px solid #d0fae5;
-      border-radius: 999px;
-      color: #027a48;
+      background: var(--status-success-bg, #ecfdf5);
+      border: 1px solid var(--status-success-text, #047857);
+      border-radius: var(--radius-pill, 9999px);
+      color: var(--status-success-text, #047857);
       cursor: pointer;
       display: inline-flex;
       font-size: 0.82rem;
       font-weight: 600;
       gap: 0.45rem;
-      min-height: 2.35rem;
-      padding: 0.45rem 0.85rem;
+      min-height: 2.25rem;
+      padding: 0.45rem var(--space-4, 0.85rem);
     }
 
     .system-status .status-dot {
-      background: #12b76a;
+      background: var(--status-success, #12b76a);
       border-radius: 50%;
       height: 0.45rem;
       width: 0.45rem;
     }
 
-    .date-range {
-      border: 1px solid #dce3ef;
-      border-radius: 10px;
-      color: #344054;
-      font-size: 0.85rem;
-      font-weight: 700;
-      padding: 0.65rem 0.85rem;
-    }
-
-    .date-range span {
-      color: #667085;
-      margin-left: 0.65rem;
-    }
-
-    .icon-btn {
-      align-items: center;
-      background: #fff;
-      border: 1px solid #e5eaf2;
-      border-radius: 50%;
-      color: #667085;
-      cursor: pointer;
-      display: flex;
-      height: 2.35rem;
-      justify-content: center;
-      width: 2.35rem;
-    }
-
-    .icon-btn svg {
-      height: 1.05rem;
-      stroke: currentColor;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-      stroke-width: 1.75;
-      fill: none;
-      width: 1.05rem;
-    }
-
     .avatar {
       align-items: center;
-      background: linear-gradient(145deg, #0b5cff, #7c3aed);
+      background: linear-gradient(145deg, var(--primary, #0b5cff), #7c3aed);
       border-radius: 50%;
       color: #fff;
       display: flex;
       font-size: 0.78rem;
-      font-weight: 900;
-      height: 2.5rem;
+      font-weight: 800;
+      height: 2.25rem;
       justify-content: center;
-      width: 2.5rem;
+      width: 2.25rem;
     }
 
     .user-summary {
       display: grid;
-      gap: 0.1rem;
+      gap: 0.08rem;
     }
 
     .user-summary strong {
-      color: #17213a;
-      font-size: 0.88rem;
+      color: var(--text-primary, #17213a);
+      font-size: 0.875rem;
+      font-weight: 600;
     }
 
     .user-summary span {
-      color: #667085;
+      color: var(--text-muted, #667085);
       font-size: 0.75rem;
     }
 
-    .dropdown-caret {
-      color: #98a2b3;
-      font-size: 0.85rem;
-      margin-left: -0.15rem;
-    }
-
     @media (max-width: 900px) {
-      .user-summary,
-      .dropdown-caret {
+      .user-summary {
         display: none;
       }
     }
 
     @media (max-width: 700px) {
-      .date-range,
-      .system-status {
-        display: none;
-      }
-
       .global-search {
         max-width: none;
       }
@@ -323,3 +249,5 @@ export class Header {
     return this.router.url.split('?')[0] === '/admin/subscriptions/create';
   }
 }
+
+
