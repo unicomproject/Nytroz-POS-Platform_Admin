@@ -145,6 +145,7 @@ describe('PlatformCreateTenantPage durable onboarding', () => {
     const el = fixture().nativeElement as HTMLElement;
     expect(el.querySelector('app-page-header')).toBeTruthy();
     expect(el.textContent).toContain('Tenants');
+    expect(el.textContent).toContain('Create a new tenant');
   });
 
   it('renders a seven-step stepper', () => {
@@ -156,6 +157,15 @@ describe('PlatformCreateTenantPage durable onboarding', () => {
     const el = fixture().nativeElement as HTMLElement;
     expect(el.querySelector('.wizard-hero')).toBeTruthy();
     expect(el.textContent).toContain('7-step guided onboarding');
+    expect(el.textContent).toContain('Launch a tenant with confidence');
+  });
+
+  it('renders setup summary beside the form after options load', () => {
+    const el = fixture().nativeElement as HTMLElement;
+    expect(el.querySelector('.setup-summary')).toBeTruthy();
+    expect(el.querySelector('.wizard-layout')).toBeTruthy();
+    expect(el.textContent).toContain('Setup summary');
+    expect(el.textContent).toContain('Not entered');
   });
 
   it('labels Continue before review and Create Tenant on review', () => {
@@ -166,15 +176,41 @@ describe('PlatformCreateTenantPage durable onboarding', () => {
     expect((created.nativeElement as HTMLElement).querySelector('.footer-right')?.textContent).toContain('Create Tenant');
   });
 
-  it('renders Save Draft and Cancel actions', () => {
+  it('keeps footer action hierarchy with Cancel on the right cluster', () => {
     const el = fixture().nativeElement as HTMLElement;
-    expect(el.textContent).toContain('Save Draft');
-    expect(el.textContent).toContain('Cancel');
+    const left = el.querySelector('.footer-left')?.textContent ?? '';
+    const right = el.querySelector('.footer-right')?.textContent ?? '';
+    expect(left).toContain('Back');
+    expect(left).toContain('Save Draft');
+    expect(right).toContain('Cancel');
+    expect(right).toContain('Continue');
   });
 
-  it('uses UI-1 app-button components in the footer', () => {
-    const el = fixture().nativeElement as HTMLElement;
-    expect(el.querySelectorAll('.wizard-footer app-button').length).toBeGreaterThanOrEqual(4);
+  it('exposes accessible labels for step validation error counts', () => {
+    const created = fixture();
+    const component = created.componentInstance;
+    component.businessInfoForm.markAllAsTouched();
+    component.currentStep.set('plan-selection');
+    created.detectChanges();
+    const errorBadge = (created.nativeElement as HTMLElement).querySelector('.step-errors');
+    expect(errorBadge?.getAttribute('aria-label') ?? '').toMatch(/validation error/);
+  });
+
+  it('does not paint upcoming steps as error for empty fields', () => {
+    const created = fixture();
+    const component = created.componentInstance;
+    component.currentStep.set('business-info');
+    created.detectChanges();
+    expect(component.stepState('plan-selection', 1)).toBe('upcoming');
+    expect(component.showStepErrorCount('plan-selection', 1)).toBe(false);
+  });
+
+  it('does not show an error count badge on the current step', () => {
+    const created = fixture();
+    const component = created.componentInstance;
+    component.currentStep.set('business-info');
+    created.detectChanges();
+    expect(component.showStepErrorCount('business-info', 0)).toBe(false);
   });
 
   it('renders structured review summary groups', () => {

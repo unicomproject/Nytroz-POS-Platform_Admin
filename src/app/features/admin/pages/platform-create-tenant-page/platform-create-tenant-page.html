@@ -10,16 +10,20 @@
   />
 
   <section class="wizard-hero" aria-labelledby="wizard-hero-title">
+    <div class="hero-glow" aria-hidden="true"></div>
     <div class="hero-copy">
       <p class="hero-eyebrow" id="wizard-hero-title">7-step guided onboarding</p>
-      <p class="hero-lead">Launch a tenant with durable draft save, plan selection, and admin invite readiness.</p>
-      <p class="hero-step">Current step: <strong>{{ currentStepLabel() }}</strong></p>
-      @if (draftId(); as id) {
-        <p class="hero-progress">Draft {{ id }} · {{ progressPercent() }}% complete</p>
-      } @else if (progressPercent() > 0) {
-        <p class="hero-progress">Draft progress: {{ progressPercent() }}%</p>
-      }
-      <p class="hero-note">Provisioning starts after Create Tenant.</p>
+      <p class="hero-lead">Launch a tenant with confidence</p>
+      <div class="hero-meta">
+        <span class="hero-chip">Current: {{ currentStepLabel() }}</span>
+        <span class="hero-chip">Step {{ currentStepNumber() }} of {{ steps.length }}</span>
+        @if (draftId()) {
+          <span class="hero-chip">Draft {{ progressPercent() }}%</span>
+        } @else {
+          <span class="hero-chip">New draft</span>
+        }
+      </div>
+      <p class="hero-note">Provisioning begins after Create Tenant — payment, activation, and invitation remain separate stages.</p>
     </div>
   </section>
 
@@ -35,16 +39,24 @@
       >
         <span class="step-marker" aria-hidden="true">
           @if (stepState(step.key, index) === 'completed') {
-            <svg class="step-check" viewBox="0 0 16 16" fill="none">
+            <svg class="step-check" viewBox="0 0 16 16" fill="none" aria-hidden="true">
               <path d="M3.5 8.5l3 3 6-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
           } @else {
             <span class="step-num">{{ index + 1 }}</span>
           }
         </span>
-        <span class="step-label">{{ step.label }}</span>
-        @if (stepErrorCount(step.key) > 0) {
-          <span class="step-errors">{{ stepErrorCount(step.key) }}</span>
+        <span class="step-copy">
+          <span class="step-label">{{ step.label }}</span>
+          <span class="step-short">{{ step.shortLabel }}</span>
+        </span>
+        @if (showStepErrorCount(step.key, index)) {
+          <span
+            class="step-errors"
+            [attr.aria-label]="stepErrorAriaLabel(step.label, stepErrorCount(step.key))"
+          >
+            {{ stepErrorCount(step.key) }}
+          </span>
         }
       </li>
     }
@@ -63,6 +75,10 @@
     <div class="wizard-layout">
       <section class="wizard-main" aria-labelledby="step-heading">
         <header class="step-header">
+          <div class="step-header-top">
+            <p class="step-kicker">Step {{ currentStepNumber() }} of {{ steps.length }}</p>
+            <span class="step-progress-label">Wizard progress {{ wizardStepProgressPercent() }}%</span>
+          </div>
           <h2 id="step-heading">{{ currentStepLabel() }}</h2>
           <p class="step-purpose">{{ currentStepPurpose() }}</p>
         </header>
@@ -470,36 +486,45 @@
       </section>
 
       <aside class="setup-summary" aria-label="Setup summary">
-        <h2>Setup summary</h2>
+        <div class="summary-head">
+          <h2>Setup summary</h2>
+          <p class="summary-sub">Live context from this wizard — not provisioning status.</p>
+        </div>
+        <div class="summary-progress" aria-hidden="true">
+          <div class="summary-progress-bar" [style.width.%]="wizardStepProgressPercent()"></div>
+        </div>
+        <p class="summary-progress-text">Step {{ currentStepNumber() }} of {{ steps.length }} · {{ wizardStepProgressPercent() }}%</p>
         <dl>
           <div>
             <dt>Tenant</dt>
-            <dd>{{ displayValue(businessInfoForm.controls.name.value) }}</dd>
+            <dd>{{ summaryValue(businessInfoForm.controls.name.value) }}</dd>
           </div>
           <div>
             <dt>Code</dt>
-            <dd>{{ displayValue(businessInfoForm.controls.code.value) }}</dd>
+            <dd>{{ summaryValue(businessInfoForm.controls.code.value) }}</dd>
           </div>
           <div>
             <dt>Plan</dt>
-            <dd>{{ displayValue(selectedPlan()?.name) }}</dd>
+            <dd>{{ summaryValue(selectedPlan()?.name, 'Not selected') }}</dd>
           </div>
           <div>
-            <dt>Subscription type</dt>
-            <dd>{{ displayValue(billingSubscriptionForm.controls.subscriptionType.value) }}</dd>
+            <dt>Billing</dt>
+            <dd>{{ summaryValue(billingSubscriptionForm.controls.subscriptionType.value, 'Not selected') }}</dd>
           </div>
           <div>
             <dt>Billing cycle</dt>
-            <dd>{{ displayValue(billingSubscriptionForm.controls.billingCycle.value) }}</dd>
+            <dd>{{ summaryValue(billingSubscriptionForm.controls.billingCycle.value, 'Not selected') }}</dd>
           </div>
           <div>
-            <dt>Admin email</dt>
-            <dd>{{ displayValue(tenantAdminForm.controls.email.value) }}</dd>
+            <dt>Tenant Admin</dt>
+            <dd>{{ summaryValue(tenantAdminForm.controls.email.value) }}</dd>
           </div>
-          <div>
-            <dt>Progress</dt>
-            <dd>{{ progressPercent() }}%</dd>
-          </div>
+          @if (draftId()) {
+            <div>
+              <dt>Draft progress</dt>
+              <dd>{{ progressPercent() }}% saved</dd>
+            </div>
+          }
         </dl>
       </aside>
     </div>

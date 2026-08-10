@@ -64,13 +64,13 @@ export class PlatformCreateTenantPage implements OnInit {
   private readonly route = inject(ActivatedRoute);
 
   readonly steps = [
-    { key: 'business-info' as WizardStep, label: 'Tenant Basic Details' },
-    { key: 'plan-selection' as WizardStep, label: 'Business & Contact Information' },
-    { key: 'limits-addons' as WizardStep, label: 'Subscription Plan' },
-    { key: 'billing-subscription' as WizardStep, label: 'Billing / Payment Setup' },
-    { key: 'feature-entitlements' as WizardStep, label: 'Feature Entitlements' },
-    { key: 'tenant-admin' as WizardStep, label: 'Tenant Admin User' },
-    { key: 'review-create' as WizardStep, label: 'Review, Create & Activation' }
+    { key: 'business-info' as WizardStep, label: 'Tenant Basic Details', shortLabel: 'Identity' },
+    { key: 'plan-selection' as WizardStep, label: 'Business & Contact Information', shortLabel: 'Contacts' },
+    { key: 'limits-addons' as WizardStep, label: 'Subscription Plan', shortLabel: 'Plan' },
+    { key: 'billing-subscription' as WizardStep, label: 'Billing / Payment Setup', shortLabel: 'Billing' },
+    { key: 'feature-entitlements' as WizardStep, label: 'Feature Entitlements', shortLabel: 'Features' },
+    { key: 'tenant-admin' as WizardStep, label: 'Tenant Admin User', shortLabel: 'Admin' },
+    { key: 'review-create' as WizardStep, label: 'Review, Create & Activation', shortLabel: 'Review' }
   ];
 
   private readonly stepPurposeByKey: Record<WizardStep, string> = {
@@ -123,12 +123,14 @@ export class PlatformCreateTenantPage implements OnInit {
     { label: this.draftId() ? 'Resume' : 'Create' }
   ]);
 
-  readonly pageTitle = computed(() => (this.draftId() ? 'Resume Tenant' : 'Create Tenant'));
+  readonly pageTitle = computed(() =>
+    this.draftId() ? 'Resume tenant onboarding' : 'Create a new tenant'
+  );
 
   readonly pageDescription = computed(() =>
     this.draftId()
       ? 'Continue durable onboarding from the saved draft.'
-      : 'Configure business, subscription, features, and tenant administrator.'
+      : 'Set up the business, subscription and first Tenant Administrator.'
   );
 
   readonly currentStepLabel = computed(() => {
@@ -137,6 +139,12 @@ export class PlatformCreateTenantPage implements OnInit {
   });
 
   readonly currentStepPurpose = computed(() => this.stepPurposeByKey[this.currentStep()]);
+
+  readonly currentStepNumber = computed(() => this.stepIndex(this.currentStep()) + 1);
+
+  readonly wizardStepProgressPercent = computed(() =>
+    Math.round((this.currentStepNumber() / this.steps.length) * 100)
+  );
 
   readonly businessInfoForm = this.fb.nonNullable.group({
     code: ['', Validators.required],
@@ -216,15 +224,17 @@ export class PlatformCreateTenantPage implements OnInit {
       return 'current';
     }
 
-    if (this.stepErrorCount(step) > 0) {
-      return 'error';
-    }
-
     if (this.stepIndex(this.currentStep()) > index) {
-      return 'completed';
+      return this.stepErrorCount(step) > 0 ? 'error' : 'completed';
     }
 
     return 'upcoming';
+  }
+
+  showStepErrorCount(step: WizardStep, index: number): boolean {
+    // Past steps with unresolved issues keep an accessible count badge.
+    // Current-step field errors stay in the form; avoid a noisy badge on first paint.
+    return this.stepState(step, index) === 'error' && this.stepErrorCount(step) > 0;
   }
 
   stepPurpose(step: WizardStep): string {
@@ -234,6 +244,15 @@ export class PlatformCreateTenantPage implements OnInit {
   displayValue(value: string | null | undefined): string {
     const trimmed = (value ?? '').trim();
     return trimmed.length ? trimmed : '—';
+  }
+
+  summaryValue(value: string | null | undefined, emptyLabel = 'Not entered'): string {
+    const trimmed = (value ?? '').trim();
+    return trimmed.length ? trimmed : emptyLabel;
+  }
+
+  stepErrorAriaLabel(stepLabel: string, count: number): string {
+    return `${stepLabel} — ${count} validation error${count === 1 ? '' : 's'}`;
   }
 
   adminDisplayName(): string {
