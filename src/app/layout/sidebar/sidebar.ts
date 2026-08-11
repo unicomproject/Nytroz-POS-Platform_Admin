@@ -1,5 +1,5 @@
 import { Component, computed } from '@angular/core';
-import { Router, RouterLink, RouterLinkActive } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 
 import { MenuSectionConfig, platformMenuConfig } from '../../core/config/menu.config';
 import { AccessControlService } from '../../core/services/access-control.service';
@@ -10,7 +10,7 @@ import { SidebarMenuIcon } from './sidebar-menu-icon';
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [RouterLink, RouterLinkActive, SidebarMenuIcon],
+  imports: [RouterLink, SidebarMenuIcon],
   template: `
     <aside class="sidebar">
       <a class="brand" routerLink="/admin/dashboard">
@@ -36,8 +36,7 @@ import { SidebarMenuIcon } from './sidebar-menu-icon';
             <a
               class="menu-item"
               [routerLink]="item.path"
-              routerLinkActive="active"
-              [routerLinkActiveOptions]="linkActiveOptions(item.path)"
+              [class.active]="isMenuItemActive(item.path)"
             >
               <app-sidebar-menu-icon [icon]="item.icon" />
               <span class="menu-label">{{ item.label }}</span>
@@ -304,15 +303,28 @@ export class Sidebar {
     void this.router.navigate(['/login']);
   }
 
-  linkActiveOptions(path: string): { exact: boolean } {
+  isMenuItemActive(path: string): boolean {
+    const url = this.router.url.split('?')[0];
+
     if (path === '/admin/dashboard') {
-      return { exact: true };
+      return url === '/admin/dashboard';
     }
 
-    if (path === '/admin/subscriptions' || path === '/admin/tenants') {
-      return { exact: false };
+    if (path === '/admin/tenants') {
+      if (url.startsWith('/admin/tenants/onboarding')) {
+        return false;
+      }
+      return url === '/admin/tenants' || url.startsWith('/admin/tenants/');
     }
 
-    return { exact: true };
+    if (path === '/admin/tenants/onboarding/drafts') {
+      return url === '/admin/tenants/onboarding/drafts';
+    }
+
+    if (path === '/admin/subscriptions') {
+      return url === '/admin/subscriptions' || url.startsWith('/admin/subscriptions/');
+    }
+
+    return url === path || url.startsWith(`${path}/`);
   }
 }

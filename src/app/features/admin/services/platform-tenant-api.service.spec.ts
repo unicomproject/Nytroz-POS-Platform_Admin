@@ -238,4 +238,46 @@ describe('PlatformTenantApiService', () => {
     });
     expect(enabledFeatureCount).toBe(1);
   });
+
+  it('lists onboarding drafts with mine query and discards with If-Match', () => {
+    let itemCount = 0;
+    service.listOnboardingDrafts(false).subscribe((items) => {
+      itemCount = items.length;
+    });
+
+    const listRequest = httpTesting.expectOne(
+      (req) => req.url === '/api/v1/platform-admin/tenant-onboarding/drafts'
+    );
+    expect(listRequest.request.method).toBe('GET');
+    expect(listRequest.request.params.get('mine')).toBe('false');
+    listRequest.flush({
+      success: true,
+      message: 'ok',
+      data: {
+        items: [
+          {
+            id: 'draft-1',
+            displayName: 'Acme',
+            tenantCode: 'ACME',
+            status: 'in_progress',
+            currentStep: 2,
+            progressPercent: 20,
+            ownerPlatformUserId: 'u1',
+            updatedAt: '2026-08-11T00:00:00Z',
+            expiresAt: '2026-09-01T00:00:00Z',
+            version: 5
+          }
+        ]
+      }
+    });
+    expect(itemCount).toBe(1);
+
+    service.discardOnboardingDraft('draft-1', 5).subscribe();
+    const discardRequest = httpTesting.expectOne(
+      '/api/v1/platform-admin/tenant-onboarding/drafts/draft-1'
+    );
+    expect(discardRequest.request.method).toBe('DELETE');
+    expect(discardRequest.request.headers.get('If-Match')).toBe('"5"');
+    discardRequest.flush(null);
+  });
 });
