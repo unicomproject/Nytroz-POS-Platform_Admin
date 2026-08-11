@@ -1,28 +1,207 @@
-<section class="result-page" aria-live="polite">
-  <header class="page-heading"><div><nav aria-label="Breadcrumb"><a routerLink="/admin/tenants">Tenants</a><span>/</span><span>Onboarding status</span></nav><h1>Tenant onboarding status</h1><p>Payment approval, tenant activation, and the Tenant Admin invitation are tracked as separate stages.</p></div><button type="button" class="button secondary" (click)="refresh()" [disabled]="loading() || actionBusy()">Refresh status</button></header>
-  @if (message()) { <div class="alert success" role="status">{{ message() }}</div> }
-  @if (actionError()) { <div class="alert error" role="alert">{{ actionError() }}</div> }
-  @if (error()) { <div class="alert error" role="alert">{{ error() }}</div> }
-  @if (loading() && !operation()) { <div class="state"><span class="spinner" aria-hidden="true"></span>Loading operation status…</div> }
-  @if (operation(); as op) {
-    <article class="hero card"><div><p class="eyebrow">Operation {{ op.id }}</p><h2>{{ title(op) }}</h2><p>Last updated {{ op.updatedAt ? (op.updatedAt | date:'medium') : 'not available' }}</p></div><span class="operation-status">{{ format(op.status) }}</span></article>
-    <ol class="steps" aria-label="Onboarding lifecycle">
-      <li class="complete"><span>1</span><div><strong>Tenant created</strong><small>Provisioning: {{ format(op.provisioningStatus) }}</small></div></li>
-      <li [class.complete]="normalizePaymentStatus(op.paymentStatus) === 'PAID'" [class.current]="normalizePaymentStatus(op.paymentStatus) !== 'PAID'"><span>2</span><div><strong>Manual payment</strong><small>{{ format(normalizePaymentStatus(op.paymentStatus)) }}</small></div></li>
-      <li [class.complete]="isActiveTenant()" [class.current]="normalizePaymentStatus(op.paymentStatus) === 'PAID' && !isActiveTenant()"><span>3</span><div><strong>Tenant activation</strong><small>{{ format(currentTenantStatus() || 'PENDING') }}</small></div></li>
-      <li [class.complete]="['SENT','ACCEPTED'].includes(op.invitationStatus)" [class.current]="isActiveTenant()"><span>4</span><div><strong>Tenant Admin invitation</strong><small>{{ format(op.invitationStatus) }}</small></div></li>
-    </ol>
-    <div class="grid">
-      <article class="card"><h2>Tenant</h2><dl><div><dt>Name</dt><dd>{{ tenant()?.name || payment()?.payment?.tenantName || 'Available in tenant record' }}</dd></div><div><dt>Reference</dt><dd>{{ tenant()?.code || payment()?.payment?.tenantCode || op.tenantId }}</dd></div><div><dt>Status</dt><dd>{{ format(currentTenantStatus()) }}</dd></div></dl><a [routerLink]="['/admin/tenants', op.tenantId]">Open tenant</a></article>
-      <article class="card"><h2>Payment and invoice</h2>@if (payment(); as detail) { <dl><div><dt>Payment</dt><dd><app-manual-payment-status-badge [status]="detail.payment.status" /></dd></div><div><dt>Invoice</dt><dd>{{ detail.payment.invoiceNumber }}</dd></div><div><dt>Total</dt><dd>{{ detail.payment.expectedAmount | number:'1.2-2' }} {{ detail.payment.currencyCode }}</dd></div><div><dt>Plan</dt><dd>{{ detail.payment.planName }} · {{ format(detail.payment.billingCycle) }}</dd></div><div><dt>Notification</dt><dd>Delivery status is not exposed by this operation contract</dd></div><div><dt>Secure payment access</dt><dd>Provisioned; link remains private</dd></div></dl><a [routerLink]="['/admin/billing/manual-payments', detail.payment.paymentId]">Open payment review</a> } @else { <dl><div><dt>Payment</dt><dd>{{ format(normalizePaymentStatus(op.paymentStatus)) }}</dd></div><div><dt>Invoice</dt><dd>Requires billing-view permission</dd></div></dl> }</article>
-      <article class="card"><h2>Setup handoff</h2><dl><div><dt>Invitation</dt><dd>{{ format(op.invitationStatus) }}</dd></div><div><dt>Account ready</dt><dd>{{ isActiveTenant() && ['SENT','ACCEPTED'].includes(op.invitationStatus) ? 'Confirmed' : 'Not yet confirmed' }}</dd></div><div><dt>Retry eligible</dt><dd>{{ op.retryable ? 'Yes' : 'No' }}</dd></div>@if (op.failureCode) { <div><dt>Failure reference</dt><dd>{{ op.failureCode }}</dd></div> }</dl></article>
-    </div>
-    @if (projectionError()) { <p class="projection-error" role="status">Some billing details are unavailable: {{ projectionError() }}</p> }
-    <section class="actions card"><div><h2>Available actions</h2><p>Actions remain permission- and lifecycle-controlled by the backend.</p></div><div>
-      @if (payment()?.activationEligible && canActivate()) { <button type="button" class="button primary" (click)="activateTenant()" [disabled]="actionBusy()">Activate tenant</button> }
-      @if (payment() && canManageBilling() && normalizePaymentStatus(op.paymentStatus) !== 'PAID') { <button type="button" class="button secondary" (click)="resendPaymentNotification()" [disabled]="actionBusy()">Resend payment notification</button> }
-      @if (op.retryable && canManageBilling()) { <button type="button" class="button warning" (click)="retryOperation()" [disabled]="actionBusy()">Retry eligible operation</button> }
-      @if (isActiveTenant() && canResendInvitation()) { <button type="button" class="button secondary" (click)="resendInvitation()" [disabled]="actionBusy()">Resend Tenant Admin invitation</button> }
-    </div></section>
+<section class="operation-page">
+  <div class="sr-only" aria-live="polite" aria-atomic="true">{{ statusAnnouncement() }}</div>
+
+  <app-page-header
+    [title]="pageTitle()"
+    description="Track tenant creation and the post-submit payment, activation, and invitation lifecycle."
+    [breadcrumbs]="[{ label: 'Tenants', path: '/admin/tenants' }, { label: 'Operation status' }]"
+  >
+    <app-button variant="ghost" [disabled]="actionBusy()" (click)="navigateToTenants()">Back to Tenants</app-button>
+    <app-button
+      variant="secondary"
+      [disabled]="initialLoading() || refreshing() || actionBusy()"
+      (click)="refresh()"
+    >
+      Refresh Status
+    </app-button>
+  </app-page-header>
+
+  @if (message()) {
+    <div class="inline-alert success" role="status">{{ message() }}</div>
   }
+
+  @if (actionError()) {
+    <div class="inline-alert error" role="alert">{{ actionError() }}</div>
+  }
+
+  @if (initialLoading() && !operation()) {
+    <app-loading-skeleton [rows]="4" [avatar]="true" />
+  }
+
+  @if (pageErrorKind() === 'not-found') {
+    <app-error-state
+      title="Operation not found"
+      message="This operation reference could not be loaded. It may be invalid or no longer available."
+    >
+      <app-button variant="primary" (click)="navigateToTenants()">Back to Tenants</app-button>
+    </app-error-state>
+  } @else if (pageErrorKind() === 'permission-denied') {
+    <app-error-state
+      title="You don't have permission to view this operation"
+      message="Contact a platform administrator if you believe you should have access."
+    >
+      <app-button variant="primary" (click)="navigateToTenants()">Back to Tenants</app-button>
+    </app-error-state>
+  } @else if (pageErrorKind() === 'missing-id' || pageErrorKind() === 'fatal') {
+    <app-error-state
+      [title]="pageErrorKind() === 'missing-id' ? 'Operation reference missing' : 'Unable to load operation status'"
+      [message]="fatalError() ?? 'Something went wrong while loading this operation.'"
+      [hasRetry]="pageErrorKind() === 'fatal'"
+      (retry)="refresh()"
+    >
+      <app-button variant="secondary" (click)="navigateToTenants()">Back to Tenants</app-button>
+    </app-error-state>
+  }
+
+  @if (operation(); as op) {
+    @if (pollError()) {
+      <div class="inline-alert error poll-error" role="alert">
+        We couldn't refresh the latest status. The last known operation state is shown below.
+      </div>
+    }
+
+    @if (statusPresentation(); as status) {
+      <section
+        class="status-surface"
+        [class.tone-blue]="status.surfaceTone === 'blue'"
+        [class.tone-success]="status.surfaceTone === 'success'"
+        [class.tone-failure]="status.surfaceTone === 'failure'"
+        aria-labelledby="operation-status-headline"
+      >
+        <div class="status-icon" aria-hidden="true">
+          @if (status.showSpinner) {
+            <span class="spinner"></span>
+          } @else if (status.surfaceTone === 'success') {
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>
+          } @else if (status.surfaceTone === 'failure') {
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          } @else {
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4m0 4h.01"/></svg>
+          }
+        </div>
+
+        <div class="status-copy">
+          <h2 id="operation-status-headline">{{ status.headline }}</h2>
+          <p>{{ status.subcopy }}</p>
+          @if (tenantName() || tenantCode()) {
+            <div class="tenant-identity">
+              @if (tenantName()) {
+                <strong>{{ tenantName() }}</strong>
+              }
+              @if (tenantCode()) {
+                <span>{{ tenantCode() }}</span>
+              }
+            </div>
+          }
+          <p class="updated-meta">
+            @if (refreshing()) {
+              Refreshing status…
+            } @else {
+              Updated {{ op.updatedAt ? (op.updatedAt | date:'medium') : 'not available' }}
+            }
+          </p>
+        </div>
+
+        <app-status-badge [variant]="status.badgeVariant">{{ status.badgeText }}</app-status-badge>
+      </section>
+    }
+
+    <app-onboarding-lifecycle-panel [nodes]="lifecycleNodes()" />
+
+    <div class="context-grid">
+      <section class="context-panel" aria-labelledby="tenant-context-heading">
+        <h3 id="tenant-context-heading">Tenant &amp; operation context</h3>
+        <dl class="meta-grid">
+          <div><dt>Tenant status</dt><dd>{{ format(currentTenantStatus()) || '—' }}</dd></div>
+          <div><dt>Payment status</dt><dd>{{ paymentStatusLabel(op.paymentStatus) }}</dd></div>
+          <div><dt>Invitation status</dt><dd>{{ invitationStatusLabel(op.invitationStatus) }}</dd></div>
+          @if (payment(); as detail) {
+            <div><dt>Subscription plan</dt><dd>{{ detail.payment.planName }} · {{ format(detail.payment.billingCycle) }}</dd></div>
+          }
+          @if (op.failureCode) {
+            <div><dt>Reference</dt><dd>{{ op.failureCode }}</dd></div>
+          }
+          <div><dt>Operation ID</dt><dd class="mono">{{ op.id }}</dd></div>
+        </dl>
+      </section>
+
+      <section class="guidance-panel" [class.warning]="statusPresentation()?.pageView === 'payment-pending'" [class.danger]="statusPresentation()?.pageView === 'failure-retryable' || statusPresentation()?.pageView === 'failure-final'">
+        <h3>What happens next</h3>
+        @if (statusPresentation()?.pageView === 'payment-pending') {
+          <p>The tenant record exists. Complete manual payment review to advance activation. This is not an operation failure.</p>
+        } @else if (statusPresentation()?.pageView === 'activation-pending') {
+          <p>Activate the tenant when eligible. Invitation delivery continues asynchronously after activation.</p>
+        } @else if (statusPresentation()?.pageView === 'invitation-pending') {
+          <p>Invitation is queued or pending. Delivery is not guaranteed until the backend reports Sent or Accepted.</p>
+        } @else if (statusPresentation()?.pageView === 'long-running') {
+          <p>You can safely leave this page and return using this operation link. Refresh status when you return.</p>
+        } @else if (statusPresentation()?.pageView === 'failure-retryable') {
+          <p>Retry processing only re-queues eligible async delivery work — it does not recreate the tenant.</p>
+        } @else if (statusPresentation()?.pageView === 'success') {
+          <p>Open the tenant record to continue operational setup.</p>
+        } @else {
+          <p>Payment, activation, and invitation stages will update as the backend lifecycle progresses.</p>
+        }
+      </section>
+    </div>
+
+    @if (payment(); as detail) {
+      <section class="context-panel payment-panel" aria-labelledby="payment-detail-heading">
+        <h3 id="payment-detail-heading">Payment &amp; invoice</h3>
+        <dl class="meta-grid">
+          <div><dt>Payment</dt><dd><app-manual-payment-status-badge [status]="detail.payment.status" /></dd></div>
+          <div><dt>Invoice</dt><dd>{{ detail.payment.invoiceNumber }}</dd></div>
+          <div><dt>Total</dt><dd>{{ detail.payment.expectedAmount | number:'1.2-2' }} {{ detail.payment.currencyCode }}</dd></div>
+          <div><dt>Notification</dt><dd>Delivery status is not exposed by this operation contract</dd></div>
+        </dl>
+        <a class="text-link" [routerLink]="['/admin/billing/manual-payments', detail.payment.paymentId]">Open payment review</a>
+      </section>
+    } @else if (!canViewBilling()) {
+      <section class="context-panel payment-panel">
+        <h3>Payment &amp; invoice</h3>
+        <p class="muted-copy">Billing details require billing-view permission.</p>
+      </section>
+    }
+
+    @if (projectionError()) {
+      <p class="projection-note" role="status">Some billing details are unavailable: {{ projectionError() }}</p>
+    }
+
+    <section class="actions-bar" aria-label="Available actions">
+      <p class="actions-hint">Actions remain permission- and lifecycle-controlled by the backend.</p>
+      <div class="actions-group">
+        @if (showRetry()) {
+          <app-button variant="primary" [disabled]="actionBusy()" (click)="retryOperation()">Retry Processing</app-button>
+        }
+        @if (showViewTenant()) {
+          <app-button [variant]="showRetry() ? 'secondary' : 'primary'" (click)="navigateToTenant(op.tenantId)">View Tenant</app-button>
+        }
+        @if (showActivate()) {
+          <app-button variant="primary" [disabled]="actionBusy()" (click)="openActivateConfirm()">Activate tenant</app-button>
+        }
+        @if (showResendPayment()) {
+          <app-button variant="secondary" [disabled]="actionBusy()" (click)="openResendPaymentConfirm()">Resend payment notification</app-button>
+        }
+        @if (showResendInvitation()) {
+          <app-button variant="secondary" [disabled]="actionBusy()" (click)="openResendInvitationConfirm()">Resend Tenant Admin invitation</app-button>
+        }
+        <app-button variant="secondary" [disabled]="refreshing() || actionBusy()" (click)="refresh()">Refresh Status</app-button>
+        <app-button variant="ghost" (click)="navigateToTenants()">Back to Tenants</app-button>
+        @if (showCreateAnother()) {
+          <app-button variant="ghost" (click)="navigateToCreateTenant()">Create Another Tenant</app-button>
+        }
+      </div>
+    </section>
+  }
+
+  <app-confirmation-dialog
+    [isOpen]="confirmOpen()"
+    [title]="confirmTitle()"
+    [message]="confirmMessage()"
+    confirmLabel="Continue"
+    cancelLabel="Cancel"
+    [isLoading]="actionBusy()"
+    (confirm)="onConfirmDialog(true)"
+    (cancel)="onConfirmDialog(false)"
+  />
 </section>
