@@ -4,7 +4,7 @@ import { of, throwError } from 'rxjs';
 
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import { createTenantCreateOptions } from '../../../../testing/test-fixtures';
-import { TenantOnboardingDraft } from '../../models/platform-tenant-onboarding.model';
+import { TenantOnboardingDraft, TenantOnboardingPayload } from '../../models/platform-tenant-onboarding.model';
 import { PlatformTenantApiService } from '../../services/platform-tenant-api.service';
 import { PlatformCreateTenantPage } from './platform-create-tenant-page';
 
@@ -83,6 +83,13 @@ describe('PlatformCreateTenantPage durable onboarding', () => {
     const component = fixture().componentInstance; expect(component.businessInfoForm.controls.countryCode.value).toBe('');
   });
   it('blocks step one until required values are valid', () => expect(fixture().componentInstance.isCurrentStepValid()).toBe(false));
+  it('requires business type on step one', () => {
+    const component = fixture().componentInstance;
+    fillValid(component);
+    component.currentStep.set('business-info');
+    component.businessInfoForm.controls.businessType.setValue('');
+    expect(component.isCurrentStepValid()).toBe(false);
+  });
   it('advances completed steps and saves the durable draft', () => {
     const component = fixture().componentInstance; fillValid(component); component.currentStep.set('business-info'); component.nextStep();
     expect(component.currentStep()).toBe('plan-selection'); expect(api['createOnboardingDraft']).toHaveBeenCalledOnce();
@@ -133,4 +140,114 @@ describe('PlatformCreateTenantPage durable onboarding', () => {
     expect(api['createOnboardingDraft'].mock.calls[0][0].plan.billingCycle).toBe('yearly');
   });
   it('does not expose temporary-password controls', () => expect((fixture().nativeElement as HTMLElement).textContent).not.toContain('Temporary Password'));
+
+  it('renders PageHeader with Tenants breadcrumb', () => {
+    const el = fixture().nativeElement as HTMLElement;
+    expect(el.querySelector('app-page-header')).toBeTruthy();
+    expect(el.textContent).toContain('Tenants');
+    expect(el.textContent).toContain('Create a new tenant');
+  });
+
+  it('renders a seven-step stepper', () => {
+    const el = fixture().nativeElement as HTMLElement;
+    expect(el.querySelectorAll('.stepper > li')).toHaveLength(7);
+  });
+
+  it('renders the premium wizard hero', () => {
+    const el = fixture().nativeElement as HTMLElement;
+    expect(el.querySelector('.wizard-hero')).toBeTruthy();
+    expect(el.textContent).toContain('7-step guided onboarding');
+    expect(el.textContent).toContain('Launch a tenant with confidence');
+  });
+
+  it('renders setup summary beside the form after options load', () => {
+    const el = fixture().nativeElement as HTMLElement;
+    expect(el.querySelector('.setup-summary')).toBeTruthy();
+    expect(el.querySelector('.wizard-layout')).toBeTruthy();
+    expect(el.textContent).toContain('Setup summary');
+    expect(el.textContent).toContain('Not entered');
+  });
+
+  it('labels Continue before review and Create Tenant on review', () => {
+    const created = fixture();
+    expect((created.nativeElement as HTMLElement).querySelector('.footer-right')?.textContent).toContain('Continue');
+    created.componentInstance.currentStep.set('review-create');
+    created.detectChanges();
+    expect((created.nativeElement as HTMLElement).querySelector('.footer-right')?.textContent).toContain('Create Tenant');
+  });
+
+  it('keeps footer action hierarchy with Cancel on the right cluster', () => {
+    const el = fixture().nativeElement as HTMLElement;
+    const left = el.querySelector('.footer-left')?.textContent ?? '';
+    const right = el.querySelector('.footer-right')?.textContent ?? '';
+    expect(left).toContain('Back');
+    expect(left).toContain('Save Draft');
+    expect(right).toContain('Cancel');
+    expect(right).toContain('Continue');
+  });
+
+  it('exposes accessible labels for step validation error counts', () => {
+    const created = fixture();
+    const component = created.componentInstance;
+    component.businessInfoForm.markAllAsTouched();
+    component.currentStep.set('plan-selection');
+    created.detectChanges();
+    const errorBadge = (created.nativeElement as HTMLElement).querySelector('.step-errors');
+    expect(errorBadge?.getAttribute('aria-label') ?? '').toMatch(/validation error/);
+  });
+
+  it('does not paint upcoming steps as error for empty fields', () => {
+    const created = fixture();
+    const component = created.componentInstance;
+    component.currentStep.set('business-info');
+    created.detectChanges();
+    expect(component.stepState('plan-selection', 1)).toBe('upcoming');
+    expect(component.showStepErrorCount('plan-selection', 1)).toBe(false);
+  });
+
+  it('does not show an error count badge on the current step', () => {
+    const created = fixture();
+    const component = created.componentInstance;
+    component.currentStep.set('business-info');
+    created.detectChanges();
+    expect(component.showStepErrorCount('business-info', 0)).toBe(false);
+  });
+
+  it('renders structured review summary groups', () => {
+    const created = fixture();
+    fillValid(created.componentInstance);
+    created.componentInstance.currentStep.set('review-create');
+    created.detectChanges();
+    const el = created.nativeElement as HTMLElement;
+    expect(el.querySelector('.review-groups')).toBeTruthy();
+    expect(el.textContent).toContain('Provisioning begins after submission.');
+    expect(el.textContent).toContain('Tenant Admin');
+  });
+
+  it('restores addon quantities from draft plan payload', () => {
+    const component = fixture().componentInstance;
+    const payload = {
+      basicDetails: null,
+      businessContact: null,
+      plan: {
+        subscriptionPlanId: 'plan-1',
+        subscriptionType: 'PAID',
+        billingCycle: 'monthly',
+        addons: [{ addonId: 'addon-1', quantity: 3 }],
+        requestedLimits: { maxOutlets: 5, maxTills: 10, maxUsers: 20 }
+      },
+      billing: null,
+      entitlements: null,
+      tenantAdmin: null
+    } as TenantOnboardingPayload;
+
+    (component as unknown as { applyDraftPayload: (value: TenantOnboardingPayload) => void }).applyDraftPayload(payload);
+    expect(component.addonQuantity('addon-1')).toBe(3);
+  });
+
+  it('navigates Cancel to the tenant list', () => {
+    const component = fixture().componentInstance;
+    component.cancelWizard();
+    expect(router.navigate).toHaveBeenCalledWith(['/admin/tenants']);
+  });
 });

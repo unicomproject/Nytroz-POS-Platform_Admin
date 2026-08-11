@@ -1,0 +1,534 @@
+<section class="wizard-page">
+  @if (errorMessage()) {
+    <div class="toast error" role="alert">{{ errorMessage() }}</div>
+  }
+
+  <app-page-header
+    [title]="pageTitle()"
+    [description]="pageDescription()"
+    [breadcrumbs]="breadcrumbs()"
+  />
+
+  <app-create-tenant-wizard-nav
+    [steps]="steps"
+    [currentStepKey]="currentStep()"
+    [currentStepLabel]="currentStepLabel()"
+    [currentStepNumber]="currentStepNumber()"
+    [draftId]="draftId()"
+    [progressPercent]="progressPercent()"
+    [stepStates]="wizardStepStates()"
+    [stepErrorCounts]="wizardStepErrorCounts()"
+  />
+
+  @if (isLoadingOptions() || isLoadingDraft()) {
+    <app-loading-skeleton [rows]="6" />
+  } @else if (optionsLoadFailed()) {
+    <app-error-state
+      title="Create options could not be loaded"
+      [message]="errorMessage() || 'Tenant create options failed to load. Please retry.'"
+      [hasRetry]="true"
+      (retry)="retryLoadOptions()"
+    />
+  } @else {
+    <div class="wizard-layout">
+      <section class="wizard-main" aria-labelledby="step-heading">
+        <header class="step-header">
+          <div class="step-header-top">
+            <p class="step-kicker">Step {{ currentStepNumber() }} of {{ steps.length }}</p>
+            <span class="step-progress-label">Wizard progress {{ wizardStepProgressPercent() }}%</span>
+          </div>
+          <h2 id="step-heading">{{ currentStepLabel() }}</h2>
+          <p class="step-purpose">{{ currentStepPurpose() }}</p>
+        </header>
+
+        @switch (currentStep()) {
+          @case ('business-info') {
+            <form [formGroup]="businessInfoForm" class="grid two">
+              <app-form-field id="tenant-code" label="Tenant Code" [required]="true" [error]="fieldMessage(businessInfoForm.controls.code, 'Tenant code')">
+                <input id="tenant-code" formControlName="code" />
+              </app-form-field>
+              <app-form-field id="tenant-slug" label="Tenant Slug" [required]="true" [error]="fieldMessage(businessInfoForm.controls.tenantSlug, 'Tenant slug')">
+                <input id="tenant-slug" formControlName="tenantSlug" />
+              </app-form-field>
+              <app-form-field id="requested-subdomain" label="Requested Subdomain">
+                <input id="requested-subdomain" formControlName="requestedSubdomain" />
+              </app-form-field>
+              <app-form-field id="business-name" label="Business Name" [required]="true" [error]="fieldMessage(businessInfoForm.controls.name, 'Business name')">
+                <input id="business-name" formControlName="name" />
+              </app-form-field>
+              <app-form-field id="legal-name" label="Legal Name" [required]="true" [error]="fieldMessage(businessInfoForm.controls.legalName, 'Legal name')">
+                <input id="legal-name" formControlName="legalName" />
+              </app-form-field>
+              <app-form-field id="registration-number" label="Registration Number">
+                <input id="registration-number" formControlName="registrationNumber" />
+              </app-form-field>
+              <app-form-field id="tax-number" label="Tax Number">
+                <input id="tax-number" formControlName="taxNumber" />
+              </app-form-field>
+              <app-form-field
+                id="country-code"
+                label="Country"
+                [required]="true"
+                [error]="countryOptionsLoadError() || fieldMessage(businessInfoForm.controls.countryCode, 'Country')"
+              >
+                <select id="country-code" formControlName="countryCode">
+                  <option value="">Select country</option>
+                  @for (item of createOptions().countryCodes; track item.value) {
+                    <option [value]="item.value">{{ item.label }}</option>
+                  }
+                </select>
+              </app-form-field>
+              <app-form-field id="base-currency" label="Currency" [required]="true" [error]="fieldMessage(businessInfoForm.controls.baseCurrency, 'Currency')">
+                <select id="base-currency" formControlName="baseCurrency">
+                  <option value="">Select currency</option>
+                  @for (item of createOptions().currencies; track item.value) {
+                    <option [value]="item.value">{{ item.label }}</option>
+                  }
+                </select>
+              </app-form-field>
+              <app-form-field id="default-timezone" label="Timezone" [required]="true" [error]="fieldMessage(businessInfoForm.controls.defaultTimezone, 'Timezone')">
+                <select id="default-timezone" formControlName="defaultTimezone">
+                  <option value="">Select</option>
+                  @for (item of createOptions().timezones; track item.value) {
+                    <option [value]="item.value">{{ item.label }}</option>
+                  }
+                </select>
+              </app-form-field>
+              <app-form-field id="default-locale" label="Locale" [required]="true" [error]="fieldMessage(businessInfoForm.controls.defaultLocale, 'Locale')">
+                <select id="default-locale" formControlName="defaultLocale">
+                  <option value="">Select</option>
+                  @for (item of createOptions().locales; track item.value) {
+                    <option [value]="item.value">{{ item.label }}</option>
+                  }
+                </select>
+              </app-form-field>
+              <app-form-field id="business-type" label="Business Type" [required]="true" [error]="fieldMessage(businessInfoForm.controls.businessType, 'Business type')">
+                <select id="business-type" formControlName="businessType">
+                  <option value="">Select</option>
+                  @for (item of createOptions().businessTypes; track item.value) {
+                    <option [value]="item.value">{{ item.label }}</option>
+                  }
+                </select>
+              </app-form-field>
+              <app-form-field id="operating-mode" label="Operating Mode" [required]="true" [error]="fieldMessage(businessInfoForm.controls.operatingMode, 'Operating mode')">
+                <select id="operating-mode" formControlName="operatingMode">
+                  <option value="">Select</option>
+                  @for (item of createOptions().operatingModes; track item.value) {
+                    <option [value]="item.value">{{ item.label }}</option>
+                  }
+                </select>
+              </app-form-field>
+            </form>
+          }
+
+          @case ('plan-selection') {
+            <form [formGroup]="businessInfoForm" class="grid two">
+              <app-form-field id="address-line1" label="Registered Address Line 1" [required]="true" [error]="fieldMessage(businessInfoForm.controls.addressLine1, 'Registered address')">
+                <input id="address-line1" formControlName="addressLine1" />
+              </app-form-field>
+              <app-form-field id="address-city" label="City">
+                <input id="address-city" formControlName="addressCity" />
+              </app-form-field>
+              <app-form-field id="address-country" label="Address Country" [required]="true" [error]="fieldMessage(businessInfoForm.controls.addressCountryCode, 'Address country')">
+                <select id="address-country" formControlName="addressCountryCode">
+                  <option value="">Select country</option>
+                  @for (item of createOptions().countryCodes; track item.value) {
+                    <option [value]="item.value">{{ item.label }}</option>
+                  }
+                </select>
+              </app-form-field>
+              <app-form-field id="primary-contact-name" label="Primary Contact Name" [required]="true" [error]="fieldMessage(businessInfoForm.controls.primaryContactName, 'Primary contact name')">
+                <input id="primary-contact-name" formControlName="primaryContactName" />
+              </app-form-field>
+              <app-form-field id="primary-contact-email" label="Primary Contact Email" [required]="true" [error]="fieldMessage(businessInfoForm.controls.primaryContactEmail, 'Primary contact email')">
+                <input id="primary-contact-email" type="email" formControlName="primaryContactEmail" />
+              </app-form-field>
+              <app-form-field id="primary-contact-phone" label="Primary Contact Phone" [required]="true" [error]="fieldMessage(businessInfoForm.controls.primaryContactPhone, 'Primary contact phone')">
+                <input id="primary-contact-phone" formControlName="primaryContactPhone" />
+              </app-form-field>
+              <app-form-field id="website-url" label="Website">
+                <input id="website-url" type="url" formControlName="websiteUrl" />
+              </app-form-field>
+              <app-form-field id="billing-contact-name" label="Billing Contact Name" [required]="true" [error]="fieldMessage(businessInfoForm.controls.billingContactName, 'Billing contact name')">
+                <input id="billing-contact-name" formControlName="billingContactName" />
+              </app-form-field>
+              <app-form-field id="billing-contact-email" label="Billing Contact Email" [required]="true" [error]="fieldMessage(businessInfoForm.controls.billingContactEmail, 'Billing contact email')">
+                <input id="billing-contact-email" type="email" formControlName="billingContactEmail" />
+              </app-form-field>
+              <app-form-field id="support-contact-name" label="Support Contact Name">
+                <input id="support-contact-name" formControlName="supportContactName" />
+              </app-form-field>
+              <app-form-field id="support-contact-email" label="Support Contact Email" [error]="fieldMessage(businessInfoForm.controls.supportContactEmail, 'Support contact email')">
+                <input id="support-contact-email" type="email" formControlName="supportContactEmail" />
+              </app-form-field>
+            </form>
+          }
+
+          @case ('limits-addons') {
+            <form [formGroup]="planSelectionForm" class="plan-section">
+              @if (!createOptions().plans.length) {
+                <app-empty-state
+                  title="No plans available"
+                  message="No subscription plans were returned. Configure plans before creating a tenant."
+                />
+              } @else {
+                <div class="plan-grid" role="group" aria-label="Subscription Plan">
+                  @for (plan of createOptions().plans; track plan.id) {
+                    <article class="plan-card" [class.selected]="planSelectionForm.controls.subscriptionPlanId.value === plan.id">
+                      <header>
+                        <strong>{{ plan.name }}</strong>
+                        <small>{{ plan.planCode }} · {{ plan.billingCycle }}</small>
+                      </header>
+                      <p>{{ plan.description || 'No description provided.' }}</p>
+                      <div class="plan-meta">
+                        <span>Price: {{ plan.baseCurrency }} {{ plan.basePrice }}</span>
+                      </div>
+                      <app-button type="button" variant="secondary" size="compact" (click)="selectPlan(plan.id)">
+                        Select
+                      </app-button>
+                    </article>
+                  }
+                </div>
+              }
+            </form>
+
+            <h3 class="section-title">Limits &amp; Add-ons</h3>
+            <form [formGroup]="limitsAddonsForm" class="grid three">
+              <app-form-field id="max-outlets" label="Max Outlets" [required]="true" [error]="fieldMessage(limitsAddonsForm.controls.maxOutlets, 'Max outlets')">
+                <input id="max-outlets" type="number" min="1" formControlName="maxOutlets" />
+              </app-form-field>
+              <app-form-field id="max-tills" label="Max Tills" [required]="true" [error]="fieldMessage(limitsAddonsForm.controls.maxTills, 'Max tills')">
+                <input id="max-tills" type="number" min="1" formControlName="maxTills" />
+              </app-form-field>
+              <app-form-field id="max-users" label="Max Users" [required]="true" [error]="fieldMessage(limitsAddonsForm.controls.maxUsers, 'Max users')">
+                <input id="max-users" type="number" min="1" formControlName="maxUsers" />
+              </app-form-field>
+            </form>
+
+            @if (createOptions().addons.length) {
+              <h3 class="section-title">Add-ons</h3>
+              <div class="addon-grid">
+                @for (addon of createOptions().addons; track addon.id) {
+                  <article class="addon-card">
+                    <strong>{{ addon.name }}</strong>
+                    <small>{{ addon.addonCode }}</small>
+                    <p>{{ addon.description || 'No description provided.' }}</p>
+                    <div class="addon-footer">
+                      <span>{{ addon.currency }} {{ addon.unitPrice }} / unit</span>
+                      <app-form-field [id]="'addon-qty-' + addon.id">
+                        <input
+                          [id]="'addon-qty-' + addon.id"
+                          type="number"
+                          min="0"
+                          [attr.aria-label]="'Quantity for ' + addon.name"
+                          [ngModel]="addonQuantity(addon.id)"
+                          (ngModelChange)="setAddonQuantity(addon, $event)"
+                          [ngModelOptions]="{ standalone: true }"
+                        />
+                      </app-form-field>
+                    </div>
+                  </article>
+                }
+              </div>
+            }
+
+            <div class="effective-limits">
+              <strong>Effective limits with selected add-ons</strong>
+              <span>Outlets: {{ effectiveLimit('max_outlets') }}</span>
+              <span>Tills: {{ effectiveLimit('max_tills') }}</span>
+              <span>Users: {{ effectiveLimit('max_users') }}</span>
+            </div>
+          }
+
+          @case ('feature-entitlements') {
+            @if (!selectedPlan()) {
+              <p class="muted">Select a plan first to configure feature entitlements.</p>
+            } @else {
+              @for (module of createOptions().catalogModules; track module.id) {
+                <section class="feature-group">
+                  <h3>{{ module.name }}</h3>
+                  <ul>
+                    @for (feature of module.features; track feature.id) {
+                      <li [class.disabled]="!isFeatureAllowed(feature)">
+                        <label>
+                          <input
+                            type="checkbox"
+                            [checked]="isFeatureEnabled(feature.id)"
+                            [disabled]="!isFeatureAllowed(feature)"
+                            (change)="toggleFeature(feature, $event)"
+                          />
+                          <span>{{ feature.name }}</span>
+                          <small>{{ feature.featureCode }}</small>
+                        </label>
+                      </li>
+                    }
+                  </ul>
+                </section>
+              }
+            }
+          }
+
+          @case ('tenant-admin') {
+            <form [formGroup]="tenantAdminForm" class="grid two">
+              <app-form-field id="admin-first-name" label="First Name" [required]="true" [error]="fieldMessage(tenantAdminForm.controls.firstName, 'First name')">
+                <input id="admin-first-name" formControlName="firstName" />
+              </app-form-field>
+              <app-form-field id="admin-last-name" label="Last Name">
+                <input id="admin-last-name" formControlName="lastName" />
+              </app-form-field>
+              <app-form-field id="admin-email" label="Email" [required]="true" [error]="fieldMessage(tenantAdminForm.controls.email, 'Admin email')">
+                <input id="admin-email" formControlName="email" />
+              </app-form-field>
+              <app-form-field id="admin-phone" label="Phone">
+                <input id="admin-phone" formControlName="phone" />
+              </app-form-field>
+              <p class="hint full">
+                The Tenant Admin is saved as a pending invite. After activation, an invitation email is queued via Azure Communication Services. Use Resend Invitation from the onboarding result if delivery needs another attempt.
+              </p>
+            </form>
+          }
+
+          @case ('billing-subscription') {
+            <div class="info-callout" role="note">
+              <strong>Billing honesty</strong>
+              <p>
+                For durable onboarding, invoice creation is derived from subscription type PAID. Payment collection and activation happen after finalize. Do not treat Paid or Activated as complete before Create Tenant.
+              </p>
+            </div>
+            <form [formGroup]="billingSubscriptionForm" class="grid two">
+              <fieldset class="full subscription-type-fieldset">
+                <legend>Subscription Type *</legend>
+                <div class="subscription-type-options" role="radiogroup" aria-label="Subscription type">
+                  @for (item of subscriptionTypeOptions; track item.value) {
+                    <label class="subscription-type-option" [class.selected]="billingSubscriptionForm.controls.subscriptionType.value === item.value">
+                      <input type="radio" formControlName="subscriptionType" [value]="item.value" />
+                      <span>{{ item.label }}</span>
+                    </label>
+                  }
+                </div>
+                @if (fieldMessage(billingSubscriptionForm.controls.subscriptionType, 'Subscription type')) {
+                  <small class="step-errors">{{ fieldMessage(billingSubscriptionForm.controls.subscriptionType, 'Subscription type') }}</small>
+                }
+              </fieldset>
+              <app-form-field id="billing-status" label="Billing Status" [required]="true" [error]="fieldMessage(billingSubscriptionForm.controls.billingStatus, 'Billing status')">
+                <select id="billing-status" formControlName="billingStatus">
+                  <option value="">Select</option>
+                  @for (item of createOptions().billingStatuses; track item.value) {
+                    <option [value]="item.value">{{ item.label }}</option>
+                  }
+                </select>
+              </app-form-field>
+              <app-form-field id="billing-cycle" label="Billing Cycle" [required]="true" [error]="fieldMessage(billingSubscriptionForm.controls.billingCycle, 'Billing cycle')">
+                <select id="billing-cycle" formControlName="billingCycle">
+                  <option value="">Select</option>
+                  @for (item of createOptions().billingCycles; track item.value) {
+                    <option [value]="item.value">{{ item.label }}</option>
+                  }
+                </select>
+              </app-form-field>
+              <app-form-field id="subscription-status" label="Subscription Status" [required]="true" [error]="fieldMessage(billingSubscriptionForm.controls.subscriptionStatus, 'Subscription status')">
+                <select id="subscription-status" formControlName="subscriptionStatus">
+                  <option value="">Select</option>
+                  @for (item of createOptions().subscriptionStatuses; track item.value) {
+                    <option [value]="item.value">{{ item.label }}</option>
+                  }
+                </select>
+              </app-form-field>
+              <app-form-field id="invoice-email" label="Invoice Email" [error]="fieldMessage(billingSubscriptionForm.controls.invoiceEmail, 'Invoice email')">
+                <input id="invoice-email" formControlName="invoiceEmail" />
+              </app-form-field>
+              <app-form-field id="payment-method" label="Payment Method">
+                <select id="payment-method" formControlName="paymentMethod">
+                  <option value="">Select</option>
+                  @for (item of createOptions().paymentMethods; track item.value) {
+                    <option [value]="item.value">{{ item.label }}</option>
+                  }
+                </select>
+              </app-form-field>
+              <div class="full">
+                <app-form-field id="billing-notes" label="Notes">
+                  <textarea id="billing-notes" rows="3" formControlName="notes"></textarea>
+                </app-form-field>
+              </div>
+              <label class="checkbox">
+                <input type="checkbox" formControlName="autoRenew" />
+                <span>Auto renew</span>
+              </label>
+              <label class="checkbox">
+                <input type="checkbox" formControlName="createDraftInvoice" />
+                <span>Create draft invoice</span>
+              </label>
+            </form>
+          }
+
+          @case ('review-create') {
+            @if (validationSummary().length) {
+              <div class="validation-summary" role="alert">
+                <strong>Fix the following before creating:</strong>
+                <ul>
+                  @for (item of validationSummary(); track $index) {
+                    <li>{{ item }}</li>
+                  }
+                </ul>
+              </div>
+            }
+
+            <p class="review-note">Provisioning begins after submission.</p>
+
+            <div class="review-groups">
+              <section>
+                <h3>Tenant</h3>
+                <dl>
+                  <div><dt>Name</dt><dd>{{ displayValue(businessInfoForm.controls.name.value) }}</dd></div>
+                  <div><dt>Code</dt><dd>{{ displayValue(businessInfoForm.controls.code.value) }}</dd></div>
+                  <div><dt>Slug</dt><dd>{{ displayValue(businessInfoForm.controls.tenantSlug.value) }}</dd></div>
+                  <div><dt>Country</dt><dd>{{ displayValue(businessInfoForm.controls.countryCode.value) }}</dd></div>
+                  <div><dt>Currency</dt><dd>{{ displayValue(businessInfoForm.controls.baseCurrency.value) }}</dd></div>
+                  <div><dt>Timezone</dt><dd>{{ displayValue(businessInfoForm.controls.defaultTimezone.value) }}</dd></div>
+                  <div><dt>Locale</dt><dd>{{ displayValue(businessInfoForm.controls.defaultLocale.value) }}</dd></div>
+                  <div><dt>Business type</dt><dd>{{ displayValue(businessInfoForm.controls.businessType.value) }}</dd></div>
+                  <div><dt>Operating mode</dt><dd>{{ displayValue(businessInfoForm.controls.operatingMode.value) }}</dd></div>
+                </dl>
+              </section>
+
+              <section>
+                <h3>Business</h3>
+                <dl>
+                  <div><dt>Address</dt><dd>{{ displayValue(businessInfoForm.controls.addressLine1.value) }}</dd></div>
+                  <div><dt>City</dt><dd>{{ displayValue(businessInfoForm.controls.addressCity.value) }}</dd></div>
+                  <div><dt>Address country</dt><dd>{{ displayValue(businessInfoForm.controls.addressCountryCode.value) }}</dd></div>
+                  <div><dt>Primary contact</dt><dd>{{ displayValue(businessInfoForm.controls.primaryContactName.value) }}</dd></div>
+                  <div><dt>Primary email</dt><dd>{{ displayValue(businessInfoForm.controls.primaryContactEmail.value) }}</dd></div>
+                  <div><dt>Billing contact</dt><dd>{{ displayValue(businessInfoForm.controls.billingContactName.value) }}</dd></div>
+                  <div><dt>Billing email</dt><dd>{{ displayValue(businessInfoForm.controls.billingContactEmail.value) }}</dd></div>
+                </dl>
+              </section>
+
+              <section>
+                <h3>Subscription</h3>
+                <dl>
+                  <div><dt>Plan</dt><dd>{{ displayValue(selectedPlan()?.name) }}</dd></div>
+                  <div><dt>Max outlets</dt><dd>{{ limitsAddonsForm.controls.maxOutlets.value ?? '—' }}</dd></div>
+                  <div><dt>Max tills</dt><dd>{{ limitsAddonsForm.controls.maxTills.value ?? '—' }}</dd></div>
+                  <div><dt>Max users</dt><dd>{{ limitsAddonsForm.controls.maxUsers.value ?? '—' }}</dd></div>
+                </dl>
+              </section>
+
+              <section>
+                <h3>Billing</h3>
+                <dl>
+                  <div><dt>Subscription type</dt><dd>{{ displayValue(billingSubscriptionForm.controls.subscriptionType.value) }}</dd></div>
+                  <div><dt>Billing cycle</dt><dd>{{ displayValue(billingSubscriptionForm.controls.billingCycle.value) }}</dd></div>
+                  <div><dt>Billing status</dt><dd>{{ displayValue(billingSubscriptionForm.controls.billingStatus.value) }}</dd></div>
+                  <div><dt>Subscription status</dt><dd>{{ displayValue(billingSubscriptionForm.controls.subscriptionStatus.value) }}</dd></div>
+                  <div><dt>Invoice email</dt><dd>{{ displayValue(billingSubscriptionForm.controls.invoiceEmail.value) }}</dd></div>
+                  <div><dt>Payment method</dt><dd>{{ displayValue(billingSubscriptionForm.controls.paymentMethod.value) }}</dd></div>
+                </dl>
+              </section>
+
+              <section>
+                <h3>Entitlements</h3>
+                <dl>
+                  <div><dt>Selected features</dt><dd>{{ selectedFeatureIds().length }}</dd></div>
+                </dl>
+              </section>
+
+              <section>
+                <h3>Tenant Admin</h3>
+                <dl>
+                  <div><dt>Name</dt><dd>{{ adminDisplayName() }}</dd></div>
+                  <div><dt>Email</dt><dd>{{ displayValue(tenantAdminForm.controls.email.value) }}</dd></div>
+                  <div><dt>Phone</dt><dd>{{ displayValue(tenantAdminForm.controls.phone.value) }}</dd></div>
+                </dl>
+              </section>
+            </div>
+          }
+        }
+      </section>
+
+      <aside class="setup-summary" aria-label="Setup summary">
+        <div class="summary-head">
+          <h2>Setup summary</h2>
+          <p class="summary-sub">Live context from this wizard — not provisioning status.</p>
+        </div>
+        <div class="summary-progress" aria-hidden="true">
+          <div class="summary-progress-bar" [style.width.%]="wizardStepProgressPercent()"></div>
+        </div>
+        <p class="summary-progress-text">Step {{ currentStepNumber() }} of {{ steps.length }} · {{ wizardStepProgressPercent() }}%</p>
+        <dl>
+          <div>
+            <dt>Tenant</dt>
+            <dd>{{ summaryValue(businessInfoForm.controls.name.value) }}</dd>
+          </div>
+          <div>
+            <dt>Code</dt>
+            <dd>{{ summaryValue(businessInfoForm.controls.code.value) }}</dd>
+          </div>
+          <div>
+            <dt>Plan</dt>
+            <dd>{{ summaryValue(selectedPlan()?.name, 'Not selected') }}</dd>
+          </div>
+          <div>
+            <dt>Billing</dt>
+            <dd>{{ summaryValue(billingSubscriptionForm.controls.subscriptionType.value, 'Not selected') }}</dd>
+          </div>
+          <div>
+            <dt>Billing cycle</dt>
+            <dd>{{ summaryValue(billingSubscriptionForm.controls.billingCycle.value, 'Not selected') }}</dd>
+          </div>
+          <div>
+            <dt>Tenant Admin</dt>
+            <dd>{{ summaryValue(tenantAdminForm.controls.email.value) }}</dd>
+          </div>
+          @if (draftId()) {
+            <div>
+              <dt>Draft progress</dt>
+              <dd>{{ progressPercent() }}% saved</dd>
+            </div>
+          }
+        </dl>
+      </aside>
+    </div>
+  }
+
+  <footer class="wizard-footer">
+    <div class="footer-left">
+      <app-button type="button" variant="secondary" [disabled]="isSaving()" (click)="goBack()">Back</app-button>
+      <app-button type="button" variant="secondary" [disabled]="isSaving() || isLoadingOptions()" (click)="saveDraft()">
+        Save Draft
+      </app-button>
+      <div class="save-state" aria-live="polite">
+        <app-status-badge [variant]="saveStateVariant()">{{ saveStateLabel() }}</app-status-badge>
+        @if (saveState() === 'saving') {
+          <span>Saving draft...</span>
+        } @else if (saveState() === 'saved') {
+          <span>Saved {{ lastSavedAt() }}</span>
+        } @else if (saveState() === 'failed') {
+          <span>Draft save failed. Retry is available.</span>
+        }
+      </div>
+    </div>
+    <div class="footer-right">
+      <app-button type="button" variant="tertiary" [disabled]="isSaving()" (click)="cancelWizard()">Cancel</app-button>
+      @if (currentStep() !== 'review-create') {
+        <app-button
+          type="button"
+          variant="primary"
+          [disabled]="isSaving() || isLoadingOptions() || !isCurrentStepValid()"
+          (click)="nextStep()"
+        >
+          Continue
+        </app-button>
+      } @else {
+        <app-button
+          type="button"
+          variant="primary"
+          [disabled]="isSaving() || isLoadingOptions() || !canCreateTenant()"
+          (click)="createTenant()"
+        >
+          {{ isSaving() ? 'Creating...' : 'Create Tenant' }}
+        </app-button>
+      }
+    </div>
+  </footer>
+</section>
