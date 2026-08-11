@@ -1,11 +1,13 @@
 import { SubscriptionPlanStatus } from './platform-subscription-plan.model';
 
 export type SubscriptionPlanStatusTab = 'all' | 'draft' | 'published' | 'archived';
+export type SubscriptionPlanStatusBadgeVariant = 'success' | 'info' | 'warning' | 'danger' | 'neutral';
 
+/** Canonical operator-facing labels (UI-4A Visual Direction). */
 const STATUS_LABELS: Record<SubscriptionPlanStatus, string> = {
   draft: 'Draft',
-  active: 'Published',
-  retired: 'Archived'
+  active: 'Active',
+  retired: 'Retired'
 };
 
 export function normalizeSubscriptionPlanStatus(status: string | null | undefined): SubscriptionPlanStatus | null {
@@ -30,6 +32,7 @@ export function subscriptionPlanStatusLabel(status: string | null | undefined): 
   return normalized ? STATUS_LABELS[normalized] : '—';
 }
 
+/** @deprecated Prefer subscriptionPlanStatusVariant for StatusBadge. Kept for legacy CSS class callers. */
 export function subscriptionPlanStatusBadgeClass(status: string | null | undefined): string {
   const normalized = normalizeSubscriptionPlanStatus(status);
 
@@ -42,6 +45,23 @@ export function subscriptionPlanStatusBadgeClass(status: string | null | undefin
       return 'archived';
     default:
       return 'archived';
+  }
+}
+
+export function subscriptionPlanStatusVariant(
+  status: string | null | undefined
+): SubscriptionPlanStatusBadgeVariant {
+  const normalized = normalizeSubscriptionPlanStatus(status);
+
+  switch (normalized) {
+    case 'draft':
+      return 'neutral';
+    case 'active':
+      return 'success';
+    case 'retired':
+      return 'neutral';
+    default:
+      return 'neutral';
   }
 }
 

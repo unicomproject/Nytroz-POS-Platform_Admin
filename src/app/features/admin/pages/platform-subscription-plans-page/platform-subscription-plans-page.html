@@ -1,0 +1,170 @@
+<section class="plans-page">
+  @if (successMessage()) {
+    <div class="toast success" role="status">{{ successMessage() }}</div>
+  }
+
+  <app-page-header
+    title="Subscription Plans"
+    description="Manage catalog plans available for tenant onboarding across the OneVerz platform."
+  >
+    @if (canCreate) {
+      <app-button variant="primary" [routerLink]="createPlanRoute">Create Plan</app-button>
+    }
+  </app-page-header>
+
+  <section class="context-band" aria-label="Subscription plans context">
+    <div class="context-copy">
+      <p class="context-eyebrow">Plan catalog</p>
+      <h2>Commercial plans for tenant assignment</h2>
+      <p>
+        Browse draft, active, and retired plans. View opens the plan workspace; create and lifecycle
+        changes stay permission-gated.
+      </p>
+    </div>
+  </section>
+
+  <section class="filter-bar-container" aria-label="Plan filters">
+    <label class="filter-field search-field">
+      <span class="field-label">Search</span>
+      <span class="input-wrap">
+        <input
+          type="search"
+          placeholder="Search by plan name or code"
+          [ngModel]="searchTerm()"
+          (ngModelChange)="onSearchChange($event)"
+          aria-label="Search plans by name or code"
+        />
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
+      </span>
+    </label>
+    <label class="filter-field">
+      <span class="field-label">Status</span>
+      <select [ngModel]="statusFilter()" (ngModelChange)="onStatusChange($event)" aria-label="Filter by status">
+        <option value="">All</option>
+        <option value="draft">Draft</option>
+        <option value="active">Active</option>
+        <option value="retired">Retired</option>
+      </select>
+    </label>
+    <label class="filter-field">
+      <span class="field-label">Billing Cycle</span>
+      <select
+        [ngModel]="billingCycleFilter()"
+        (ngModelChange)="onBillingCycleChange($event)"
+        aria-label="Filter by billing cycle"
+      >
+        <option value="">All</option>
+        <option value="monthly">Monthly</option>
+        <option value="yearly">Annual</option>
+        <option value="one_time">One-time</option>
+      </select>
+    </label>
+    @if (hasActiveFilters()) {
+      <div class="filter-actions">
+        <app-button variant="secondary" size="compact" (click)="resetFilters()">Reset</app-button>
+      </div>
+    }
+  </section>
+
+  @if (errorMessage()) {
+    <app-error-state
+      title="Unable to load subscription plans"
+      [message]="errorMessage()!"
+      [hasRetry]="true"
+      (retry)="reload()"
+    />
+  } @else if (isLoading()) {
+    <app-loading-skeleton [rows]="5" [avatar]="false" />
+  } @else if (planList(); as list) {
+    @if (list.items.length) {
+      <section class="table-card" aria-label="Subscription plans">
+        <div class="data-table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th scope="col">Plan</th>
+                <th scope="col">Commercial term</th>
+                <th scope="col">Billing cycle</th>
+                <th scope="col">Active tenants</th>
+                <th scope="col">Status</th>
+                <th scope="col">Updated</th>
+                <th scope="col">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (plan of list.items; track plan.id) {
+                <tr>
+                  <td>
+                    <div class="identity">
+                      <strong>{{ plan.planName }}</strong>
+                      <span>{{ plan.planCode }}</span>
+                    </div>
+                  </td>
+                  <td class="cell-text">{{ formatCommercialTerm(plan) }}</td>
+                  <td class="cell-text">{{ billingCycleLabel(plan.billingCycle) }}</td>
+                  <td class="cell-num">{{ plan.activeTenantsCount }}</td>
+                  <td>
+                    <app-status-badge [variant]="statusVariant(plan.status)">
+                      {{ statusLabel(plan.status) }}
+                    </app-status-badge>
+                  </td>
+                  <td class="cell-text">{{ plan.lastUpdatedAt | date: 'mediumDate' }}</td>
+                  <td>
+                    @if (plan.canView) {
+                      <app-button variant="ghost" size="compact" [routerLink]="viewRoute(plan)">
+                        View
+                      </app-button>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <footer class="pagination">
+        <span class="range-label">{{ rangeLabel(list) }}</span>
+        <div class="pagination-controls">
+          <app-button
+            variant="secondary"
+            size="compact"
+            [disabled]="!list.hasPreviousPage"
+            (click)="goToPage(list.pageNumber - 1)"
+            aria-label="Previous page"
+          >
+            ‹
+          </app-button>
+          @for (page of pageNumbers(list); track page) {
+            <app-button
+              variant="secondary"
+              size="compact"
+              [class.active]="page === list.pageNumber"
+              (click)="goToPage(page)"
+            >
+              {{ page }}
+            </app-button>
+          }
+          <app-button
+            variant="secondary"
+            size="compact"
+            [disabled]="!list.hasNextPage"
+            (click)="goToPage(list.pageNumber + 1)"
+            aria-label="Next page"
+          >
+            ›
+          </app-button>
+        </div>
+      </footer>
+    } @else {
+      <div class="empty-wrap">
+        <app-empty-state [title]="emptyTitle()" [message]="emptyMessage()" />
+        @if (hasActiveFilters()) {
+          <app-button variant="primary" (click)="resetFilters()">Reset Filters</app-button>
+        } @else if (canCreate) {
+          <app-button variant="primary" [routerLink]="createPlanRoute">Create Plan</app-button>
+        }
+      </div>
+    }
+  }
+</section>
