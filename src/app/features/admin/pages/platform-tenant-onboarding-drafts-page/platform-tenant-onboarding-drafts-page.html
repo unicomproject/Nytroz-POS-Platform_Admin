@@ -1,0 +1,206 @@
+<section class="drafts-page">
+  <app-page-header
+    title="Onboarding Drafts"
+    description="Resume or manage saved tenant onboarding work."
+  >
+    @if (canCreateTenant) {
+      <app-button variant="primary" [routerLink]="createTenantRoute">Create Tenant</app-button>
+    }
+  </app-page-header>
+
+  <section class="context-band" aria-label="Onboarding drafts context">
+    <div class="context-copy">
+      <p class="context-eyebrow">Saved setups</p>
+      <h2>Resume unfinished tenant onboarding</h2>
+      <p>
+        Drafts stay editable until they are submitted, discarded, or reach retention expiry. Resume opens the
+        Create Tenant wizard at the saved step.
+      </p>
+    </div>
+  </section>
+
+  @if (canViewAllDrafts) {
+    <div class="scope-bar" role="group" aria-label="Draft scope">
+      <app-button
+        variant="secondary"
+        size="compact"
+        [class.scope-active]="mineOnly()"
+        (click)="setMineScope(true)"
+      >
+        My Drafts
+      </app-button>
+      <app-button
+        variant="secondary"
+        size="compact"
+        [class.scope-active]="!mineOnly()"
+        (click)="setMineScope(false)"
+      >
+        All Drafts
+      </app-button>
+    </div>
+  }
+
+  @if (actionError()) {
+    <p class="action-error" role="alert">{{ actionError() }}</p>
+  }
+
+  @if (listError()) {
+    <app-error-state
+      title="Unable to load onboarding drafts"
+      [message]="listError()!"
+      [hasRetry]="true"
+      (retry)="reload()"
+    />
+  } @else if (loading()) {
+    <app-loading-skeleton [rows]="4" [avatar]="false" />
+  } @else if (!drafts().length) {
+    <div class="empty-wrap">
+      <app-empty-state [title]="emptyTitle()" [message]="emptyMessage()" />
+      @if (canCreateTenant) {
+        <app-button variant="primary" [routerLink]="createTenantRoute">Create Tenant</app-button>
+      }
+    </div>
+  } @else {
+    <section class="table-card" aria-label="Onboarding drafts">
+      <div class="table-toolbar">
+        <p class="draft-count">{{ draftCountLabel() }}</p>
+      </div>
+
+      <div class="data-table-container desktop-table">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th scope="col">Draft</th>
+              <th scope="col">Setup progress</th>
+              <th scope="col">Status</th>
+              <th scope="col">Updated</th>
+              <th scope="col">Expires</th>
+              <th scope="col">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (draft of drafts(); track draft.id) {
+              <tr>
+                <td>
+                  <div class="identity">
+                    <strong>{{ displayName(draft) }}</strong>
+                    <span>{{ displayCode(draft) }}</span>
+                  </div>
+                </td>
+                <td>
+                  <div
+                    class="progress-cell"
+                    [attr.aria-label]="stepText(draft.currentStep) + ', ' + stepLabel(draft.currentStep)"
+                  >
+                    <strong>{{ stepText(draft.currentStep) }}</strong>
+                    <span class="step-name">{{ stepLabel(draft.currentStep) }}</span>
+                    <progress max="100" [value]="draft.progressPercent">{{ draft.progressPercent }}%</progress>
+                  </div>
+                </td>
+                <td>
+                  <app-status-badge [variant]="statusVariant(draft.status)">
+                    {{ statusLabel(draft.status) }}
+                  </app-status-badge>
+                </td>
+                <td>
+                  <time
+                    class="updated"
+                    [attr.datetime]="draft.updatedAt || null"
+                    [attr.title]="draft.updatedAt ? (draft.updatedAt | date: 'medium') : null"
+                  >
+                    {{ relativeUpdated(draft.updatedAt) }}
+                  </time>
+                </td>
+                <td>
+                  <span class="expiry">Expires {{ draft.expiresAt | date: 'mediumDate' }}</span>
+                </td>
+                <td>
+                  <div class="row-actions">
+                    @if (canResume(draft)) {
+                      <app-button
+                        variant="primary"
+                        size="compact"
+                        [routerLink]="resumeRoute(draft)"
+                      >
+                        Resume Setup
+                      </app-button>
+                    }
+                    @if (canDiscard(draft)) {
+                      <app-button
+                        variant="ghost"
+                        size="compact"
+                        class="discard-action"
+                        (click)="openDiscard(draft)"
+                      >
+                        Discard
+                      </app-button>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <ul class="draft-cards" aria-label="Onboarding drafts">
+        @for (draft of drafts(); track draft.id) {
+          <li class="draft-card">
+            <div class="identity">
+              <strong>{{ displayName(draft) }}</strong>
+              <span>{{ displayCode(draft) }}</span>
+            </div>
+            <div class="card-meta">
+              <app-status-badge [variant]="statusVariant(draft.status)">
+                {{ statusLabel(draft.status) }}
+              </app-status-badge>
+              <span>{{ relativeUpdated(draft.updatedAt) }}</span>
+              <span>Expires {{ draft.expiresAt | date: 'mediumDate' }}</span>
+            </div>
+            <div
+              class="progress-cell"
+              [attr.aria-label]="stepText(draft.currentStep) + ', ' + stepLabel(draft.currentStep)"
+            >
+              <strong>{{ stepText(draft.currentStep) }}</strong>
+              <span class="step-name">{{ stepLabel(draft.currentStep) }}</span>
+              <progress max="100" [value]="draft.progressPercent">{{ draft.progressPercent }}%</progress>
+            </div>
+            <div class="row-actions">
+              @if (canResume(draft)) {
+                <app-button
+                  variant="primary"
+                  size="compact"
+                  [routerLink]="resumeRoute(draft)"
+                >
+                  Resume Setup
+                </app-button>
+              }
+              @if (canDiscard(draft)) {
+                <app-button
+                  variant="ghost"
+                  size="compact"
+                  class="discard-action"
+                  (click)="openDiscard(draft)"
+                >
+                  Discard
+                </app-button>
+              }
+            </div>
+          </li>
+        }
+      </ul>
+    </section>
+  }
+
+  <app-confirmation-dialog
+    [isOpen]="discardOpen()"
+    title="Discard onboarding draft?"
+    [message]="discardDialogMessage()"
+    confirmLabel="Discard Draft"
+    cancelLabel="Cancel"
+    variant="destructive"
+    [isLoading]="discardLoading()"
+    (confirm)="confirmDiscard()"
+    (cancel)="cancelDiscard()"
+  />
+</section>

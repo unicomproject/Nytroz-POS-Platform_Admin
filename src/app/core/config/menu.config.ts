@@ -51,6 +51,13 @@ export const platformMenuConfig: MenuSectionConfig[] = [
         requiredPermission: platformPermissions.tenantsView
       },
       {
+        label: 'Onboarding Drafts',
+        path: '/admin/tenants/onboarding/drafts',
+        requiresTenant: false,
+        icon: 'tenants',
+        requiredPermission: platformPermissions.tenantsCreate
+      },
+      {
         label: 'Subscriptions',
         path: '/admin/subscriptions',
         requiresTenant: false,
