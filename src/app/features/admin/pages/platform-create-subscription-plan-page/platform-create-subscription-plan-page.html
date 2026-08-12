@@ -1,0 +1,549 @@
+<section class="plan-wizard-page">
+  @if (successMessage()) {
+    <div class="toast success" role="status">{{ successMessage() }}</div>
+  }
+  @if (errorMessage()) {
+    <div class="toast error" role="alert">{{ errorMessage() }}</div>
+  }
+
+  <app-page-header
+    [title]="pageTitle()"
+    [description]="pageDescription()"
+    [breadcrumbs]="breadcrumbs()"
+  >
+    <app-status-badge variant="neutral">Draft</app-status-badge>
+  </app-page-header>
+
+  <section class="config-band" aria-labelledby="plan-config-title">
+    <p class="config-eyebrow">Plan configuration</p>
+    <h2 id="plan-config-title">{{ configBandHeading() }}</h2>
+    <p>
+      Configure commercial identity, included modules and features, base price, and usage limits.
+      Publishing makes the plan assignable to tenants; some fields are no longer editable afterwards.
+    </p>
+  </section>
+
+  @if (editBlocked()) {
+    <app-error-state title="This plan cannot be edited here" [message]="editBlockedMessage()" />
+  } @else {
+    <app-create-subscription-plan-wizard-nav
+      [steps]="steps"
+      [currentStepKey]="currentStep()"
+      [stepStates]="wizardStepStates()"
+    />
+
+    @if (planLoading()) {
+      <app-loading-skeleton [rows]="6" />
+    } @else {
+      <div class="workspace">
+        <section class="form-panel" aria-labelledby="step-heading">
+          @switch (currentStep()) {
+            @case ('basics') {
+              <header class="step-header">
+                <p class="step-kicker">Step {{ currentStepNumber() }} of {{ steps.length }}</p>
+                <h2 id="step-heading">Plan Basics</h2>
+                <p class="step-purpose">
+                  Define the commercial identity of this plan. Status stays Draft until you publish from Review.
+                </p>
+              </header>
+              <form class="step-form grid two" [formGroup]="basicsForm">
+                <app-form-field
+                  id="plan-name"
+                  label="Plan Name"
+                  [required]="true"
+                  helperText="This name will be visible to tenants."
+                  [error]="basicsFieldError('planName')"
+                >
+                  <input id="plan-name" formControlName="planName" autocomplete="off" placeholder="Enter plan name" />
+                </app-form-field>
+
+                <app-form-field
+                  id="plan-code"
+                  label="Plan Code"
+                  [required]="true"
+                  helperText="Unique code for internal reference. Cannot be changed after publish."
+                  [error]="basicsFieldError('planCode')"
+                >
+                  <input
+                    id="plan-code"
+                    formControlName="planCode"
+                    autocomplete="off"
+                    placeholder="Enter plan code"
+                    (input)="onPlanCodeInput($event)"
+                  />
+                </app-form-field>
+
+                <app-form-field
+                  class="full"
+                  id="plan-description"
+                  label="Description"
+                  [helperText]="descriptionHelperText()"
+                  [error]="basicsFieldError('description')"
+                >
+                  <textarea
+                    id="plan-description"
+                    formControlName="description"
+                    rows="4"
+                    maxlength="500"
+                    placeholder="Enter description about this plan"
+                  ></textarea>
+                </app-form-field>
+
+                <app-form-field
+                  id="billing-cycle"
+                  label="Billing Cycle"
+                  [required]="true"
+                  helperText="Choose how this plan will be billed."
+                  [error]="basicsFieldError('billingCycle')"
+                >
+                  <select id="billing-cycle" formControlName="billingCycle">
+                    <option value="">Select billing cycle</option>
+                    @for (option of billingCycleOptions; track option.value) {
+                      <option [value]="option.value">{{ option.label }}</option>
+                    }
+                  </select>
+                </app-form-field>
+
+                <app-form-field
+                  id="base-currency"
+                  label="Currency"
+                  [required]="true"
+                  helperText="Default currency for pricing."
+                  [error]="basicsFieldError('baseCurrency')"
+                >
+                  <select id="base-currency" formControlName="baseCurrency">
+                    <option value="">Select currency</option>
+                    @for (option of currencyOptions; track option.value) {
+                      <option [value]="option.value">{{ option.label }}</option>
+                    }
+                  </select>
+                </app-form-field>
+
+                <app-form-field id="plan-status" label="Status" helperText="Plan is in draft until you publish it.">
+                  <input id="plan-status" type="text" value="Draft" readonly aria-readonly="true" />
+                </app-form-field>
+
+                <div class="info-callout full">
+                  <strong>Plan status: Draft</strong>
+                  <span>
+                    Plan is in draft until you publish it. Only active plans can be assigned to tenants.
+                  </span>
+                </div>
+              </form>
+            }
+            @case ('modules') {
+              <header class="step-header">
+                <p class="step-kicker">Step {{ currentStepNumber() }} of {{ steps.length }}</p>
+                <h2 id="step-heading">Modules</h2>
+                <p class="step-purpose">Select the commercial subscription modules included in this plan.</p>
+              </header>
+              @if (modulesLoading()) {
+                <app-loading-skeleton [rows]="4" />
+              } @else if (catalogError()) {
+                <app-error-state
+                  title="Module catalog could not be loaded"
+                  [message]="catalogError()!"
+                  [hasRetry]="true"
+                  (retry)="reloadCatalogs()"
+                />
+              } @else if (!modules().length) {
+                <app-empty-state
+                  title="No subscription modules found"
+                  message="The backend subscription catalog did not return TM-EPOS MVP modules."
+                />
+              } @else {
+                <div class="choice-list" role="group" aria-label="Module inclusion">
+                  @for (module of modules(); track module.id) {
+                    <article
+                      class="choice-row"
+                      [class.selected]="moduleAvailability()[module.id] === 'included'"
+                      [class.locked]="module.isLocked"
+                    >
+                      <div class="choice-copy">
+                        <strong>{{ module.name }}</strong>
+                        <span>{{ module.description || 'No description provided.' }}</span>
+                        @if (module.isLocked) {
+                          <small>Included by default</small>
+                        }
+                      </div>
+                      <div class="radio-pair">
+                        @for (option of availabilityOptions; track option) {
+                          <label class="radio-pill">
+                            <input
+                              type="radio"
+                              [name]="'module-' + module.id"
+                              [value]="option"
+                              [checked]="moduleAvailability()[module.id] === option"
+                              [disabled]="module.isLocked"
+                              (change)="setModuleAvailability(module.id, option)"
+                            />
+                            {{ availabilityLabel(option) }}
+                          </label>
+                        }
+                      </div>
+                    </article>
+                  }
+                </div>
+              }
+            }
+            @case ('features') {
+              <header class="step-header">
+                <p class="step-kicker">Step {{ currentStepNumber() }} of {{ steps.length }}</p>
+                <h2 id="step-heading">Features</h2>
+                <p class="step-purpose">Configure feature entitlements grouped by included module.</p>
+              </header>
+              @if (featuresLoading()) {
+                <app-loading-skeleton [rows]="4" />
+              } @else if (catalogError()) {
+                <app-error-state
+                  title="Feature catalog could not be loaded"
+                  [message]="catalogError()!"
+                  [hasRetry]="true"
+                  (retry)="reloadCatalogs()"
+                />
+              } @else if (!selectedModulesCount()) {
+                <app-empty-state
+                  title="Select modules first"
+                  message="Features are shown after at least one module is included."
+                />
+              } @else if (!featureGroups().length) {
+                <app-empty-state
+                  title="No features found"
+                  message="The selected modules do not expose subscription feature entitlements."
+                />
+              } @else {
+                <div class="choice-list">
+                  @for (group of featureGroups(); track group.moduleId) {
+                    <section class="feature-group" [attr.aria-label]="group.moduleName">
+                      <h3>{{ group.moduleName }}</h3>
+                      @for (feature of group.features; track feature.id) {
+                        <div class="choice-row" [class.disabled]="isFeatureDisabled(feature)">
+                          <div class="choice-copy">
+                            <strong>{{ feature.name }}</strong>
+                            <span>{{ feature.description || feature.entitlementKey || feature.featureKey }}</span>
+                            @if (feature.isLocked) {
+                              <small>Included by default</small>
+                            }
+                          </div>
+                          <div class="radio-pair">
+                            @for (option of availabilityOptions; track option) {
+                              <label class="radio-pill">
+                                <input
+                                  type="radio"
+                                  [name]="feature.id"
+                                  [value]="option"
+                                  [checked]="featureAvailability()[feature.id] === option"
+                                  [disabled]="isFeatureDisabled(feature)"
+                                  (change)="setFeatureAvailability(feature.id, option)"
+                                />
+                                {{ availabilityLabel(option) }}
+                              </label>
+                            }
+                          </div>
+                        </div>
+                      }
+                    </section>
+                  }
+                </div>
+              }
+            }
+            @case ('pricing') {
+              <header class="step-header">
+                <p class="step-kicker">Step {{ currentStepNumber() }} of {{ steps.length }}</p>
+                <h2 id="step-heading">Base Pricing</h2>
+                <p class="step-purpose">Set the base subscription price for the billing cycle selected in Basics.</p>
+              </header>
+              <form class="step-form grid two" [formGroup]="pricingForm">
+                <app-form-field id="pricing-cycle" label="Billing Cycle" helperText="Selected in Basics step.">
+                  <input
+                    id="pricing-cycle"
+                    type="text"
+                    [value]="billingCycleLabel()"
+                    readonly
+                    aria-readonly="true"
+                    aria-label="Billing cycle"
+                  />
+                </app-form-field>
+
+                <app-form-field id="pricing-currency" label="Currency" helperText="Selected in Basics step.">
+                  <input
+                    id="pricing-currency"
+                    type="text"
+                    [value]="currencyLabel()"
+                    readonly
+                    aria-readonly="true"
+                    aria-label="Currency"
+                  />
+                </app-form-field>
+
+                <app-form-field
+                  id="base-price"
+                  label="Base Price"
+                  [required]="true"
+                  helperText="This is the base subscription price for the selected billing cycle."
+                  [error]="basePriceError()"
+                >
+                  <span class="price-control">
+                    <span class="price-prefix" aria-hidden="true">{{ currencyCode() }}</span>
+                    <input
+                      id="base-price"
+                      [value]="basePriceInput()"
+                      placeholder="0.00"
+                      inputmode="decimal"
+                      aria-label="Base price"
+                      (input)="onBasePriceInput($event)"
+                      (blur)="onBasePriceBlur()"
+                    />
+                  </span>
+                </app-form-field>
+
+                <div class="info-callout full">
+                  <span>
+                    This base price will be used for tenant subscription billing based on the selected billing cycle.
+                  </span>
+                </div>
+              </form>
+            }
+            @case ('limits') {
+              <header class="step-header">
+                <p class="step-kicker">Step {{ currentStepNumber() }} of {{ steps.length }}</p>
+                <h2 id="step-heading">Plan Limits</h2>
+                <p class="step-purpose">Define the default usage allowances for tenants on this plan.</p>
+              </header>
+              <form class="step-form grid three" [formGroup]="limitsForm">
+                <app-form-field
+                  id="max-outlets"
+                  label="Outlet Limit"
+                  [required]="true"
+                  helperText="Maximum outlets allowed for this plan."
+                  [error]="limitsFieldError('maxOutlets')"
+                >
+                  <input
+                    id="max-outlets"
+                    type="number"
+                    formControlName="maxOutlets"
+                    min="1"
+                    step="1"
+                    aria-label="Outlet limit"
+                  />
+                </app-form-field>
+
+                <app-form-field
+                  id="max-tills"
+                  label="Till Limit"
+                  [required]="true"
+                  helperText="Maximum tills allowed for this plan."
+                  [error]="limitsFieldError('maxTills')"
+                >
+                  <input
+                    id="max-tills"
+                    type="number"
+                    formControlName="maxTills"
+                    min="1"
+                    step="1"
+                    aria-label="Till limit"
+                  />
+                </app-form-field>
+
+                <app-form-field
+                  id="max-users"
+                  label="User Limit"
+                  [required]="true"
+                  helperText="Maximum users allowed for this plan."
+                  [error]="limitsFieldError('maxUsers')"
+                >
+                  <input
+                    id="max-users"
+                    type="number"
+                    formControlName="maxUsers"
+                    min="1"
+                    step="1"
+                    aria-label="User limit"
+                  />
+                </app-form-field>
+
+                <div class="info-callout full">
+                  <span>These limits define the default usage allowance for tenants on this plan.</span>
+                </div>
+              </form>
+            }
+            @case ('review') {
+              <header class="step-header">
+                <p class="step-kicker">Step {{ currentStepNumber() }} of {{ steps.length }}</p>
+                <h2 id="step-heading">Review &amp; Publish</h2>
+                <p class="step-purpose">
+                  Confirm the configuration before publishing. The plan stays Draft until you confirm publish.
+                </p>
+              </header>
+              <div class="review-grid">
+                <section class="review-block">
+                  <h3>Identity</h3>
+                  <dl>
+                    <div>
+                      <dt>Plan Name</dt>
+                      <dd>{{ basicsForm.controls.planName.value || '—' }}</dd>
+                    </div>
+                    <div>
+                      <dt>Plan Code</dt>
+                      <dd>{{ basicsForm.controls.planCode.value || '—' }}</dd>
+                    </div>
+                    <div>
+                      <dt>Description</dt>
+                      <dd>{{ basicsForm.controls.description.value || '—' }}</dd>
+                    </div>
+                  </dl>
+                </section>
+                <section class="review-block">
+                  <h3>Commercial</h3>
+                  <dl>
+                    <div>
+                      <dt>Billing Cycle</dt>
+                      <dd>{{ billingCycleLabel() }}</dd>
+                    </div>
+                    <div>
+                      <dt>Currency</dt>
+                      <dd>{{ basicsForm.controls.baseCurrency.value || '—' }}</dd>
+                    </div>
+                    <div>
+                      <dt>Base Price</dt>
+                      <dd>{{ basePriceSummaryLabel() }}</dd>
+                    </div>
+                  </dl>
+                </section>
+                <section class="review-block">
+                  <h3>Limits</h3>
+                  <dl>
+                    <div>
+                      <dt>Outlet Limit</dt>
+                      <dd>{{ limitsForm.controls.maxOutlets.value ?? '—' }}</dd>
+                    </div>
+                    <div>
+                      <dt>Till Limit</dt>
+                      <dd>{{ limitsForm.controls.maxTills.value ?? '—' }}</dd>
+                    </div>
+                    <div>
+                      <dt>User Limit</dt>
+                      <dd>{{ limitsForm.controls.maxUsers.value ?? '—' }}</dd>
+                    </div>
+                  </dl>
+                </section>
+                <section class="review-block">
+                  <h3>Entitlements</h3>
+                  <dl>
+                    <div>
+                      <dt>Modules</dt>
+                      <dd>{{ modulesSummary() }}</dd>
+                    </div>
+                    <div>
+                      <dt>Features</dt>
+                      <dd>{{ featuresSummary() }}</dd>
+                    </div>
+                  </dl>
+                </section>
+              </div>
+              <div class="info-callout">
+                <span>
+                  Publish makes this plan assignable to tenants. Save Draft keeps the plan as Draft without publishing.
+                </span>
+              </div>
+            }
+          }
+        </section>
+
+        <aside class="summary-panel" aria-label="Live plan summary">
+          <h2>Draft Summary</h2>
+          <dl class="summary-rows">
+            <div>
+              <dt>Plan Name</dt>
+              <dd>{{ basicsForm.controls.planName.value || '—' }}</dd>
+            </div>
+            <div>
+              <dt>Plan Code</dt>
+              <dd>{{ basicsForm.controls.planCode.value || '—' }}</dd>
+            </div>
+            <div>
+              <dt>Billing Cycle</dt>
+              <dd>{{ billingCycleLabel() }}</dd>
+            </div>
+            <div>
+              <dt>Currency</dt>
+              <dd>{{ currencyLabel() }}</dd>
+            </div>
+            @if (showBasePriceInSummary()) {
+              <div>
+                <dt>Base Price</dt>
+                <dd>{{ basePriceSummaryLabel() }}</dd>
+              </div>
+            }
+            <div>
+              <dt>Status</dt>
+              <dd><app-status-badge variant="neutral">Draft</app-status-badge></dd>
+            </div>
+          </dl>
+          <ul class="summary-progress">
+            <li><span>Modules</span><strong [class]="modulesSummaryClass()">{{ modulesSummary() }}</strong></li>
+            <li><span>Features</span><strong [class]="featuresSummaryClass()">{{ featuresSummary() }}</strong></li>
+            <li><span>Pricing</span><strong [class]="pricingSummaryClass()">{{ pricingSummary() }}</strong></li>
+            <li><span>Limits</span><strong [class]="limitsSummaryClass()">{{ limitsSummary() }}</strong></li>
+          </ul>
+          @if (selectedModuleNames().length) {
+            <section class="selection-summary" aria-label="Selected modules">
+              <h3>Selected Modules</h3>
+              <ul>
+                @for (moduleName of selectedModuleNames(); track moduleName) {
+                  <li>{{ moduleName }}</li>
+                }
+              </ul>
+            </section>
+          }
+          @if (selectedFeatureGroups().length) {
+            <section class="selection-summary" aria-label="Selected features">
+              <h3>Selected Features</h3>
+              @for (group of selectedFeatureGroups(); track group.moduleName) {
+                <strong>{{ group.moduleName }}</strong>
+                <ul>
+                  @for (featureName of group.featureNames; track featureName) {
+                    <li>{{ featureName }}</li>
+                  }
+                </ul>
+              }
+            </section>
+          }
+          <p class="summary-note">Complete all steps to see the full summary.</p>
+        </aside>
+      </div>
+    }
+
+    <footer class="wizard-footer">
+      <div class="footer-left">
+        <app-button class="back-btn" variant="secondary" [disabled]="isSaving()" (click)="goBack()">Back</app-button>
+      </div>
+      <div class="footer-right">
+        <app-button class="save-btn" variant="secondary" [disabled]="isSaving()" (click)="saveDraft()">
+          {{ isSaving() ? 'Saving...' : 'Save Draft' }}
+        </app-button>
+        @if (currentStep() !== 'review') {
+          <app-button class="next-btn" variant="primary" [disabled]="isSaving()" (click)="nextStep()">
+            {{ isSaving() ? 'Saving...' : 'Next' }}
+          </app-button>
+        } @else {
+          <app-button class="publish-btn" variant="primary" [disabled]="isSaving()" (click)="openPublishModal()">
+            Publish Plan
+          </app-button>
+        }
+      </div>
+    </footer>
+  }
+
+  <app-confirmation-dialog
+    [isOpen]="showPublishModal()"
+    title="Publish subscription plan?"
+    message="Once published, this plan can be assigned to tenants. Some fields cannot be edited directly after publishing."
+    confirmLabel="Publish Plan"
+    cancelLabel="Cancel"
+    loadingLabel="Publishing..."
+    [isLoading]="isSaving()"
+    (confirm)="confirmPublish()"
+    (cancel)="closePublishModal()"
+  />
+</section>

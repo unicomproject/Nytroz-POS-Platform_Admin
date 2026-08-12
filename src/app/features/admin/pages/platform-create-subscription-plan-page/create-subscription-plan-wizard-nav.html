@@ -1,0 +1,27 @@
+<nav class="step-nav-wrap" aria-label="Subscription plan wizard steps">
+  <ol class="step-nav">
+    @for (step of steps(); track step.key; let index = $index; let first = $first; let last = $last) {
+      <li
+        class="step-item"
+        [attr.data-state]="stateFor(step.key)"
+        [class.current]="stateFor(step.key) === 'current'"
+        [class.completed]="stateFor(step.key) === 'completed'"
+        [class.upcoming]="stateFor(step.key) === 'upcoming'"
+        [attr.aria-current]="currentStepKey() === step.key ? 'step' : null"
+        [attr.aria-label]="stepAriaLabel(step.label, index, steps().length)"
+      >
+        <span class="step-rail" aria-hidden="true">
+          <span class="rail-line rail-before" [class.rail-hidden]="first"></span>
+          <span class="step-indicator">
+            <span class="indicator-num">{{ index + 1 }}</span>
+            <svg class="indicator-check" viewBox="0 0 16 16" fill="none">
+              <path d="M3.5 8.5l3 3 6-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </span>
+          <span class="rail-line rail-after" [class.rail-hidden]="last"></span>
+        </span>
+        <span class="step-label">{{ step.label }}</span>
+      </li>
+    }
+  </ol>
+</nav>
