@@ -1,0 +1,75 @@
+<section class="st-form-page">
+  <app-page-header
+    title="Create Initial Tenant Role"
+    description="Creates an additional custom role. Bootstrap Tenant Admin was provisioned at tenant create."
+    [breadcrumbs]="breadcrumbItems()"
+  />
+
+  <app-selected-tenant-context-band
+    [tenantId]="tenantId()"
+    [tenantName]="band().tenantName"
+    [tenantCode]="band().tenantCode"
+    [lifecycleStatus]="band().lifecycleStatus"
+    [planName]="band().planName"
+    [showSwitch]="false"
+  />
+
+  <div class="alert alert-warning">
+    Bootstrap Tenant Admin role was provisioned at tenant create. This form creates an <strong>additional</strong> custom role.
+  </div>
+
+  @if (errorMessage()) {
+    <div class="alert alert-danger" role="alert">{{ errorMessage() }}</div>
+  }
+
+  <form class="form-card" (ngSubmit)="submit()">
+    <app-form-field id="role-name" label="Role Name" [required]="true">
+      <input
+        id="role-name"
+        type="text"
+        [ngModel]="roleName()"
+        (ngModelChange)="roleName.set($event)"
+        name="roleName"
+        placeholder="Store Manager"
+      />
+    </app-form-field>
+
+    <app-form-field id="description" label="Description">
+      <textarea
+        id="description"
+        rows="2"
+        [ngModel]="description()"
+        (ngModelChange)="description.set($event)"
+        name="description"
+        placeholder="Optional description"
+      ></textarea>
+    </app-form-field>
+
+    <fieldset class="permission-set">
+      <legend>Permission Groups</legend>
+      <p class="hint">Bootstrap assignable codes (entitlement filtering remains server-side).</p>
+      <ul>
+        @for (option of permissionOptions; track option.code) {
+          <li>
+            <label>
+              <input
+                type="checkbox"
+                [checked]="isSelected(option.code)"
+                (change)="togglePermission(option.code, $any($event.target).checked)"
+              />
+              <span>{{ option.label }}</span>
+              <code>{{ option.code }}</code>
+            </label>
+          </li>
+        }
+      </ul>
+    </fieldset>
+
+    <div class="form-footer">
+      <a class="btn-link" [routerLink]="['/admin/tenants', tenantId(), 'configure']">Cancel</a>
+      <app-button type="submit" variant="primary" [disabled]="submitting()">
+        {{ submitting() ? 'Saving…' : 'Save Role' }}
+      </app-button>
+    </div>
+  </form>
+</section>

@@ -1,0 +1,75 @@
+<section class="setup-hub-page">
+  <app-page-header
+    title="Initial Setup"
+    description="Optional assisted bootstrap for this tenant. Ongoing operations remain with Tenant Admin."
+    [breadcrumbs]="breadcrumbItems()"
+  />
+
+  @if (isLoading()) {
+    <div aria-busy="true" aria-label="Loading setup hub">
+      <app-loading-skeleton [rows]="4" />
+    </div>
+  } @else if (errorMessage()) {
+    <app-error-state
+      title="Setup hub could not be loaded"
+      [message]="errorMessage()!"
+      [hasRetry]="true"
+      (retry)="reload()"
+    />
+  } @else if (summary(); as data) {
+    <app-selected-tenant-context-band
+      [tenantId]="data.tenant.tenantId"
+      [tenantName]="data.tenant.tenantName"
+      [tenantCode]="data.tenant.tenantCode"
+      [lifecycleStatus]="data.tenant.lifecycleStatus"
+      [planName]="data.tenant.planName"
+    />
+
+    <div class="hub-grid">
+      @for (card of moduleCards(); track card.key) {
+        <article class="module-card" [class.disabled]="isDisabled(card)">
+          <div class="card-head">
+            <h3>{{ card.title }}</h3>
+            <span class="chip" [class]="statusChipClass(card.module?.status)">
+              {{ card.module?.status || 'UNKNOWN' }}
+            </span>
+          </div>
+          <p>{{ card.description }}</p>
+          @if (card.module?.dependencyNotice) {
+            <div class="dep">{{ card.module?.dependencyNotice }}</div>
+          }
+          <div class="summary">{{ summaryText(card) }}</div>
+          <div class="card-actions">
+            @if (isDisabled(card) || !card.primaryLink) {
+              <button type="button" class="btn btn-secondary btn-sm" disabled>
+                {{ ctaLabel(card) }}
+              </button>
+            } @else {
+              <a
+                class="btn btn-sm"
+                [class.btn-primary]="(card.module?.status || '').toUpperCase() !== 'CONFIGURED'"
+                [class.btn-secondary]="(card.module?.status || '').toUpperCase() === 'CONFIGURED'"
+                [routerLink]="card.primaryLink"
+              >
+                {{ ctaLabel(card) }}
+              </a>
+            }
+            @if (card.secondaryLink && card.importPermission && canManage(card.importPermission) && !isDisabled(card)) {
+              <a class="btn btn-secondary btn-sm" [routerLink]="card.secondaryLink">
+                {{ card.secondaryLabel }}
+              </a>
+            }
+          </div>
+        </article>
+      }
+    </div>
+
+    <div class="handoff-panel">
+      <h3>Tenant Admin Handoff</h3>
+      <p>
+        Operational setup is optional. Activation is not blocked by bootstrap completion.
+        Full storefront, Click &amp; Collect, and ongoing catalog management remain with Tenant Admin.
+      </p>
+    </div>
+  }
+</section>

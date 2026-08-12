@@ -1,0 +1,100 @@
+<section class="st-form-page">
+  <app-page-header
+    title="Manual Initial Product"
+    description="Bootstrap minimum set — not the full Tenant Admin product wizard."
+    [breadcrumbs]="breadcrumbItems()"
+  />
+
+  <app-selected-tenant-context-band
+    [tenantId]="tenantId()"
+    [tenantName]="band().tenantName"
+    [tenantCode]="band().tenantCode"
+    [lifecycleStatus]="band().lifecycleStatus"
+    [planName]="band().planName"
+    [showSwitch]="false"
+  />
+
+  @if (errorMessage()) {
+    <div class="alert alert-danger" role="alert">{{ errorMessage() }}</div>
+  }
+
+  <form class="form-card" (ngSubmit)="submit()">
+    <app-form-field id="product-name" label="Product Name" [required]="true">
+      <input
+        id="product-name"
+        type="text"
+        [ngModel]="productName()"
+        (ngModelChange)="productName.set($event)"
+        name="productName"
+      />
+    </app-form-field>
+
+    <div class="field-row">
+      <app-form-field id="sku" label="SKU" [required]="true">
+        <input id="sku" type="text" [ngModel]="sku()" (ngModelChange)="sku.set($event)" name="sku" />
+      </app-form-field>
+      <app-form-field id="price" label="Sale Price" [required]="true">
+        <input
+          id="price"
+          type="number"
+          step="0.01"
+          [ngModel]="sellingPrice()"
+          (ngModelChange)="sellingPrice.set($event)"
+          name="sellingPrice"
+        />
+      </app-form-field>
+    </div>
+
+    <app-form-field id="barcode" label="Barcode">
+      <input id="barcode" type="text" [ngModel]="barcode()" (ngModelChange)="barcode.set($event)" name="barcode" />
+    </app-form-field>
+
+    <div class="field-row">
+      <app-form-field id="stock" label="Opening Stock">
+        <input
+          id="stock"
+          type="number"
+          min="0"
+          [ngModel]="openingStockQuantity()"
+          (ngModelChange)="openingStockQuantity.set($event)"
+          name="openingStockQuantity"
+        />
+      </app-form-field>
+      <app-form-field id="outlet" label="Outlet (if stock > 0)">
+        @if (knownOutlets().length) {
+          <select id="outlet" [ngModel]="outletId()" (ngModelChange)="outletId.set($event)" name="outletId">
+            <option value="">— None —</option>
+            @for (outlet of knownOutlets(); track outlet.outletId) {
+              <option [value]="outlet.outletId">{{ outlet.outletName }}</option>
+            }
+          </select>
+        } @else {
+          <input
+            id="outlet"
+            type="text"
+            [ngModel]="outletId()"
+            (ngModelChange)="outletId.set($event)"
+            name="outletId"
+            placeholder="Outlet ID (optional)"
+          />
+        }
+      </app-form-field>
+    </div>
+
+    <label class="checkbox-field">
+      <input
+        type="checkbox"
+        [checked]="trackInventory()"
+        (change)="trackInventory.set($any($event.target).checked)"
+      />
+      <span>Track inventory</span>
+    </label>
+
+    <div class="form-footer">
+      <a class="btn-link" [routerLink]="['/admin/tenants', tenantId(), 'configure']">Cancel</a>
+      <app-button type="submit" variant="primary" [disabled]="submitting()">
+        {{ submitting() ? 'Saving…' : 'Save Product' }}
+      </app-button>
+    </div>
+  </form>
+</section>

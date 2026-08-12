@@ -1,0 +1,80 @@
+<div
+  class="tenant-context"
+  [class.suspended]="isSuspended()"
+  role="region"
+  aria-label="Selected tenant context"
+>
+  <div class="identity">
+    <div class="name">{{ tenantName() }}</div>
+    <div class="meta">
+      @if (tenantCode()) {
+        <span class="chip chip-code">{{ tenantCode() }}</span>
+      }
+      @if (lifecycleStatus()) {
+        <span class="chip" [class.chip-active]="!isSuspended()" [class.chip-suspended]="isSuspended()">
+          {{ lifecycleStatus() }}
+        </span>
+      }
+      @if (planName()) {
+        <span class="chip chip-plan">{{ planName() }}</span>
+      }
+    </div>
+  </div>
+  <div class="actions">
+    @if (showSwitch()) {
+      <app-button variant="secondary" size="compact" (click)="openSwitch()">Switch Tenant</app-button>
+    }
+    @if (showExit()) {
+      <app-button variant="secondary" size="compact" (click)="confirmExit()">Exit Tenant Context</app-button>
+    }
+  </div>
+</div>
+
+<app-confirmation-dialog
+  [isOpen]="exitConfirmOpen()"
+  title="Exit Tenant Context"
+  message="Leave selected-tenant bootstrap and return to tenant detail?"
+  confirmLabel="Exit"
+  cancelLabel="Cancel"
+  (confirm)="exitContext()"
+  (cancel)="cancelExit()"
+/>
+
+@if (switchOpen()) {
+  <div class="switch-backdrop" (click)="closeSwitch()" role="presentation"></div>
+  <aside class="switch-panel" role="dialog" aria-modal="true" aria-label="Switch tenant">
+    <header class="switch-header">
+      <h2>Switch Tenant</h2>
+      <button type="button" class="icon-close" aria-label="Close" (click)="closeSwitch()">×</button>
+    </header>
+    <label class="search-field">
+      <span>Search tenants</span>
+      <input
+        type="search"
+        [ngModel]="switchSearch()"
+        (ngModelChange)="switchSearch.set($event)"
+        (keyup.enter)="loadTenants()"
+        placeholder="Name or code"
+      />
+    </label>
+    <app-button variant="secondary" size="compact" (click)="loadTenants()">Search</app-button>
+    @if (switchLoading()) {
+      <p class="muted">Loading tenants…</p>
+    } @else if (switchError()) {
+      <p class="error" role="alert">{{ switchError() }}</p>
+    } @else if (!switchOptions().length) {
+      <p class="muted">No tenants found.</p>
+    } @else {
+      <ul class="tenant-list">
+        @for (tenant of switchOptions(); track tenant.id) {
+          <li>
+            <button type="button" (click)="selectTenant(tenant.id, tenant.name, tenant.code)">
+              <strong>{{ tenant.name }}</strong>
+              <span>{{ tenant.code }}</span>
+            </button>
+          </li>
+        }
+      </ul>
+    }
+  </aside>
+}

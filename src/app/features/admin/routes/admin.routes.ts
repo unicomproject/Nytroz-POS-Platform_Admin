@@ -37,6 +37,13 @@ const adminPageRoutes: Routes = [
     data: { title: 'Resume Tenant Onboarding', requiredPermission: platformPermissions.tenantsCreate }
   },
   {
+    path: 'tenants/:tenantId/configure',
+    canActivateChild: [permissionGuard],
+    loadChildren: () =>
+      import('../../selected-tenant/routes/selected-tenant.routes').then((m) => m.selectedTenantRoutes),
+    data: { title: 'Configure Tenant', requiredPermission: platformPermissions.tenantsBootstrapAccess }
+  },
+  {
     path: 'tenants/:tenantId',
     loadComponent: () =>
       import('../pages/platform-tenant-detail-page/platform-tenant-detail-page').then((m) => m.PlatformTenantDetailPage),

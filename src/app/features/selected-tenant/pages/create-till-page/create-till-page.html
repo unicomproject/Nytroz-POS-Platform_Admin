@@ -1,0 +1,80 @@
+<section class="st-form-page">
+  <app-page-header
+    title="Create Initial Till"
+    description="Create a till for an active outlet. Device binding stays with Tenant Admin."
+    [breadcrumbs]="breadcrumbItems()"
+  />
+
+  <app-selected-tenant-context-band
+    [tenantId]="tenantId()"
+    [tenantName]="band().tenantName"
+    [tenantCode]="band().tenantCode"
+    [lifecycleStatus]="band().lifecycleStatus"
+    [planName]="band().planName"
+    [showSwitch]="false"
+  />
+
+  @if (gapNotice()) {
+    <div class="alert alert-warning" role="status">{{ gapNotice() }}</div>
+  }
+  @if (errorMessage()) {
+    <div class="alert alert-danger" role="alert">{{ errorMessage() }}</div>
+  }
+
+  <form class="form-card" (ngSubmit)="submit()">
+    <app-form-field id="outlet" label="Outlet" [required]="true">
+      @if (knownOutlets().length) {
+        <select id="outlet" [ngModel]="outletId()" (ngModelChange)="outletId.set($event)" name="outletId">
+          @for (outlet of knownOutlets(); track outlet.outletId) {
+            <option [value]="outlet.outletId">
+              {{ outlet.outletName }}{{ outlet.outletCode ? ' (' + outlet.outletCode + ')' : '' }}
+            </option>
+          }
+        </select>
+      } @else {
+        <input
+          id="outlet"
+          type="text"
+          [ngModel]="outletId()"
+          (ngModelChange)="outletId.set($event)"
+          name="outletId"
+          placeholder="Outlet ID (GUID)"
+        />
+      }
+      <p class="hint">Till must belong to an active outlet</p>
+    </app-form-field>
+
+    <app-form-field id="till-name" label="Till Name" [required]="true">
+      <input
+        id="till-name"
+        type="text"
+        [ngModel]="tillName()"
+        (ngModelChange)="tillName.set($event)"
+        name="tillName"
+        placeholder="Front Counter"
+      />
+    </app-form-field>
+
+    <app-form-field id="till-code" label="Till Code" [required]="true">
+      <input
+        id="till-code"
+        type="text"
+        [ngModel]="tillCode()"
+        (ngModelChange)="tillCode.set($event)"
+        name="tillCode"
+        placeholder="TILL-01"
+      />
+    </app-form-field>
+
+    <div class="alert alert-warning">
+      Device binding is performed by Tenant Admin after handoff — not in bootstrap scope.
+    </div>
+
+    <div class="form-footer">
+      <a class="btn-link" [routerLink]="['/admin/tenants', tenantId(), 'configure']">Cancel</a>
+      <app-button type="submit" variant="primary" [disabled]="submitting() || outletModuleCount() < 1">
+        {{ submitting() ? 'Saving…' : 'Save Till' }}
+      </app-button>
+    </div>
+  </form>
+</section>

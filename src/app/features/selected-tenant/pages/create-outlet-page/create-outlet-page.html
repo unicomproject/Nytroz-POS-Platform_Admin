@@ -1,0 +1,131 @@
+<section class="st-form-page">
+  <app-page-header
+    title="Create Initial Outlet"
+    description="Bootstrap the first outlet for this tenant."
+    [breadcrumbs]="breadcrumbItems()"
+  />
+
+  <app-selected-tenant-context-band
+    [tenantId]="tenantId()"
+    [tenantName]="band().tenantName"
+    [tenantCode]="band().tenantCode"
+    [lifecycleStatus]="band().lifecycleStatus"
+    [planName]="band().planName"
+    [showSwitch]="false"
+  />
+
+  @if (successMessage()) {
+    <div class="alert alert-success" role="status">{{ successMessage() }}</div>
+  }
+  @if (errorMessage()) {
+    <div class="alert alert-danger" role="alert">{{ errorMessage() }}</div>
+  }
+
+  <form class="form-card" (ngSubmit)="submit()">
+    <app-form-field id="outlet-name" label="Outlet Name" [required]="true" [error]="fieldError()">
+      <input
+        id="outlet-name"
+        type="text"
+        [ngModel]="outletName()"
+        (ngModelChange)="outletName.set($event)"
+        name="outletName"
+        placeholder="Main Store"
+      />
+    </app-form-field>
+
+    <div class="field-row">
+      <app-form-field id="outlet-type" label="Outlet Type" [required]="true">
+        <select
+          id="outlet-type"
+          [ngModel]="outletType()"
+          (ngModelChange)="outletType.set($event)"
+          name="outletType"
+        >
+          <option value="STORE">STORE</option>
+          <option value="WAREHOUSE">WAREHOUSE</option>
+        </select>
+      </app-form-field>
+      <app-form-field id="timezone" label="Timezone" [required]="true">
+        <select
+          id="timezone"
+          [ngModel]="timezone()"
+          (ngModelChange)="timezone.set($event)"
+          name="timezone"
+        >
+          <option value="Asia/Colombo">Asia/Colombo</option>
+          <option value="UTC">UTC</option>
+          <option value="Asia/Dubai">Asia/Dubai</option>
+          <option value="Asia/Singapore">Asia/Singapore</option>
+        </select>
+      </app-form-field>
+    </div>
+
+    <app-form-field id="address-line1" label="Address Line 1" [required]="true">
+      <input
+        id="address-line1"
+        type="text"
+        [ngModel]="addressLine1()"
+        (ngModelChange)="addressLine1.set($event)"
+        name="addressLine1"
+        placeholder="123 Galle Road"
+      />
+    </app-form-field>
+
+    <div class="field-row">
+      <app-form-field id="city" label="City" [required]="true">
+        <input id="city" type="text" [ngModel]="city()" (ngModelChange)="city.set($event)" name="city" />
+      </app-form-field>
+      <app-form-field id="country" label="Country" [required]="true">
+        <input
+          id="country"
+          type="text"
+          maxlength="2"
+          [ngModel]="countryCode()"
+          (ngModelChange)="countryCode.set($event)"
+          name="countryCode"
+        />
+      </app-form-field>
+    </div>
+
+    <div class="field-row">
+      <app-form-field id="postal" label="Postal Code">
+        <input
+          id="postal"
+          type="text"
+          [ngModel]="postalCode()"
+          (ngModelChange)="postalCode.set($event)"
+          name="postalCode"
+        />
+      </app-form-field>
+      <app-form-field id="state" label="State / Province">
+        <input
+          id="state"
+          type="text"
+          [ngModel]="stateOrProvince()"
+          (ngModelChange)="stateOrProvince.set($event)"
+          name="stateOrProvince"
+        />
+      </app-form-field>
+    </div>
+
+    <div class="field-row">
+      <app-form-field id="phone" label="Phone">
+        <input id="phone" type="tel" [ngModel]="phone()" (ngModelChange)="phone.set($event)" name="phone" />
+      </app-form-field>
+      <app-form-field id="email" label="Email">
+        <input id="email" type="email" [ngModel]="email()" (ngModelChange)="email.set($event)" name="email" />
+      </app-form-field>
+    </div>
+
+    <p class="hint">
+      Click &amp; Collect collection point configuration is deferred to Tenant Admin after business hours are configured.
+    </p>
+
+    <div class="form-footer">
+      <a class="btn-link" [routerLink]="['/admin/tenants', tenantId(), 'configure']">Cancel</a>
+      <app-button type="submit" variant="primary" [disabled]="submitting()">
+        {{ submitting() ? 'Saving…' : 'Save Outlet' }}
+      </app-button>
+    </div>
+  </form>
+</section>

@@ -33,4 +33,11 @@ describe('adminRoutes', () => {
     expect(queue?.data?.['requiredPermission']).toBe('platform.billing.view');
     expect(detail?.data?.['requiredPermission']).toBe('platform.billing.view');
   });
+
+  it('registers selected-tenant configure routes under tenants/:tenantId/configure', () => {
+    const configure = pageRoutes.find((route) => route.path === 'tenants/:tenantId/configure');
+    expect(configure).toBeTruthy();
+    expect(configure?.data?.['requiredPermission']).toBe('platform.tenants.bootstrap.access');
+    expect(configure?.loadChildren).toBeTruthy();
+  });
 });

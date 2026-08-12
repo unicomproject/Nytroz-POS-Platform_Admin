@@ -1,0 +1,83 @@
+<section class="st-form-page">
+  <app-page-header
+    title="Configure Initial Online Store"
+    description="Minimum assisted store readiness only. Full storefront, Click & Collect, and channel merchandising stay with Tenant Admin."
+    [breadcrumbs]="breadcrumbItems()"
+  />
+
+  <app-selected-tenant-context-band
+    [tenantId]="tenantId()"
+    [tenantName]="band().tenantName"
+    [tenantCode]="band().tenantCode"
+    [lifecycleStatus]="band().lifecycleStatus"
+    [planName]="band().planName"
+    [showSwitch]="false"
+  />
+
+  @if (successMessage()) {
+    <div class="alert alert-success" role="status">{{ successMessage() }}</div>
+  }
+  @if (errorMessage()) {
+    <div class="alert alert-danger" role="alert">{{ errorMessage() }}</div>
+  }
+  @if (showClickCollectNotice()) {
+    <div class="alert alert-warning" role="status">
+      Click &amp; Collect is entitled but collection points are not configured yet. That remains a Tenant Admin task.
+      Online Store readiness can still be saved.
+    </div>
+  }
+
+  @if (isLoading()) {
+    <p class="muted">Loading online store bootstrap…</p>
+  } @else if (notEntitled()) {
+    <div class="state-panel">
+      <h2>Online Store not entitled</h2>
+      <p>Plan feature <code>online_store</code> is off for this tenant. No Super Admin bootstrap is required.</p>
+      <a class="btn-link" [routerLink]="['/admin/tenants', tenantId(), 'configure']">Back to Setup Hub</a>
+    </div>
+  } @else {
+    <form class="form-card" (ngSubmit)="submit()">
+      <app-form-field id="store-status" label="Store status" [required]="true" [error]="statusError()">
+        <select
+          id="store-status"
+          [ngModel]="storeStatus()"
+          (ngModelChange)="storeStatus.set($event)"
+          name="storeStatus"
+        >
+          <option value="DRAFT">DRAFT</option>
+          <option value="ACTIVE">ACTIVE</option>
+        </select>
+        <p class="hint">Locked vocabulary: DRAFT (initial) · ACTIVE (approved readiness).</p>
+      </app-form-field>
+
+      <app-form-field id="tax-display" label="Tax display mode">
+        <select
+          id="tax-display"
+          [ngModel]="taxDisplayMode()"
+          (ngModelChange)="taxDisplayMode.set($event)"
+          name="taxDisplayMode"
+        >
+          <option value="MATCH_TENANT">MATCH_TENANT</option>
+        </select>
+        <p class="hint">Optional bootstrap field · online_store.defaults.taxDisplayMode</p>
+      </app-form-field>
+
+      <div class="deferred">
+        <strong>Deferred to Tenant Admin</strong>
+        <ul>
+          <li>Branding, banners, SEO, theme</li>
+          <li>Product-by-product online channel visibility</li>
+          <li>Click &amp; Collect / collection outlets (FMO)</li>
+          <li>Business hours, policies, order operations</li>
+        </ul>
+      </div>
+
+      <div class="form-footer">
+        <a class="btn-link" [routerLink]="['/admin/tenants', tenantId(), 'configure']">Cancel</a>
+        <app-button type="submit" variant="primary" [disabled]="submitting()">
+          {{ submitting() ? 'Saving…' : 'Save Online Store' }}
+        </app-button>
+      </div>
+    </form>
+  }
+</section>

@@ -2,12 +2,13 @@ import { DatePipe } from '@angular/common';
 import { Component, computed, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { switchMap } from 'rxjs';
 
 import { platformPermissions } from '../../../../core/config/permission-keys';
 import { AccessControlService } from '../../../../core/services/access-control.service';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
+import { TenantContextService } from '../../../../core/services/tenant-context.service';
 import { TenantLifecycleStatuses } from '../../constants/tenant-lifecycle-status.constants';
 import {
   PlatformTenantEntitlementCatalogFeature,
@@ -99,6 +100,11 @@ import { StatusBadge } from '../../../../shared/ui/status-badge/status-badge';
             @if (!editMode() && showSuspend(data)) {
               <app-button variant="destructive" [disabled]="isActionPending()" (click)="confirmSuspend()">
                 Suspend Tenant
+              </app-button>
+            }
+            @if (!editMode() && canConfigureTenant()) {
+              <app-button variant="primary" [disabled]="isActionPending()" (click)="configureTenant(data)">
+                Configure Tenant
               </app-button>
             }
           </div>
@@ -950,7 +956,9 @@ export class PlatformTenantDetailPage {
   private readonly api = inject(PlatformTenantApiService);
   private readonly apiError = inject(ApiErrorService);
   private readonly accessControl = inject(AccessControlService);
+  private readonly tenantContext = inject(TenantContextService);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly tenant = signal<PlatformTenantDetail | null>(null);
@@ -1288,6 +1296,24 @@ export class PlatformTenantDetailPage {
 
   canUpdate(): boolean {
     return this.accessControl.hasPermission(platformPermissions.tenantsUpdate);
+  }
+
+  canConfigureTenant(): boolean {
+    return (
+      this.accessControl.hasPermission(platformPermissions.tenantsView) &&
+      this.accessControl.hasPermission(platformPermissions.tenantsBootstrapAccess)
+    );
+  }
+
+  configureTenant(tenant: PlatformTenantDetail): void {
+    this.tenantContext.setSelectedTenant({
+      tenantId: tenant.id,
+      tenantName: tenant.name,
+      tenantCode: tenant.code,
+      status: tenant.lifecycleStatus || tenant.status,
+      planName: tenant.subscription?.planName
+    });
+    void this.router.navigate(['/admin/tenants', tenant.id, 'configure']);
   }
 
   switchTab(tab: 'details' | 'audit'): void {

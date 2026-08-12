@@ -42,6 +42,23 @@ export const apiEndpoints = {
     settings: '/platform-admin/settings',
     returnPolicyTemplates: '/platform/return-policy-templates',
     returnPolicyTemplate: (templateId: string) => `/platform/return-policy-templates/${templateId}`,
+    bootstrap: {
+      summary: (tenantId: string) => `/platform-admin/tenants/${tenantId}/bootstrap/summary`,
+      outlets: (tenantId: string) => `/platform-admin/tenants/${tenantId}/bootstrap/outlets`,
+      tills: (tenantId: string) => `/platform-admin/tenants/${tenantId}/bootstrap/tills`,
+      roles: (tenantId: string) => `/platform-admin/tenants/${tenantId}/bootstrap/roles`,
+      users: (tenantId: string) => `/platform-admin/tenants/${tenantId}/bootstrap/users`,
+      products: (tenantId: string) => `/platform-admin/tenants/${tenantId}/bootstrap/products`,
+      importTemplate: (tenantId: string) =>
+        `/platform-admin/tenants/${tenantId}/bootstrap/products/import/template`,
+      importValidate: (tenantId: string) =>
+        `/platform-admin/tenants/${tenantId}/bootstrap/products/import/validate`,
+      importCommit: (tenantId: string, importId: string) =>
+        `/platform-admin/tenants/${tenantId}/bootstrap/products/import/${importId}/commit`,
+      importErrors: (tenantId: string, importId: string) =>
+        `/platform-admin/tenants/${tenantId}/bootstrap/products/import/${importId}/errors.csv`,
+      onlineStore: (tenantId: string) => `/platform-admin/tenants/${tenantId}/bootstrap/online-store`
+    }
   },
   tenant: {
     users: '/users',

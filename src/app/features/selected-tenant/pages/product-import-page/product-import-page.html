@@ -1,0 +1,92 @@
+<section class="st-form-page">
+  <app-page-header
+    title="Import Initial Products (CSV)"
+    description="Validate, preview, and commit bootstrap product imports."
+    [breadcrumbs]="breadcrumbItems()"
+  />
+
+  <app-selected-tenant-context-band
+    [tenantId]="tenantId()"
+    [tenantName]="band().tenantName"
+    [tenantCode]="band().tenantCode"
+    [lifecycleStatus]="band().lifecycleStatus"
+    [planName]="band().planName"
+    [showSwitch]="false"
+  />
+
+  @if (errorMessage()) {
+    <div class="alert alert-danger" role="alert">{{ errorMessage() }}</div>
+  }
+
+  @if (step() === 'upload') {
+    <div class="form-card">
+      <label class="file-field">
+        <span>CSV File *</span>
+        <input type="file" accept=".csv,text/csv" (change)="onFileSelected($event)" />
+      </label>
+      <button type="button" class="link-btn" (click)="downloadTemplate()">Download template</button>
+      <p class="hint">Client soft limits: 5MB / 2000 rows.</p>
+      <app-button variant="primary" [disabled]="busy()" (click)="validate()">
+        {{ busy() ? 'Validating…' : 'Validate & Preview' }}
+      </app-button>
+    </div>
+  }
+
+  @if (step() === 'preview' && preview(); as data) {
+    <div class="form-card">
+      <p>
+        <strong>{{ data.validRows }}</strong> rows valid ·
+        <strong>{{ data.invalidRows }}</strong> rows with errors ·
+        Total {{ data.totalRows }}
+      </p>
+      @if (data.previewInvalidRows.length) {
+        <table class="data">
+          <thead>
+            <tr>
+              <th>Row</th>
+              <th>Error</th>
+              <th>Detail</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of data.previewInvalidRows; track row.rowNumber + row.errorCode) {
+              <tr class="error-row">
+                <td>{{ row.rowNumber }}</td>
+                <td>{{ row.errorCode }}</td>
+                <td>{{ row.errorDetail }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+      <div class="actions">
+        <app-button variant="primary" [disabled]="busy() || data.validRows < 1" (click)="commit()">
+          {{ busy() ? 'Importing…' : 'Import ' + data.validRows + ' valid rows' }}
+        </app-button>
+        <app-button variant="secondary" [disabled]="busy()" (click)="resetUpload()">
+          Upload different file
+        </app-button>
+        @if (data.invalidRows > 0) {
+          <app-button variant="secondary" [disabled]="busy()" (click)="downloadErrors()">
+            Download errors.csv
+          </app-button>
+        }
+      </div>
+    </div>
+  }
+
+  @if (step() === 'result' && commitResult(); as result) {
+    <div class="form-card">
+      <div class="alert alert-success" role="status">
+        {{ result.committedRows }} products imported successfully.
+        {{ result.skippedRows }} rows skipped due to validation errors.
+      </div>
+      <div class="actions">
+        <a class="btn-link" [routerLink]="['/admin/tenants', tenantId(), 'configure']">Back to Setup Hub</a>
+        @if (result.skippedRows > 0) {
+          <app-button variant="secondary" (click)="downloadErrors()">Download errors.csv</app-button>
+        }
+      </div>
+    </div>
+  }
+</section>

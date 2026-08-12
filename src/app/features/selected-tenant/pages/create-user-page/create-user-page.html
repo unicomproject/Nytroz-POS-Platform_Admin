@@ -1,0 +1,93 @@
+<section class="st-form-page">
+  <app-page-header
+    title="Add Additional Tenant User"
+    description="First Tenant Admin was created in the tenant wizard — use this for additional staff only."
+    [breadcrumbs]="breadcrumbItems()"
+  />
+
+  <app-selected-tenant-context-band
+    [tenantId]="tenantId()"
+    [tenantName]="band().tenantName"
+    [tenantCode]="band().tenantCode"
+    [lifecycleStatus]="band().lifecycleStatus"
+    [planName]="band().planName"
+    [showSwitch]="false"
+  />
+
+  @if (gapNotice()) {
+    <div class="alert alert-warning" role="status">{{ gapNotice() }}</div>
+  }
+  @if (errorMessage()) {
+    <div class="alert alert-danger" role="alert">{{ errorMessage() }}</div>
+  }
+
+  <form class="form-card" (ngSubmit)="submit()">
+    <app-form-field id="display-name" label="Full Name" [required]="true">
+      <input
+        id="display-name"
+        type="text"
+        [ngModel]="displayName()"
+        (ngModelChange)="displayName.set($event)"
+        name="displayName"
+      />
+    </app-form-field>
+
+    <div class="field-row">
+      <app-form-field id="email" label="Email" [required]="true">
+        <input id="email" type="email" [ngModel]="email()" (ngModelChange)="email.set($event)" name="email" />
+      </app-form-field>
+      <app-form-field id="phone" label="Phone">
+        <input id="phone" type="tel" [ngModel]="phone()" (ngModelChange)="phone.set($event)" name="phone" />
+      </app-form-field>
+    </div>
+
+    <app-form-field id="role" label="Role" [required]="true">
+      @if (knownRoles().length) {
+        <select id="role" [ngModel]="roleId()" (ngModelChange)="roleId.set($event)" name="roleId">
+          @for (role of knownRoles(); track role.roleId) {
+            <option [value]="role.roleId">{{ role.roleName }}</option>
+          }
+        </select>
+      } @else {
+        <input
+          id="role"
+          type="text"
+          [ngModel]="roleId()"
+          (ngModelChange)="roleId.set($event)"
+          name="roleId"
+          placeholder="Role ID (GUID)"
+        />
+      }
+    </app-form-field>
+
+    <fieldset class="outlet-set">
+      <legend>Outlet Access</legend>
+      <p class="hint">Optional outlet scope for this user</p>
+      @if (knownOutlets().length) {
+        <ul>
+          @for (outlet of knownOutlets(); track outlet.outletId) {
+            <li>
+              <label>
+                <input
+                  type="checkbox"
+                  [checked]="selectedOutletIds().includes(outlet.outletId)"
+                  (change)="toggleOutlet(outlet.outletId, $any($event.target).checked)"
+                />
+                {{ outlet.outletName }}
+              </label>
+            </li>
+          }
+        </ul>
+      } @else {
+        <p class="hint">No session outlets available. Create an outlet in this session to assign outlet access.</p>
+      }
+    </fieldset>
+
+    <div class="form-footer">
+      <a class="btn-link" [routerLink]="['/admin/tenants', tenantId(), 'configure']">Cancel</a>
+      <app-button type="submit" variant="primary" [disabled]="submitting()">
+        {{ submitting() ? 'Saving…' : 'Save & Send Invite' }}
+      </app-button>
+    </div>
+  </form>
+</section>
