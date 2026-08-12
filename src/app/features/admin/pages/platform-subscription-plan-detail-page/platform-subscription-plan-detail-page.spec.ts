@@ -1,11 +1,13 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute, convertToParamMap, Router, provideRouter } from '@angular/router';
+import { By } from '@angular/platform-browser';
+import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { Observable, of, Subject, throwError } from 'rxjs';
 
 import { platformPermissions } from '../../../../core/config/permission-keys';
 import { AccessControlService } from '../../../../core/services/access-control.service';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
+import { ConfirmationDialog } from '../../../../shared/components/confirmation-dialog/confirmation-dialog';
 import { SubscriptionPlanDetail } from '../../models/platform-subscription-plan.model';
 import { PlatformSubscriptionPlanApiService } from '../../services/platform-subscription-plan-api.service';
 import { PlatformSubscriptionPlanDetailPage } from './platform-subscription-plan-detail-page';
@@ -40,7 +42,10 @@ describe('PlatformSubscriptionPlanDetailPage', () => {
         { provide: ActivatedRoute, useValue: { paramMap: of(paramMap), snapshot: { paramMap } } },
         { provide: PlatformSubscriptionPlanApiService, useValue: api },
         { provide: ApiErrorService, useValue: { toSafeMessage: () => 'Plan failed safely' } },
-        { provide: AccessControlService, useValue: { hasPermission: (permission: string) => permissions.has(permission) } }
+        {
+          provide: AccessControlService,
+          useValue: { hasPermission: (permission: string) => permissions.has(permission) }
+        }
       ]
     }).compileComponents();
 
@@ -63,12 +68,9 @@ describe('PlatformSubscriptionPlanDetailPage', () => {
       reactivateSubscriptionPlan: vi.fn().mockReturnValue(of({ id: PLAN_ID })),
       deleteDraftSubscriptionPlan: vi.fn().mockReturnValue(of(true))
     };
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
   });
 
-  afterEach(() => vi.restoreAllMocks());
-
-  it('loads the detail route by ID and renders summary, pricing, limits and features', async () => {
+  it('loads the detail route by ID and renders commercial terms and Active tenants', async () => {
     const fixture = await createComponent();
     const text = fixture.nativeElement.textContent ?? '';
 
@@ -76,36 +78,104 @@ describe('PlatformSubscriptionPlanDetailPage', () => {
     expect(text).toContain('Professional Plan');
     expect(text).toContain('PRO');
     expect(text).toContain('LKR');
+    expect(text).toContain('Active tenants');
+    expect(text).toContain('Trial and past-due are not included');
     expect(text).toContain('Maximum outlets');
     expect(text).toContain('Core POS');
     expect(text).toContain('Sales');
+    expect(text).not.toMatch(/invoice|payment recovery|override for tenant|billing ops/i);
   });
 
-  it('shows the loading state while the request is pending', async () => {
+  it('shows loading skeleton while the request is pending', async () => {
     const fixture = await createComponent(PLAN_ID, new Subject<SubscriptionPlanDetail>());
-    expect(fixture.nativeElement.querySelector('.detail-skeleton')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('app-loading-skeleton')).toBeTruthy();
+  });
+
+  it('shows Draft label and draft actions', async () => {
+    const fixture = await createComponent();
+    const text = fixture.nativeElement.textContent ?? '';
+    const buttons = buttonLabels(fixture);
+
+    expect(text).toContain('Draft');
+    expect(buttons).toContain('Publish');
+    expect(buttons).toContain('Edit Plan');
+    expect(buttons).toContain('Duplicate');
+    expect(buttons).toContain('Delete draft');
+    expect(buttons).not.toContain('Retire');
+    expect(buttons).not.toContain('Reactivate');
+  });
+
+  it('shows Active label with Duplicate and Retire actions', async () => {
+    const fixture = await createComponent(
+      PLAN_ID,
+      of(planFixture({ status: 'active', canEdit: false, canDelete: false, canArchive: true }))
+    );
+    const text = fixture.nativeElement.textContent ?? '';
+    const buttons = buttonLabels(fixture);
+
+    expect(text).toContain('Active');
+    expect(text).not.toContain('Published');
+    expect(buttons).toContain('Duplicate');
+    expect(buttons).toContain('Retire');
+    expect(buttons).not.toContain('Archive');
+    expect(buttons).not.toContain('Publish');
+    expect(buttons).not.toContain('Delete draft');
+  });
+
+  it('shows Retired label with Reactivate and Duplicate', async () => {
+    const fixture = await createComponent(
+      PLAN_ID,
+      of(
+        planFixture({
+          status: 'retired',
+          canEdit: false,
+          canDelete: false,
+          canArchive: false,
+          canReactivate: true
+        })
+      )
+    );
+    const text = fixture.nativeElement.textContent ?? '';
+    const buttons = buttonLabels(fixture);
+
+    expect(text).toContain('Retired');
+    expect(text).not.toContain('Archived');
+    expect(buttons).toContain('Reactivate');
+    expect(buttons).toContain('Duplicate');
+    expect(buttons).not.toContain('Retire');
+  });
+
+  it('shows trial only when trialDays > 0', async () => {
+    let fixture = await createComponent(PLAN_ID, of(planFixture({ trialDays: 14 })));
+    expect(fixture.nativeElement.textContent).toContain('14-day trial');
+
+    TestBed.resetTestingModule();
+    fixture = await createComponent(PLAN_ID, of(planFixture({ trialDays: 0 })));
+    expect(fixture.nativeElement.textContent).not.toContain('-day trial');
   });
 
   it.each([
-    [404, 'Subscription Plan Not Found'],
+    [404, 'Subscription plan not found'],
     [403, 'Permission denied'],
-    [500, 'Subscription plan could not be loaded']
+    [500, 'Unable to load this subscription plan']
   ])('shows the explicit %i response state', async (status, expected) => {
     const fixture = await createComponent(
       PLAN_ID,
       throwError(() => new HttpErrorResponse({ status }))
     );
     expect(fixture.nativeElement.textContent).toContain(expected);
-    if (status === 500) expect(fixture.nativeElement.textContent).toContain('Try again');
+    if (status === 500) {
+      expect(fixture.nativeElement.textContent).toContain('Try again');
+    }
   });
 
   it('rejects an invalid plan ID without calling the backend', async () => {
     const fixture = await createComponent('not-a-uuid');
     expect(api.getSubscriptionPlanDetail).not.toHaveBeenCalled();
-    expect(fixture.nativeElement.textContent).toContain('Subscription Plan Not Found');
+    expect(fixture.nativeElement.textContent).toContain('Subscription plan not found');
   });
 
-  it('navigates Edit to the existing wizard with edit state', async () => {
+  it('navigates Edit Plan to the wizard with edit state', async () => {
     const fixture = await createComponent();
     const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
@@ -116,57 +186,99 @@ describe('PlatformSubscriptionPlanDetailPage', () => {
     });
   });
 
-  it('hides actions when the matching permission is absent', async () => {
-    permissions = new Set([platformPermissions.subscriptionPlansView]);
-    const fixture = await createComponent();
-    const text = fixture.nativeElement.textContent ?? '';
-
-    expect(text).not.toContain('Edit');
-    expect(text).not.toContain('Publish');
-    expect(text).not.toContain('Duplicate');
-    expect(text).not.toContain('Delete draft');
-  });
-
-  it('shows only lifecycle actions valid for the current status', async () => {
-    const fixture = await createComponent(PLAN_ID, of(planFixture({ status: 'active', canEdit: false, canDelete: false, canArchive: true })));
-    const text = fixture.nativeElement.textContent ?? '';
-    const buttonLabels = [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')]
-      .map((button) => button.textContent?.trim());
-
-    expect(text).toContain('Archive');
-    expect(buttonLabels).not.toContain('Publish');
-    expect(buttonLabels).not.toContain('Delete draft');
-  });
-
-  it('publishes after confirmation and refreshes detail from the backend', async () => {
+  it('opens ConfirmationDialog and confirms Publish once', async () => {
     api.getSubscriptionPlanDetail
       .mockReturnValueOnce(of(planFixture()))
       .mockReturnValueOnce(of(planFixture({ status: 'active', canEdit: false, canArchive: true })));
     const fixture = await createComponent();
 
-    fixture.componentInstance.publish(planFixture());
+    fixture.componentInstance.requestPublish(planFixture());
+    fixture.detectChanges();
 
+    expect(api.publishSubscriptionPlan).not.toHaveBeenCalled();
+    expect(fixture.debugElement.query(By.directive(ConfirmationDialog))).toBeTruthy();
+    expect(fixture.nativeElement.textContent).toContain('Publish this plan?');
+
+    fixture.componentInstance.confirmPending();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(api.publishSubscriptionPlan).toHaveBeenCalledTimes(1);
     expect(api.publishSubscriptionPlan).toHaveBeenCalledWith(PLAN_ID);
-    expect(api.getSubscriptionPlanDetail).toHaveBeenCalledTimes(2);
-    expect(fixture.componentInstance.plan()?.status).toBe('active');
   });
 
-  it('runs duplicate, archive, reactivate and delete through their real API methods', async () => {
+  it('cancel closes ConfirmationDialog without mutation', async () => {
     const fixture = await createComponent();
-    const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    fixture.componentInstance.requestRetire(
+      planFixture({ status: 'active', canEdit: false, canArchive: true })
+    );
+    fixture.detectChanges();
 
-    fixture.componentInstance.duplicate(planFixture());
-    fixture.componentInstance.archive(planFixture({ status: 'active', canEdit: false, canArchive: true }));
-    fixture.componentInstance.reactivate(planFixture({ status: 'retired', canEdit: false, canReactivate: true }));
-    fixture.componentInstance.deleteDraft(planFixture());
+    fixture.componentInstance.cancelConfirm();
+    fixture.detectChanges();
 
-    expect(api.duplicateSubscriptionPlan).toHaveBeenCalledWith(PLAN_ID);
-    expect(api.archiveSubscriptionPlan).toHaveBeenCalledWith(PLAN_ID);
-    expect(api.reactivateSubscriptionPlan).toHaveBeenCalledWith(PLAN_ID);
-    expect(api.deleteDraftSubscriptionPlan).toHaveBeenCalledWith(PLAN_ID);
-    expect(navigate).toHaveBeenCalledWith(['/admin/subscriptions']);
+    expect(api.archiveSubscriptionPlan).not.toHaveBeenCalled();
+    expect(fixture.componentInstance.confirmOpen()).toBe(false);
+  });
+
+  it('Retire confirmation calls archive API once with safe copy', async () => {
+    const fixture = await createComponent(
+      PLAN_ID,
+      of(planFixture({ status: 'active', canEdit: false, canDelete: false, canArchive: true }))
+    );
+
+    fixture.componentInstance.requestRetire(
+      planFixture({ status: 'active', canEdit: false, canArchive: true })
+    );
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('no longer be available for new assignments');
+    expect(fixture.nativeElement.textContent).toContain('does not delete existing tenant relationships');
+
+    fixture.componentInstance.confirmPending();
+    expect(api.archiveSubscriptionPlan).toHaveBeenCalledTimes(1);
+  });
+
+  it('guards double-submit while an action is pending', async () => {
+    const pending = new Subject<unknown>();
+    api.publishSubscriptionPlan.mockReturnValue(pending.asObservable());
+    const fixture = await createComponent();
+
+    fixture.componentInstance.requestPublish(planFixture());
+    fixture.componentInstance.confirmPending();
+    fixture.componentInstance.confirmPending();
+
+    expect(api.publishSubscriptionPlan).toHaveBeenCalledTimes(1);
+    pending.complete();
+  });
+
+  it('hides actions when matching permissions are absent', async () => {
+    permissions = new Set([platformPermissions.subscriptionPlansView]);
+    const fixture = await createComponent();
+    const text = fixture.nativeElement.textContent ?? '';
+
+    expect(text).not.toContain('Edit Plan');
+    expect(text).not.toContain('Publish');
+    expect(text).not.toContain('Duplicate');
+    expect(text).not.toContain('Delete draft');
+  });
+
+  it('does not use window.confirm', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm');
+    const fixture = await createComponent();
+
+    fixture.componentInstance.requestPublish(planFixture());
+    fixture.componentInstance.confirmPending();
+
+    expect(confirmSpy).not.toHaveBeenCalled();
   });
 });
+
+function buttonLabels(fixture: ComponentFixture<PlatformSubscriptionPlanDetailPage>): string[] {
+  return [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')]
+    .map((button) => button.textContent?.trim() ?? '')
+    .filter(Boolean);
+}
 
 function planFixture(overrides: Partial<SubscriptionPlanDetail> = {}): SubscriptionPlanDetail {
   return {
@@ -192,11 +304,25 @@ function planFixture(overrides: Partial<SubscriptionPlanDetail> = {}): Subscript
     canReactivate: false,
     createdAt: '2026-07-01T00:00:00Z',
     updatedAt: '2026-07-12T00:00:00Z',
-    limits: [{ id: 'limit-1', code: 'MAX_OUTLETS', name: 'Maximum outlets', value: 5, isUnlimited: false, unitCode: null }],
-    modules: [{
-      id: 'module-1', code: 'CORE_POS', name: 'Core POS', description: 'Core selling tools.',
-      features: [{ id: 'feature-1', code: 'SALES', name: 'Sales', description: 'Run sales.' }]
-    }],
+    limits: [
+      {
+        id: 'limit-1',
+        code: 'MAX_OUTLETS',
+        name: 'Maximum outlets',
+        value: 5,
+        isUnlimited: false,
+        unitCode: null
+      }
+    ],
+    modules: [
+      {
+        id: 'module-1',
+        code: 'CORE_POS',
+        name: 'Core POS',
+        description: 'Core selling tools.',
+        features: [{ id: 'feature-1', code: 'SALES', name: 'Sales', description: 'Run sales.' }]
+      }
+    ],
     ...overrides
   };
 }

@@ -380,6 +380,8 @@ export function mapSubscriptionPlanListQueryParams(query: SubscriptionPlanListQu
       params['billingCycle'] = 'monthly';
     } else if (normalized === 'yearly' || normalized === 'annual') {
       params['billingCycle'] = 'yearly';
+    } else if (normalized === 'one_time' || normalized === 'onetime' || normalized === 'one-time') {
+      params['billingCycle'] = 'one_time';
     }
     // both / all / blank / demo / trial / paid → omit parameter
   }
