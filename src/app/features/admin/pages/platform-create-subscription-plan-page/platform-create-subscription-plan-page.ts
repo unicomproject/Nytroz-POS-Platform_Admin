@@ -1,626 +1,56 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
-import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 
 import { ApiErrorService } from '../../../../core/services/api-error.service';
+import { ConfirmationDialog } from '../../../../shared/components/confirmation-dialog/confirmation-dialog';
+import { EmptyState } from '../../../../shared/components/empty-state/empty-state';
+import { ErrorState } from '../../../../shared/components/error-state/error-state';
+import { LoadingSkeleton } from '../../../../shared/components/loading-skeleton/loading-skeleton';
+import { BreadcrumbItem, PageHeader } from '../../../../shared/components/page-header/page-header';
+import { Button } from '../../../../shared/ui/button/button';
+import { FormField } from '../../../../shared/ui/form-field/form-field';
+import { StatusBadge } from '../../../../shared/ui/status-badge/status-badge';
 import {
   ModuleAvailability,
   PlatformFeatureOption,
   PlatformModuleOption,
   SubscriptionDbBillingCycle,
+  SubscriptionPlanDetail,
   SubscriptionPlanDraft,
   SubscriptionPlanLimitsMutationResponse
 } from '../../models/platform-subscription-plan.model';
+import { subscriptionPlanStatusLabel } from '../../models/subscription-plan-status.util';
 import { PlatformSubscriptionPlanApiService } from '../../services/platform-subscription-plan-api.service';
+import {
+  CreateSubscriptionPlanWizardNav,
+  SubscriptionPlanStepVisualState
+} from './create-subscription-plan-wizard-nav';
 
 type WizardStep = 'basics' | 'modules' | 'features' | 'pricing' | 'limits' | 'review';
+
+type PendingEditSelection = {
+  moduleKeys: string[];
+  featureKeys: string[];
+};
 
 @Component({
   selector: 'app-platform-create-subscription-plan-page',
   standalone: true,
-  imports: [FormsModule, ReactiveFormsModule],
-  template: `
-    <section class="wizard-page">
-      @if (successMessage()) {
-        <div class="toast success" role="status">{{ successMessage() }}</div>
-      }
-      @if (errorMessage()) {
-        <div class="toast error" role="alert">{{ errorMessage() }}</div>
-      }
-
-      <header class="page-heading">
-        <h1>Create Subscription Plan</h1>
-        <p>Build a subscription package for your tenants.</p>
-      </header>
-
-      <ol class="stepper" aria-label="Create plan steps">
-        @for (step of steps; track step.key; let index = $index) {
-          <li
-            [class.active]="currentStep() === step.key"
-            [class.done]="isStepComplete(step.key, index)"
-          >
-            <span class="step-num">
-              @if (isStepComplete(step.key, index) && currentStep() !== step.key) {
-                <svg class="step-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12l4 4 8-8" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              } @else {
-                {{ index + 1 }}
-              }
-            </span>
-            <span class="step-label">{{ step.label }}</span>
-          </li>
-        }
-      </ol>
-
-      <div class="wizard-layout">
-        <div class="wizard-main">
-          <section class="step-card card">
-            @switch (currentStep()) {
-              @case ('basics') {
-                <header class="step-header with-icon">
-                  <span class="step-icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" fill="none">
-                      <path d="M8 4h8a2 2 0 0 1 2 2v14H6V6a2 2 0 0 1 2-2z" stroke="currentColor" stroke-width="1.6" />
-                      <path d="M9 9h6M9 13h6M9 17h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
-                    </svg>
-                  </span>
-                  <div>
-                    <h2>Plan Basics</h2>
-                    <p>Define the basic information about this plan.</p>
-                  </div>
-                </header>
-                <form class="step-form basics-form" [formGroup]="basicsForm">
-                  <label>
-                    <span>Plan Name <em>*</em></span>
-                    <div class="field-shell">
-                      <span class="field-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24"><path d="M8 4h8v16H8zM10 8h4M10 12h4M10 16h3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
-                      </span>
-                      <input formControlName="planName" placeholder="Enter plan name" />
-                    </div>
-                    @if (basicsForm.controls.planName.touched && basicsForm.controls.planName.invalid) {
-                      <small class="error">Plan name is required.</small>
-                    } @else {
-                      <small>This name will be visible to tenants.</small>
-                    }
-                  </label>
-
-                  <label>
-                    <span>Plan Code <em>*</em></span>
-                    <div class="field-shell">
-                      <span class="field-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24"><path d="M8 8l-2 2 2 2M16 8l2 2-2 2M14 6l-4 12" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
-                      </span>
-                      <input formControlName="planCode" placeholder="Enter plan code" (input)="onPlanCodeInput($event)" />
-                    </div>
-                    @if (basicsForm.controls.planCode.touched && basicsForm.controls.planCode.invalid) {
-                      <small class="error">Plan code is required.</small>
-                    } @else {
-                      <small>Unique code for internal reference. Cannot be changed after publish.</small>
-                    }
-                  </label>
-
-                  <label class="full">
-                    <span>Description</span>
-                    <div class="field-shell textarea-shell">
-                      <span class="field-icon top" aria-hidden="true">
-                        <svg viewBox="0 0 24 24"><path d="M4 20h16M7 16l9-9 3 3-9 9H7z" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
-                      </span>
-                      <textarea formControlName="description" rows="4" maxlength="500" placeholder="Enter description about this plan"></textarea>
-                    </div>
-                    <div class="field-meta">
-                      @if (basicsForm.controls.description.touched && basicsForm.controls.description.invalid) {
-                        <small class="error">Description cannot exceed 500 characters.</small>
-                      } @else {
-                        <small>Short description about this plan.</small>
-                      }
-                      <small class="char-count">{{ basicsForm.controls.description.value.length }}/500</small>
-                    </div>
-                  </label>
-
-                  <div class="row-three">
-                    <label>
-                      <span>Billing Cycle <em>*</em></span>
-                      <div class="field-shell">
-                        <span class="field-icon" aria-hidden="true">
-                          <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M8 3v4M16 3v4M4 10h16" stroke="currentColor" stroke-width="1.5"/></svg>
-                        </span>
-                        <select formControlName="billingCycle">
-                          <option value="">Select billing cycle</option>
-                          @for (option of billingCycleOptions; track option.value) {
-                            <option [value]="option.value">{{ option.label }}</option>
-                          }
-                        </select>
-                      </div>
-                      @if (basicsForm.controls.billingCycle.touched && basicsForm.controls.billingCycle.invalid) {
-                        <small class="error">Billing cycle is required.</small>
-                      } @else {
-                        <small>Choose how this plan will be billed.</small>
-                      }
-                    </label>
-
-                    <label>
-                      <span>Currency <em>*</em></span>
-                      <div class="field-shell">
-                        <span class="field-icon" aria-hidden="true">
-                          <svg viewBox="0 0 24 24"><path d="M12 3v18M8 7h6a3 3 0 0 1 0 6H8M8 13h7a3 3 0 0 1 0 6H8" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
-                        </span>
-                        <select formControlName="baseCurrency">
-                          <option value="">Select currency</option>
-                          <option value="LKR">LKR - Sri Lankan Rupee</option>
-                          <option value="USD">USD - US Dollar</option>
-                          <option value="GBP">GBP - British Pound</option>
-                          <option value="EUR">EUR - Euro</option>
-                        </select>
-                      </div>
-                      @if (basicsForm.controls.baseCurrency.touched && basicsForm.controls.baseCurrency.invalid) {
-                        <small class="error">Currency is required.</small>
-                      } @else {
-                        <small>Default currency for pricing.</small>
-                      }
-                    </label>
-
-                    <label>
-                      <span>Status</span>
-                      <div class="field-shell readonly status-field">
-                        <span class="status-dot draft" aria-hidden="true"></span>
-                        <span class="status-value">Draft</span>
-                      </div>
-                      <small>Plan is in draft until you publish it.</small>
-                    </label>
-                  </div>
-
-                  <div class="alert draft full">
-                    <span class="alert-icon" aria-hidden="true">
-                      <svg viewBox="0 0 24 24"><path d="M8 4h8v16H8zM10 8h4M10 12h4" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
-                    </span>
-                    <div>
-                      <strong>Plan Status: Draft</strong>
-                      <span>Plan is in draft until you publish it. Only active plans can be assigned to tenants.</span>
-                    </div>
-                  </div>
-                </form>
-              }
-              @case ('modules') {
-                <header class="step-header"><h2>Modules</h2><p>Select commercial subscription modules for this plan.</p></header>
-                @if (modulesLoading()) {
-                  <p class="muted">Loading subscription modules...</p>
-                } @else if (catalogError()) {
-                  <div class="empty-step"><strong>Module catalog could not be loaded</strong><span>{{ catalogError() }}</span></div>
-                } @else if (!modules().length) {
-                  <div class="empty-step"><strong>No subscription modules found</strong><span>The backend subscription catalog did not return TM-EPOS MVP modules.</span></div>
-                } @else {
-                  <div class="module-grid">
-                    @for (module of modules(); track module.id) {
-                      <article class="module-card" [class.selected]="moduleAvailability()[module.id] === 'included'" [class.locked]="module.isLocked">
-                        <div class="module-head">
-                          <strong>{{ module.name }}</strong>
-                          <p>{{ module.description || 'No description provided.' }}</p>
-                          @if (module.isLocked) {
-                            <small>Included by default</small>
-                          }
-                        </div>
-                        <select [ngModel]="moduleAvailability()[module.id]" [disabled]="module.isLocked" (ngModelChange)="setModuleAvailability(module.id, $event)">
-                          <option value="included">Included</option>
-                          <option value="not_available">Not Available</option>
-                        </select>
-                      </article>
-                    }
-                  </div>
-                }
-              }
-              @case ('features') {
-                <header class="step-header"><h2>Features</h2><p>Configure feature entitlements grouped by module.</p></header>
-                @if (featuresLoading()) {
-                  <p class="muted">Loading subscription features...</p>
-                } @else if (catalogError()) {
-                  <div class="empty-step"><strong>Feature catalog could not be loaded</strong><span>{{ catalogError() }}</span></div>
-                } @else if (!selectedModulesCount()) {
-                  <div class="empty-step"><strong>Select modules first</strong><span>Features are shown after at least one module is included.</span></div>
-                } @else if (!featureGroups().length) {
-                  <div class="empty-step"><strong>No features found</strong><span>The selected modules do not expose subscription feature entitlements.</span></div>
-                } @else {
-                  @for (group of featureGroups(); track group.moduleId) {
-                    <section class="feature-group">
-                      <h3>{{ group.moduleName }}</h3>
-                      <table>
-                        <thead><tr><th>Feature</th><th>Included</th><th>Not Available</th></tr></thead>
-                        <tbody>
-                          @for (feature of group.features; track feature.id) {
-                            <tr [class.disabled]="isFeatureDisabled(feature)">
-                              <td>
-                                <strong>{{ feature.name }}</strong>
-                                <span>{{ feature.description || feature.entitlementKey || feature.featureKey }}</span>
-                                @if (feature.isLocked) {
-                                  <small>Included by default</small>
-                                }
-                              </td>
-                              @for (option of availabilityOptions; track option) {
-                                <td class="radio-cell">
-                                  <input type="radio" [name]="feature.id" [value]="option" [checked]="featureAvailability()[feature.id] === option" [disabled]="isFeatureDisabled(feature)" (change)="setFeatureAvailability(feature.id, option)" />
-                                </td>
-                              }
-                            </tr>
-                          }
-                        </tbody>
-                      </table>
-                    </section>
-                  }
-                }
-              }
-              @case ('pricing') {
-                <header class="step-header with-icon pricing-step-header">
-                  <span class="step-icon pricing-icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" fill="none">
-                      <path d="M4 7h16v10H4z" stroke="currentColor" stroke-width="1.6" />
-                      <path d="M8 11h8M8 14h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
-                    </svg>
-                  </span>
-                  <div>
-                    <h2>Base Pricing</h2>
-                    <p>Define the base price for this subscription plan.</p>
-                  </div>
-                </header>
-                <form class="pricing-form" [formGroup]="pricingForm">
-                  <div class="row-three pricing-fields">
-                    <label>
-                      <span>Billing Cycle</span>
-                      <div class="field-shell readonly" aria-readonly="true">
-                        <span class="field-icon" aria-hidden="true">
-                          <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M8 3v4M16 3v4M4 10h16" stroke="currentColor" stroke-width="1.5"/></svg>
-                        </span>
-                        <span class="readonly-value">{{ billingCycleLabel() }}</span>
-                      </div>
-                      <small>Selected in Basics step.</small>
-                    </label>
-
-                    <label>
-                      <span>Currency</span>
-                      <div class="field-shell readonly" aria-readonly="true">
-                        <span class="field-icon" aria-hidden="true">
-                          <svg viewBox="0 0 24 24"><path d="M12 3v18M8 7h6a3 3 0 0 1 0 6H8M8 13h7a3 3 0 0 1 0 6H8" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
-                        </span>
-                        <span class="readonly-value">{{ currencyLabel() }}</span>
-                      </div>
-                      <small>Selected in Basics step.</small>
-                    </label>
-
-                    <label>
-                      <span>Base Price <em>*</em></span>
-                      <div class="field-shell" [class.invalid]="pricingForm.controls.basePrice.touched && pricingForm.controls.basePrice.invalid">
-                        <span class="currency-prefix">{{ currencyCode() }}</span>
-                        <input
-                          [value]="basePriceInput()"
-                          placeholder="0.00"
-                          inputmode="decimal"
-                          aria-label="Base price"
-                          (input)="onBasePriceInput($event)"
-                          (blur)="onBasePriceBlur()"
-                        />
-                      </div>
-                      @if (pricingForm.controls.basePrice.touched && pricingForm.controls.basePrice.invalid) {
-                        <small class="error">Base price is required and cannot be negative.</small>
-                      } @else {
-                        <small>This is the base subscription price for the selected billing cycle.</small>
-                      }
-                    </label>
-                  </div>
-
-                  <div class="alert info pricing-info full">
-                    <span class="alert-icon info" aria-hidden="true">
-                      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M12 10v6M12 7h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-                    </span>
-                    <span>This base price will be used for tenant subscription billing based on the selected billing cycle.</span>
-                  </div>
-                </form>
-              }
-              @case ('limits') {
-                <header class="step-header with-icon limits-step-header">
-                  <span class="step-icon limits-icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" fill="none">
-                      <path d="M12 3a9 9 0 1 0 9 9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
-                      <path d="M12 7v5l3 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-                      <circle cx="12" cy="12" r="2.5" fill="currentColor" />
-                    </svg>
-                  </span>
-                  <div>
-                    <h2>Plan Limits</h2>
-                    <p>Define usage limits for tenants on this plan.</p>
-                  </div>
-                </header>
-                <form class="limits-form" [formGroup]="limitsForm">
-                  <div class="row-three limits-fields">
-                    <label>
-                      <span>Outlet Limit <em>*</em></span>
-                      <div class="field-shell" [class.invalid]="limitsForm.controls.maxOutlets.touched && limitsForm.controls.maxOutlets.invalid">
-                        <input type="number" formControlName="maxOutlets" min="1" step="1" aria-label="Outlet limit" />
-                      </div>
-                      @if (limitsFieldError('maxOutlets'); as error) {
-                        <small class="error">{{ error }}</small>
-                      } @else {
-                        <small>Maximum outlets allowed for this plan.</small>
-                      }
-                    </label>
-
-                    <label>
-                      <span>Till Limit <em>*</em></span>
-                      <div class="field-shell" [class.invalid]="limitsForm.controls.maxTills.touched && limitsForm.controls.maxTills.invalid">
-                        <input type="number" formControlName="maxTills" min="1" step="1" aria-label="Till limit" />
-                      </div>
-                      @if (limitsFieldError('maxTills'); as error) {
-                        <small class="error">{{ error }}</small>
-                      } @else {
-                        <small>Maximum tills allowed for this plan.</small>
-                      }
-                    </label>
-
-                    <label>
-                      <span>User Limit <em>*</em></span>
-                      <div class="field-shell" [class.invalid]="limitsForm.controls.maxUsers.touched && limitsForm.controls.maxUsers.invalid">
-                        <input type="number" formControlName="maxUsers" min="1" step="1" aria-label="User limit" />
-                      </div>
-                      @if (limitsFieldError('maxUsers'); as error) {
-                        <small class="error">{{ error }}</small>
-                      } @else {
-                        <small>Maximum users allowed for this plan.</small>
-                      }
-                    </label>
-                  </div>
-
-                  <div class="alert info limits-info full">
-                    <span class="alert-icon info" aria-hidden="true">
-                      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M12 10v6M12 7h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-                    </span>
-                    <span>These limits define the default usage allowance for tenants on this plan.</span>
-                  </div>
-                </form>
-              }
-              @case ('review') {
-                <header class="step-header"><h2>Review &amp; Publish</h2><p>Review plan configuration before publishing.</p></header>
-                <dl class="review-list">
-                  <div><dt>Plan Name</dt><dd>{{ basicsForm.controls.planName.value || '—' }}</dd></div>
-                  <div><dt>Plan Code</dt><dd>{{ basicsForm.controls.planCode.value || '—' }}</dd></div>
-                  <div><dt>Billing Cycle</dt><dd>{{ billingCycleLabel() }}</dd></div>
-                  <div><dt>Currency</dt><dd>{{ basicsForm.controls.baseCurrency.value || '—' }}</dd></div>
-                  <div><dt>Base Price</dt><dd>{{ pricingForm.controls.basePrice.value ?? '—' }}</dd></div>
-                </dl>
-              }
-            }
-          </section>
-        </div>
-
-        <aside class="draft-summary card" aria-label="Draft summary">
-          <header class="summary-head">
-            <span class="summary-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24"><path d="M8 4h8v16H8zM10 8h4M10 12h4" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
-            </span>
-            <h2>Draft Summary</h2>
-          </header>
-          <dl class="summary-rows">
-            <div><dt>Plan Name</dt><dd>{{ basicsForm.controls.planName.value || '—' }}</dd></div>
-            <div><dt>Plan Code</dt><dd>{{ basicsForm.controls.planCode.value || '—' }}</dd></div>
-            <div><dt>Billing Cycle</dt><dd>{{ billingCycleLabel() }}</dd></div>
-            <div><dt>Currency</dt><dd>{{ currencyLabel() }}</dd></div>
-            @if (showBasePriceInSummary()) {
-              <div><dt>Base Price</dt><dd>{{ basePriceSummaryLabel() }}</dd></div>
-            }
-            <div><dt>Status</dt><dd><span class="status-dot draft">Draft</span></dd></div>
-          </dl>
-          <div class="summary-progress">
-            <div><span>Modules</span><strong [class]="modulesSummaryClass()">{{ modulesSummary() }}</strong></div>
-            <div><span>Features</span><strong [class]="featuresSummaryClass()">{{ featuresSummary() }}</strong></div>
-            <div><span>Pricing</span><strong [class]="pricingSummaryClass()">{{ pricingSummary() }}</strong></div>
-            <div><span>Limits</span><strong [class]="limitsSummaryClass()">{{ limitsSummary() }}</strong></div>
-          </div>
-          @if (selectedModuleNames().length) {
-            <section class="selection-summary" aria-label="Selected modules">
-              <h3>Selected Modules</h3>
-              <ul>
-                @for (moduleName of selectedModuleNames(); track moduleName) {
-                  <li>{{ moduleName }}</li>
-                }
-              </ul>
-            </section>
-          }
-          @if (selectedFeatureGroups().length) {
-            <section class="selection-summary" aria-label="Selected features">
-              <h3>Selected Features</h3>
-              @for (group of selectedFeatureGroups(); track group.moduleName) {
-                <strong>{{ group.moduleName }}</strong>
-                <ul>
-                  @for (featureName of group.featureNames; track featureName) {
-                    <li>{{ featureName }}</li>
-                  }
-                </ul>
-              }
-            </section>
-          }
-          <p class="summary-note">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M12 10v6M12 7h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-            Complete all steps to see full summary.
-          </p>
-        </aside>
-      </div>
-
-      <footer class="action-bar">
-        <button type="button" class="btn outline back-btn" (click)="goBack()">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Back
-        </button>
-        <div class="action-group">
-          <button type="button" class="btn outline save-btn" (click)="saveDraft()" [disabled]="isSaving()">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5zM8 5V3h8v2M12 11v5M9.5 13.5L12 11l2.5 2.5" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
-            {{ isSaving() ? 'Saving...' : 'Save Draft' }}
-          </button>
-          @if (currentStep() !== 'review') {
-            <button type="button" class="btn primary next-btn" (click)="nextStep()" [disabled]="isSaving()">
-              {{ isSaving() ? 'Saving...' : 'Next' }}
-              @if (!isSaving()) {
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              }
-            </button>
-          } @else {
-            <button type="button" class="btn primary publish-btn" (click)="openPublishModal()" [disabled]="isSaving()">
-              Publish Plan
-            </button>
-          }
-        </div>
-      </footer>
-
-      @if (showPublishModal()) {
-        <div class="modal-backdrop" role="presentation" (click)="closePublishModal()"></div>
-        <dialog class="modal" open aria-labelledby="publish-title">
-          <h3 id="publish-title">Publish subscription plan?</h3>
-          <p>Once published, this plan can be assigned to tenants. Some fields cannot be edited directly after publishing.</p>
-          <div class="modal-actions">
-            <button type="button" class="btn outline" (click)="closePublishModal()">Cancel</button>
-            <button type="button" class="btn primary" (click)="confirmPublish()" [disabled]="isSaving()">Publish Plan</button>
-          </div>
-        </dialog>
-      }
-    </section>
-  `,
-  styles: `
-    :host { background: #f8f9fa; color: #14213d; display: block; min-height: 100%; padding-bottom: 5.75rem; }
-    * { box-sizing: border-box; }
-    .wizard-page { display: grid; gap: 1.25rem; }
-    .toast { border-radius: 12px; box-shadow: 0 10px 24px rgba(16, 24, 40, 0.12); font-size: 0.88rem; font-weight: 600; padding: 0.85rem 1rem; position: fixed; right: 1.6rem; top: 5.5rem; z-index: 30; }
-    .toast.success { background: #ecfdf3; border: 1px solid #abefc6; color: #027a48; }
-    .toast.error { background: #fef3f2; border: 1px solid #fecdca; color: #b42318; }
-    .page-heading { display: grid; gap: 0.4rem; margin-top: 0.15rem; }
-    h1 { color: #101828; font-size: clamp(1.65rem, 2.2vw, 2.05rem); font-weight: 800; letter-spacing: -0.02em; margin: 0; }
-    .page-heading p { color: #667085; font-size: 0.92rem; margin: 0; }
-    .stepper { align-items: center; display: flex; flex-wrap: wrap; gap: 0; list-style: none; margin: 0; padding: 0; }
-    .stepper li { align-items: center; color: #667085; display: inline-flex; font-size: 0.82rem; gap: 0.5rem; position: relative; }
-    .stepper li:not(:last-child) { margin-right: 0.35rem; padding-right: 2.15rem; }
-    .stepper li:not(:last-child)::after { background: #eaecf0; content: ''; height: 1px; position: absolute; right: 0; top: 50%; transform: translateY(-50%); width: 1.65rem; }
-    .step-num { align-items: center; background: #f2f4f7; border-radius: 50%; color: #667085; display: inline-flex; flex-shrink: 0; font-size: 0.74rem; font-weight: 700; height: 1.65rem; justify-content: center; width: 1.65rem; }
-    .step-check { height: 0.85rem; width: 0.85rem; }
-    .stepper li.active .step-num, .stepper li.done .step-num { background: #0b5cff; color: #fff; }
-    .stepper li.active, .stepper li.done { color: #0b5cff; font-weight: 600; }
-    .stepper li.active { font-weight: 700; }
-    .wizard-layout { align-items: start; display: grid; gap: 1.15rem; grid-template-columns: minmax(0, 7fr) minmax(17rem, 3fr); }
-    .card { background: #fff; border: 1px solid #eaecf0; border-radius: 16px; box-shadow: 0 1px 3px rgba(16, 24, 40, 0.08), 0 1px 2px rgba(16, 24, 40, 0.04); padding: 1.35rem 1.4rem; }
-    .step-header h2 { color: #101828; font-size: 1.05rem; font-weight: 700; margin: 0; }
-    .step-header p { color: #667085; font-size: 0.84rem; margin: 0.3rem 0 0; }
-    .step-header.with-icon { align-items: flex-start; display: flex; gap: 0.85rem; margin-bottom: 1.15rem; }
-    .step-icon { align-items: center; background: #eef4ff; border-radius: 50%; color: #175cd3; display: inline-flex; flex-shrink: 0; height: 2.35rem; justify-content: center; width: 2.35rem; }
-    .step-icon svg { height: 1.1rem; width: 1.1rem; }
-    .basics-form { display: grid; gap: 1.1rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .basics-form label { display: grid; gap: 0.42rem; }
-    .basics-form .full, .basics-form .row-three { grid-column: 1 / -1; }
-    .row-three { display: grid; gap: 1.1rem; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .basics-form span { color: #344054; font-size: 0.82rem; font-weight: 600; }
-    .basics-form em { color: #d92d20; font-style: normal; }
-    .field-shell { align-items: center; background: #fff; border: 1px solid #d0d5dd; border-radius: 12px; display: flex; gap: 0.55rem; min-height: 2.85rem; padding: 0 0.85rem; transition: border-color 0.15s ease; }
-    .field-shell:focus-within { border-color: #84adff; box-shadow: 0 0 0 3px rgba(11, 92, 255, 0.12); }
-    .field-shell.readonly { background: #f9fafb; box-shadow: none; }
-    .field-shell.status-field { gap: 0.5rem; }
-    .status-value { color: #344054; font-size: 0.88rem; font-weight: 600; }
-    .field-shell textarea, .field-shell input, .field-shell select { background: transparent; border: 0; color: #101828; flex: 1; font-size: 0.88rem; min-height: 2.4rem; outline: none; width: 100%; }
-    .field-shell select { cursor: pointer; }
-    .textarea-shell { align-items: stretch; min-height: auto; padding-top: 0.7rem; }
-    .textarea-shell textarea { min-height: 6.25rem; resize: vertical; }
-    .field-icon { align-items: center; color: #98a2b3; display: inline-flex; flex: 0 0 auto; }
-    .field-icon svg { height: 1rem; width: 1rem; }
-    .field-icon.top { align-self: flex-start; margin-top: 0.2rem; }
-    .field-meta { align-items: baseline; display: flex; justify-content: space-between; gap: 0.75rem; }
-    .char-count { color: #98a2b3; flex-shrink: 0; }
-    .basics-form small { color: #667085; font-size: 0.75rem; line-height: 1.35; }
-    .basics-form small.error { color: #b42318; }
-    .status-dot.draft::before { background: #f79009; border-radius: 50%; content: ''; display: inline-block; height: 0.45rem; margin-right: 0.35rem; width: 0.45rem; vertical-align: middle; }
-    .status-field .status-dot.draft::before { margin-right: 0; }
-    .alert.draft { align-items: flex-start; background: #fff6ed; border: 1px solid #fedf89; border-radius: 12px; color: #7a2e0e; display: flex; gap: 0.75rem; padding: 0.9rem 1rem; }
-    .alert-icon { align-items: center; background: #ffead5; border-radius: 50%; color: #f79009; display: inline-flex; flex-shrink: 0; height: 2rem; justify-content: center; width: 2rem; }
-    .alert-icon svg { height: 1rem; width: 1rem; }
-    .alert.draft strong { color: #7a2e0e; display: block; font-size: 0.84rem; margin-bottom: 0.2rem; }
-    .alert.draft span { color: #93370d; display: block; font-size: 0.78rem; line-height: 1.45; }
-    .step-icon.pricing-icon { background: #eef4ff; border-radius: 10px; color: #175cd3; }
-    .pricing-step-header { margin-bottom: 1.25rem; }
-    .pricing-fields { margin-bottom: 0.25rem; }
-    .pricing-info { margin-top: 0.15rem; }
-    .step-icon.limits-icon { background: #eef4ff; border-radius: 10px; color: #175cd3; }
-    .limits-step-header { border-bottom: 1px solid #f2f4f7; margin-bottom: 1.25rem; padding-bottom: 1rem; }
-    .limits-form { display: grid; gap: 1.1rem; }
-    .limits-form label { display: grid; gap: 0.42rem; }
-    .limits-form span { color: #344054; font-size: 0.82rem; font-weight: 600; }
-    .limits-form em { color: #d92d20; font-style: normal; }
-    .limits-form small { color: #667085; font-size: 0.75rem; line-height: 1.35; }
-    .limits-form small.error { color: #b42318; }
-    .limits-fields { margin-bottom: 0.25rem; }
-    .limits-info { margin-top: 0.15rem; }
-    .limits-form .field-shell input { min-height: 2.4rem; }
-    .pricing-form { display: grid; gap: 1.1rem; }
-    .pricing-form label { display: grid; gap: 0.42rem; }
-    .pricing-form span { color: #344054; font-size: 0.82rem; font-weight: 600; }
-    .pricing-form em { color: #d92d20; font-style: normal; }
-    .pricing-form small { color: #667085; font-size: 0.75rem; line-height: 1.35; }
-    .pricing-form small.error { color: #b42318; }
-    .readonly-value { color: #344054; flex: 1; font-size: 0.88rem; font-weight: 500; }
-    .currency-prefix { border-right: 1px solid #eaecf0; color: #667085; font-size: 0.82rem; font-weight: 600; margin-right: 0.35rem; padding-right: 0.65rem; }
-    .field-shell.invalid { border-color: #fda29b; }
-    .alert.info { align-items: flex-start; background: #eff8ff; border: 1px solid #b2ddff; border-radius: 12px; color: #175cd3; display: flex; gap: 0.75rem; padding: 0.9rem 1rem; }
-    .alert-icon.info { align-items: center; background: #d1e9ff; border-radius: 50%; color: #175cd3; display: inline-flex; flex-shrink: 0; height: 2rem; justify-content: center; width: 2rem; }
-    .alert.info span { color: #175cd3; font-size: 0.78rem; line-height: 1.45; }
-    .module-grid, .empty-step, .feature-group, .review-list, .summary-progress { margin-top: 0.5rem; }
-    .module-grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); }
-    .module-card { border: 1px solid #eaecf0; border-radius: 12px; display: grid; gap: 0.65rem; padding: 0.85rem; }
-    .module-card.selected { border-color: #84adff; box-shadow: 0 0 0 3px rgba(11, 92, 255, 0.12); }
-    .module-head p, .module-head small, .muted, .empty-step span { color: #667085; font-size: 0.78rem; }
-    .empty-step { background: #f9fafb; border: 1px dashed #d0d5dd; border-radius: 12px; display: grid; gap: 0.35rem; padding: 1.25rem; }
-    table { border-collapse: collapse; width: 100%; }
-    th, td { border-bottom: 1px solid #f2f4f7; padding: 0.55rem 0.35rem; text-align: left; }
-    th { color: #667085; font-size: 0.72rem; text-transform: uppercase; }
-    td span { color: #667085; display: block; font-size: 0.75rem; margin-top: 0.2rem; }
-    tr.disabled { opacity: 0.5; }
-    .radio-cell { text-align: center; width: 5rem; }
-    .review-list { display: grid; gap: 0.65rem; margin-bottom: 1rem; }
-    .review-list div { display: grid; gap: 0.15rem; grid-template-columns: 10rem 1fr; }
-    .review-list dt { color: #667085; font-size: 0.78rem; font-weight: 600; }
-    .review-list dd { margin: 0; }
-    .draft-summary { position: sticky; top: 1rem; }
-    .summary-head { align-items: center; border-bottom: 1px solid #f2f4f7; display: flex; gap: 0.55rem; margin-bottom: 1rem; padding-bottom: 0.85rem; }
-    .summary-icon { align-items: center; color: #667085; display: inline-flex; }
-    .summary-icon svg { height: 1rem; width: 1rem; }
-    .summary-head h2 { color: #101828; font-size: 0.95rem; font-weight: 700; margin: 0; }
-    .summary-rows { display: grid; gap: 0.65rem; margin: 0; }
-    .summary-rows div { align-items: center; display: flex; gap: 0.5rem; justify-content: space-between; }
-    .summary-rows dt { color: #667085; font-size: 0.76rem; font-weight: 500; }
-    .summary-rows dd { color: #344054; font-size: 0.8rem; font-weight: 600; margin: 0; text-align: right; }
-    .summary-progress { border-top: 1px solid #f2f4f7; display: grid; gap: 0.65rem; margin-top: 1rem; padding-top: 1rem; }
-    .summary-progress div { align-items: center; display: flex; justify-content: space-between; gap: 0.75rem; }
-    .summary-progress span { color: #667085; font-size: 0.76rem; }
-    .summary-progress strong { color: #98a2b3; font-size: 0.76rem; font-weight: 500; }
-    .summary-progress strong.status-success { color: #027a48; font-weight: 600; }
-    .summary-progress strong.status-info { color: #175cd3; font-weight: 600; }
-    .summary-progress strong.status-progress { color: #175cd3; font-weight: 600; }
-    .summary-progress strong.status-muted { color: #98a2b3; font-weight: 500; }
-    .summary-note { align-items: center; background: #eef4ff; border-radius: 10px; color: #175cd3; display: flex; font-size: 0.75rem; gap: 0.45rem; line-height: 1.35; margin: 1rem 0 0; padding: 0.65rem 0.75rem; }
-    .summary-note svg { flex-shrink: 0; height: 1rem; stroke: currentColor; stroke-width: 1.5; fill: none; width: 1rem; }
-    .selection-summary { border-top: 1px solid #f2f4f7; display: grid; gap: 0.45rem; margin-top: 1rem; padding-top: 1rem; }
-    .selection-summary h3 { color: #101828; font-size: 0.82rem; margin: 0; }
-    .selection-summary strong { color: #344054; font-size: 0.76rem; }
-    .selection-summary ul { display: grid; gap: 0.25rem; list-style: none; margin: 0; padding: 0; }
-    .selection-summary li { color: #667085; font-size: 0.75rem; line-height: 1.35; }
-    .action-bar { align-items: center; background: #fff; border-top: 1px solid #eaecf0; bottom: 0; box-shadow: 0 -4px 18px rgba(16, 24, 40, 0.06); display: flex; gap: 0.75rem; justify-content: space-between; left: 16.5rem; padding: 0.95rem 1.6rem; position: fixed; right: 0; z-index: 10; }
-    .action-group { align-items: center; display: flex; flex-wrap: wrap; gap: 0.65rem; justify-content: flex-end; }
-    .btn { align-items: center; border-radius: 10px; cursor: pointer; display: inline-flex; font-size: 0.86rem; font-weight: 600; gap: 0.45rem; justify-content: center; min-height: 2.65rem; padding: 0.55rem 1.05rem; }
-    .btn svg { height: 1rem; stroke: currentColor; stroke-width: 1.75; fill: none; width: 1rem; }
-    .btn.primary { background: #0b5cff; border: 1px solid #0b5cff; color: #fff; }
-    .btn.outline { background: #fff; border: 1px solid #d0d5dd; color: #344054; }
-    .btn:disabled { cursor: not-allowed; opacity: 0.5; }
-    .modal-backdrop { background: rgba(16, 24, 40, 0.45); inset: 0; position: fixed; z-index: 20; }
-    .modal { background: #fff; border: 0; border-radius: 14px; box-shadow: 0 20px 40px rgba(16, 24, 40, 0.18); left: 50%; margin: 0; max-width: 32rem; padding: 1.25rem; position: fixed; top: 50%; transform: translate(-50%, -50%); width: calc(100% - 2rem); z-index: 21; }
-    .modal-actions { display: flex; gap: 0.65rem; justify-content: flex-end; }
-    @media (max-width: 1100px) {
-      .row-three { grid-template-columns: 1fr; }
-    }
-    @media (max-width: 960px) {
-      .wizard-layout { grid-template-columns: 1fr; }
-      .draft-summary { position: static; }
-      .basics-form { grid-template-columns: 1fr; }
-      .action-bar { left: 0; }
-    }
-  `
+  imports: [
+    ReactiveFormsModule,
+    PageHeader,
+    Button,
+    FormField,
+    StatusBadge,
+    LoadingSkeleton,
+    EmptyState,
+    ErrorState,
+    ConfirmationDialog,
+    CreateSubscriptionPlanWizardNav
+  ],
+  templateUrl: './platform-create-subscription-plan-page.html',
+  styleUrl: './platform-create-subscription-plan-page.scss'
 })
 export class PlatformCreateSubscriptionPlanPage implements OnInit {
   private readonly fb = inject(FormBuilder);
@@ -645,6 +75,13 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
     { value: 'demo', label: 'Demo' }
   ];
 
+  readonly currencyOptions: ReadonlyArray<{ value: string; label: string }> = [
+    { value: 'LKR', label: 'LKR - Sri Lankan Rupee' },
+    { value: 'USD', label: 'USD - US Dollar' },
+    { value: 'GBP', label: 'GBP - British Pound' },
+    { value: 'EUR', label: 'EUR - Euro' }
+  ];
+
   readonly availabilityOptions: ModuleAvailability[] = ['included', 'not_available'];
 
   readonly currentStep = signal<WizardStep>('basics');
@@ -666,6 +103,15 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
   readonly pricingSaved = signal(false);
   readonly limitsSaved = signal(false);
   readonly basePriceInput = signal('');
+
+  readonly isEditMode = signal(false);
+  readonly editPlanName = signal<string | null>(null);
+  readonly planLoading = signal(false);
+  readonly editBlocked = signal(false);
+  readonly editBlockedMessage = signal('');
+
+  private readonly catalogLoaded = signal(false);
+  private readonly pendingEditSelection = signal<PendingEditSelection | null>(null);
 
   private readonly currencyLabels: Record<string, string> = {
     LKR: 'LKR - Sri Lankan Rupee',
@@ -690,6 +136,41 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
     maxOutlets: [null as number | null, [Validators.required, Validators.min(1)]],
     maxTills: [null as number | null, [Validators.required, Validators.min(1)]],
     maxUsers: [null as number | null, [Validators.required, Validators.min(1)]]
+  });
+
+  readonly pageTitle = computed(() =>
+    this.isEditMode() ? 'Edit Subscription Plan' : 'Create Subscription Plan'
+  );
+
+  readonly pageDescription = computed(() =>
+    this.isEditMode()
+      ? 'Update this draft plan. Status stays Draft until you publish from Review.'
+      : 'Build a subscription package for tenant assignment. Status stays Draft until you publish from Review.'
+  );
+
+  readonly breadcrumbs = computed<BreadcrumbItem[]>(() => [
+    { label: 'Subscription Plans', path: '/admin/subscriptions' },
+    { label: this.isEditMode() ? this.editPlanName() ?? 'Edit Plan' : 'Create Plan' }
+  ]);
+
+  readonly configBandHeading = computed(() =>
+    this.isEditMode() ? 'Edit plan configuration' : 'Plan configuration'
+  );
+
+  readonly currentStepNumber = computed(() => this.stepIndex(this.currentStep()) + 1);
+
+  readonly wizardStepStates = computed<Record<string, SubscriptionPlanStepVisualState>>(() => {
+    const states: Record<string, SubscriptionPlanStepVisualState> = {};
+    this.steps.forEach((step, index) => {
+      if (this.currentStep() === step.key) {
+        states[step.key] = 'current';
+        return;
+      }
+
+      states[step.key] = this.isStepComplete(step.key, index) ? 'completed' : 'upcoming';
+    });
+
+    return states;
   });
 
   readonly featureGroups = computed(() => {
@@ -735,6 +216,10 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
       .filter((group) => group.featureNames.length > 0)
   );
 
+  availabilityLabel(option: ModuleAvailability): string {
+    return option === 'included' ? 'Included' : 'Not Available';
+  }
+
   billingCycleLabel(): string {
     const value = this.basicsForm.controls.billingCycle.value;
     return this.billingCycleOptions.find((option) => option.value === value)?.label ?? '—';
@@ -747,6 +232,43 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
 
   currencyCode(): string {
     return this.basicsForm.controls.baseCurrency.value || '—';
+  }
+
+  descriptionHelperText(): string {
+    const length = this.basicsForm.controls.description.value?.length ?? 0;
+    return `Short description about this plan. ${length}/500 characters.`;
+  }
+
+  basicsFieldError(
+    controlName: 'planName' | 'planCode' | 'description' | 'billingCycle' | 'baseCurrency'
+  ): string | null {
+    const control: AbstractControl = this.basicsForm.controls[controlName];
+    if (!control.touched || control.valid) {
+      return null;
+    }
+
+    if (control.errors?.['maxlength']) {
+      return 'Description cannot exceed 500 characters.';
+    }
+
+    const labels: Record<typeof controlName, string> = {
+      planName: 'Plan name is required.',
+      planCode: 'Plan code is required.',
+      description: 'Description is invalid.',
+      billingCycle: 'Billing cycle is required.',
+      baseCurrency: 'Currency is required.'
+    };
+
+    return labels[controlName];
+  }
+
+  basePriceError(): string | null {
+    const control = this.pricingForm.controls.basePrice;
+    if (!control.touched || control.valid) {
+      return null;
+    }
+
+    return 'Base price is required and cannot be negative.';
   }
 
   basePriceSummaryLabel(): string {
@@ -808,6 +330,7 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
     this.loadCatalogs();
     const state = history.state as { planId?: string; mode?: 'view' | 'edit' };
     if (state?.planId) {
+      this.isEditMode.set(true);
       this.loadPlanForEdit(state.planId);
     }
   }
@@ -1326,6 +849,10 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
   }
 
   confirmPublish(): void {
+    if (this.isSaving()) {
+      return;
+    }
+
     if (!this.validateBasicsStep()) {
       this.errorMessage.set('Plan name, plan code, billing cycle, and currency are required before publishing.');
       return;
@@ -1474,10 +1001,15 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
     }).format(value);
   }
 
+  reloadCatalogs(): void {
+    this.loadCatalogs();
+  }
+
   private loadCatalogs(): void {
     this.modulesLoading.set(true);
     this.featuresLoading.set(true);
     this.catalogError.set(null);
+    this.catalogLoaded.set(false);
 
     this.api.getSubscriptionCatalog().subscribe({
       next: (catalog) => {
@@ -1523,6 +1055,8 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
         this.featureAvailability.set(featureAvailability);
         this.modulesLoading.set(false);
         this.featuresLoading.set(false);
+        this.catalogLoaded.set(true);
+        this.applyEditSelection();
       },
       error: (error) => {
         this.modules.set([]);
@@ -1537,8 +1071,21 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
   }
 
   private loadPlanForEdit(planId: string): void {
+    this.planLoading.set(true);
+
     this.api.getSubscriptionPlanDetail(planId).subscribe({
       next: (plan) => {
+        this.planLoading.set(false);
+        this.editPlanName.set(plan.planName);
+
+        if (!this.isDraftPlan(plan)) {
+          this.editBlocked.set(true);
+          this.editBlockedMessage.set(
+            `Only draft plans can be edited in this workspace. This plan is ${subscriptionPlanStatusLabel(plan.status)}.`
+          );
+          return;
+        }
+
         this.savedPlanId.set(plan.id);
         this.loadedForEdit.set(true);
         this.basicsSaved.set(true);
@@ -1558,11 +1105,76 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
           maxTills: plan.maxTills,
           maxUsers: plan.maxUsers
         });
+
+        this.queueEditSelection(plan);
       },
       error: (error) => {
+        this.planLoading.set(false);
         this.errorMessage.set(this.apiError.toSafeMessage(error));
       }
     });
+  }
+
+  private isDraftPlan(plan: SubscriptionPlanDetail): boolean {
+    const status = String(plan.status ?? '').trim().toLowerCase();
+    return status === '' || status === 'draft';
+  }
+
+  /** Entitlements arrive with the plan detail; the catalog may still be in flight. */
+  private queueEditSelection(plan: SubscriptionPlanDetail): void {
+    const planModules = plan.modules ?? [];
+    if (!planModules.length) {
+      return;
+    }
+
+    const moduleKeys: string[] = [];
+    const featureKeys: string[] = [];
+
+    for (const module of planModules) {
+      moduleKeys.push(module.id, module.code);
+      for (const feature of module.features ?? []) {
+        featureKeys.push(feature.id, feature.code);
+      }
+    }
+
+    this.pendingEditSelection.set({ moduleKeys, featureKeys });
+    this.applyEditSelection();
+  }
+
+  private applyEditSelection(): void {
+    const selection = this.pendingEditSelection();
+    if (!selection || !this.catalogLoaded()) {
+      return;
+    }
+
+    const includedModules = new Set(selection.moduleKeys.filter((key) => !!key));
+    const includedFeatures = new Set(selection.featureKeys.filter((key) => !!key));
+
+    this.moduleAvailability.update((current) => {
+      const next = { ...current };
+      for (const module of this.modules()) {
+        next[module.id] = module.isLocked || includedModules.has(module.id) || includedModules.has(module.moduleKey)
+          ? 'included'
+          : 'not_available';
+      }
+      return next;
+    });
+
+    this.featureAvailability.update((current) => {
+      const next = { ...current };
+      for (const feature of this.features()) {
+        next[feature.id] = feature.isLocked || includedFeatures.has(feature.id) || includedFeatures.has(feature.featureKey)
+          ? 'included'
+          : 'not_available';
+      }
+      return next;
+    });
+
+    if (includedFeatures.size > 0) {
+      this.featuresSaved.set(true);
+    }
+
+    this.pendingEditSelection.set(null);
   }
 
   private buildDraft(): SubscriptionPlanDraft {
