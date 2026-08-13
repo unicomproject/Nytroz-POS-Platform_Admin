@@ -60,6 +60,42 @@ export class SelectedTenantContextService {
     });
   }
 
+  /** Prefer API options; keep session-only entries as cache enhancement. */
+  mergeKnownOutletsFromApi(tenantId: string, outlets: KnownOutletOption[]): void {
+    this.activeTenantIdState.set(tenantId);
+    const session = this.knownOutletsState();
+    const byId = new Map<string, KnownOutletOption>();
+    for (const outlet of outlets) {
+      byId.set(outlet.outletId, outlet);
+    }
+    for (const outlet of session) {
+      if (!byId.has(outlet.outletId)) {
+        byId.set(outlet.outletId, outlet);
+      }
+    }
+    const next = [...byId.values()];
+    this.knownOutletsState.set(next);
+    this.writeSessionJson(knownOutletsStoragePrefix + tenantId, next);
+  }
+
+  /** Prefer API options; keep session-only entries as cache enhancement. */
+  mergeKnownRolesFromApi(tenantId: string, roles: KnownRoleOption[]): void {
+    this.activeTenantIdState.set(tenantId);
+    const session = this.knownRolesState();
+    const byId = new Map<string, KnownRoleOption>();
+    for (const role of roles) {
+      byId.set(role.roleId, role);
+    }
+    for (const role of session) {
+      if (!byId.has(role.roleId)) {
+        byId.set(role.roleId, role);
+      }
+    }
+    const next = [...byId.values()];
+    this.knownRolesState.set(next);
+    this.writeSessionJson(knownRolesStoragePrefix + tenantId, next);
+  }
+
   clear(): void {
     const tenantId = this.activeTenantIdState();
     if (tenantId) {

@@ -2,6 +2,8 @@ import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import { TenantContextService } from '../../../../core/services/tenant-context.service';
@@ -64,7 +66,7 @@ export class CreateTillPage {
       this.outletId.set(queryOutletId);
     }
 
-    this.ensureSummary();
+    this.loadSummaryAndOutletOptions();
   }
 
   submit(): void {
@@ -103,22 +105,42 @@ export class CreateTillPage {
       });
   }
 
-  private ensureSummary(): void {
+  private loadSummaryAndOutletOptions(): void {
+    const tenantId = this.tenantId();
     const summary = this.selectedTenantContext.summary();
-    if (summary?.tenant.tenantId === this.tenantId()) {
-      this.refreshGapNotice();
-      return;
-    }
+    const summary$ =
+      summary?.tenant.tenantId === tenantId
+        ? of(summary)
+        : this.api.getSummary(tenantId).pipe(
+            catchError((error) => {
+              this.errorMessage.set(this.apiError.toSafeMessage(error));
+              return of(null);
+            })
+          );
 
-    this.api
-      .getSummary(this.tenantId())
+    forkJoin({
+      summary: summary$,
+      outlets: this.api.getOutletOptions(tenantId).pipe(
+        catchError((error) => {
+          this.errorMessage.set(this.apiError.toSafeMessage(error));
+          return of([]);
+        })
+      )
+    })
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (loaded) => {
+      .subscribe(({ summary: loaded, outlets }) => {
+        if (loaded) {
           this.selectedTenantContext.setSummary(loaded);
-          this.refreshGapNotice();
-        },
-        error: (error) => this.errorMessage.set(this.apiError.toSafeMessage(error))
+        }
+        this.selectedTenantContext.mergeKnownOutletsFromApi(
+          tenantId,
+          outlets.map((outlet) => ({
+            outletId: outlet.outletId,
+            outletName: outlet.outletName,
+            outletCode: outlet.outletCode
+          }))
+        );
+        this.refreshGapNotice();
       });
   }
 
@@ -131,7 +153,7 @@ export class CreateTillPage {
 
     if (!this.knownOutlets().length) {
       this.gapNotice.set(
-        'No outlet list API is available on platform bootstrap. Outlets created in this browser session appear below. Prefer creating an outlet first, then open Till Configure — or use ?outletId= after a successful outlet create.'
+        'No active outlets were returned for this tenant. Create an outlet first, then open Till Configure — or use ?outletId= after a successful outlet create.'
       );
       return;
     }

@@ -45,18 +45,13 @@
       @if (knownRoles().length) {
         <select id="role" [ngModel]="roleId()" (ngModelChange)="roleId.set($event)" name="roleId">
           @for (role of knownRoles(); track role.roleId) {
-            <option [value]="role.roleId">{{ role.roleName }}</option>
+            <option [value]="role.roleId">
+              {{ role.roleName }}{{ role.roleCode ? ' (' + role.roleCode + ')' : '' }}
+            </option>
           }
         </select>
       } @else {
-        <input
-          id="role"
-          type="text"
-          [ngModel]="roleId()"
-          (ngModelChange)="roleId.set($event)"
-          name="roleId"
-          placeholder="Role ID (GUID)"
-        />
+        <p class="hint">No roles available yet. Create a role on the Configure hub first.</p>
       }
     </app-form-field>
 
@@ -79,7 +74,7 @@
           }
         </ul>
       } @else {
-        <p class="hint">No session outlets available. Create an outlet in this session to assign outlet access.</p>
+        <p class="hint">No active outlets available for optional outlet access.</p>
       }
     </fieldset>
 

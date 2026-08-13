@@ -2,6 +2,8 @@ import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import { TenantContextService } from '../../../../core/services/tenant-context.service';
@@ -58,13 +60,7 @@ export class ProductManualPage {
   ]);
 
   constructor() {
-    const summary = this.selectedTenantContext.summary();
-    if (!summary || summary.tenant.tenantId !== this.tenantId()) {
-      this.api
-        .getSummary(this.tenantId())
-        .pipe(takeUntilDestroyed(this.destroyRef))
-        .subscribe({ next: (loaded) => this.selectedTenantContext.setSummary(loaded) });
-    }
+    this.loadSummaryAndOutletOptions();
   }
 
   submit(): void {
@@ -107,6 +103,44 @@ export class ProductManualPage {
           this.errorMessage.set(this.apiError.toSafeMessage(error));
           this.submitting.set(false);
         }
+      });
+  }
+
+  private loadSummaryAndOutletOptions(): void {
+    const tenantId = this.tenantId();
+    const summary = this.selectedTenantContext.summary();
+    const summary$ =
+      summary?.tenant.tenantId === tenantId
+        ? of(summary)
+        : this.api.getSummary(tenantId).pipe(
+            catchError((error) => {
+              this.errorMessage.set(this.apiError.toSafeMessage(error));
+              return of(null);
+            })
+          );
+
+    forkJoin({
+      summary: summary$,
+      outlets: this.api.getOutletOptions(tenantId).pipe(
+        catchError((error) => {
+          this.errorMessage.set(this.apiError.toSafeMessage(error));
+          return of([]);
+        })
+      )
+    })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(({ summary: loaded, outlets }) => {
+        if (loaded) {
+          this.selectedTenantContext.setSummary(loaded);
+        }
+        this.selectedTenantContext.mergeKnownOutletsFromApi(
+          tenantId,
+          outlets.map((outlet) => ({
+            outletId: outlet.outletId,
+            outletName: outlet.outletName,
+            outletCode: outlet.outletCode
+          }))
+        );
       });
   }
 }

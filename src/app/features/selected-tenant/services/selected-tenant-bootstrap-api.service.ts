@@ -9,12 +9,15 @@ import {
   BootstrapOnlineStoreResponse,
   BootstrapOnlineStoreUpsertRequest,
   BootstrapOutletCreateRequest,
+  BootstrapOutletOption,
   BootstrapOutletResponse,
+  BootstrapPermissionOption,
   BootstrapProductCreateRequest,
   BootstrapProductImportCommitResponse,
   BootstrapProductImportValidateResponse,
   BootstrapProductResponse,
   BootstrapRoleCreateRequest,
+  BootstrapRoleOption,
   BootstrapRoleResponse,
   BootstrapSummary,
   BootstrapSummaryApiDto,
@@ -35,6 +38,30 @@ export class SelectedTenantBootstrapApiService {
         `${appSettings.apiBaseUrl}${apiEndpoints.platform.bootstrap.summary(tenantId)}`
       )
       .pipe(map((response) => mapBootstrapSummary(response.data)));
+  }
+
+  getOutletOptions(tenantId: string): Observable<BootstrapOutletOption[]> {
+    return this.http
+      .get<ApiResponse<BootstrapOutletOption[]>>(
+        `${appSettings.apiBaseUrl}${apiEndpoints.platform.bootstrap.outletOptions(tenantId)}`
+      )
+      .pipe(map((response) => response.data ?? []));
+  }
+
+  getRoleOptions(tenantId: string): Observable<BootstrapRoleOption[]> {
+    return this.http
+      .get<ApiResponse<BootstrapRoleOption[]>>(
+        `${appSettings.apiBaseUrl}${apiEndpoints.platform.bootstrap.roleOptions(tenantId)}`
+      )
+      .pipe(map((response) => response.data ?? []));
+  }
+
+  getPermissionOptions(tenantId: string): Observable<BootstrapPermissionOption[]> {
+    return this.http
+      .get<ApiResponse<BootstrapPermissionOption[]>>(
+        `${appSettings.apiBaseUrl}${apiEndpoints.platform.bootstrap.permissionOptions(tenantId)}`
+      )
+      .pipe(map((response) => response.data ?? []));
   }
 
   createOutlet(

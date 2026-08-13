@@ -44,6 +44,12 @@ export const apiEndpoints = {
     returnPolicyTemplate: (templateId: string) => `/platform/return-policy-templates/${templateId}`,
     bootstrap: {
       summary: (tenantId: string) => `/platform-admin/tenants/${tenantId}/bootstrap/summary`,
+      outletOptions: (tenantId: string) =>
+        `/platform-admin/tenants/${tenantId}/bootstrap/options/outlets`,
+      roleOptions: (tenantId: string) =>
+        `/platform-admin/tenants/${tenantId}/bootstrap/options/roles`,
+      permissionOptions: (tenantId: string) =>
+        `/platform-admin/tenants/${tenantId}/bootstrap/options/permissions`,
       outlets: (tenantId: string) => `/platform-admin/tenants/${tenantId}/bootstrap/outlets`,
       tills: (tenantId: string) => `/platform-admin/tenants/${tenantId}/bootstrap/tills`,
       roles: (tenantId: string) => `/platform-admin/tenants/${tenantId}/bootstrap/roles`,

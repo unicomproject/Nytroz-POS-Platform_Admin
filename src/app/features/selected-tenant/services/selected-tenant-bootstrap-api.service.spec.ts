@@ -94,6 +94,60 @@ describe('SelectedTenantBootstrapApiService', () => {
     expect(outletCode).toBe('OUT-1');
   });
 
+  it('loads outlet options from bootstrap options endpoint', () => {
+    let count = 0;
+
+    service.getOutletOptions('tenant-1').subscribe((outlets) => {
+      count = outlets.length;
+    });
+
+    const request = httpTesting.expectOne(
+      '/api/v1/platform-admin/tenants/tenant-1/bootstrap/options/outlets'
+    );
+    expect(request.request.method).toBe('GET');
+    request.flush({
+      success: true,
+      message: 'ok',
+      data: [
+        {
+          outletId: 'out-1',
+          outletName: 'Main',
+          outletCode: 'OUT-1',
+          status: 'ACTIVE'
+        }
+      ]
+    });
+
+    expect(count).toBe(1);
+  });
+
+  it('loads role options from bootstrap options endpoint', () => {
+    let roleCode = '';
+
+    service.getRoleOptions('tenant-1').subscribe((roles) => {
+      roleCode = roles[0]?.roleCode ?? '';
+    });
+
+    const request = httpTesting.expectOne(
+      '/api/v1/platform-admin/tenants/tenant-1/bootstrap/options/roles'
+    );
+    expect(request.request.method).toBe('GET');
+    request.flush({
+      success: true,
+      message: 'ok',
+      data: [
+        {
+          roleId: 'role-1',
+          roleName: 'Tenant Admin',
+          roleCode: 'TENANT_ADMIN',
+          isSystem: true
+        }
+      ]
+    });
+
+    expect(roleCode).toBe('TENANT_ADMIN');
+  });
+
   it('puts online store with Idempotency-Key', () => {
     let status = '';
 

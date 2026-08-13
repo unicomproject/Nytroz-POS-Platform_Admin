@@ -47,6 +47,24 @@ export interface KnownRoleOption {
   roleCode?: string;
 }
 
+export interface BootstrapOutletOption {
+  outletId: string;
+  outletName: string;
+  outletCode: string;
+  status: string;
+}
+
+export interface BootstrapRoleOption {
+  roleId: string;
+  roleName: string;
+  roleCode: string;
+  isSystem: boolean;
+}
+
+export interface BootstrapPermissionOption {
+  permissionCode: string;
+}
+
 export interface BootstrapOutletCreateRequest {
   outletName: string;
   outletType: 'STORE' | 'WAREHOUSE';
