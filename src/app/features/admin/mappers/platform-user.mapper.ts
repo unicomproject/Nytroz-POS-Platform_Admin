@@ -60,8 +60,9 @@ export function mapPlatformUserDetail(dto: PlatformUserDetailApiDto): PlatformUs
 
 export function mapCreatePlatformUserRequest(request: CreatePlatformUserRequest): Record<string, unknown> {
   return {
+    fullName: request.fullName.trim(),
     email: request.email.trim(),
-    status: request.status,
+    phone: request.phone?.trim() || null,
     roleIds: request.roleIds
   };
 }

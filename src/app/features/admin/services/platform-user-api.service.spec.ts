@@ -54,7 +54,7 @@ describe('PlatformUserApiService', () => {
 
   it('calls POST /platform-admin/users for create', () => {
     service
-      .createUser({ email: 'new@nytroz.local', status: 'INACTIVE', roleIds: ['role-1'] })
+      .createUser({ fullName: 'New User', email: 'new@nytroz.local', phone: '1234567890', roleIds: ['role-1'] })
       .subscribe((response) => {
         expect(response.email).toBe('new@nytroz.local');
       });
@@ -62,8 +62,9 @@ describe('PlatformUserApiService', () => {
     const request = httpTesting.expectOne(`${appSettings.apiBaseUrl}${apiEndpoints.platform.users}`);
     expect(request.request.method).toBe('POST');
     expect(request.request.body).toEqual({
+      fullName: 'New User',
       email: 'new@nytroz.local',
-      status: 'INACTIVE',
+      phone: '1234567890',
       roleIds: ['role-1']
     });
     request.flush({
@@ -156,6 +157,31 @@ describe('PlatformUserApiService', () => {
         lastLoginAt: null,
         createdAt: '2026-07-01T00:00:00Z',
         updatedAt: '2026-07-02T00:00:00Z'
+      }
+    });
+  });
+
+  it('calls POST /platform-admin/users/{id}/password-reset to initiate reset', () => {
+    service.initiatePasswordReset('user-1').subscribe((response) => {
+      expect(response.deliveryMode).toBe('email');
+      expect(response.resetUrl).toBeNull();
+    });
+
+    const request = httpTesting.expectOne(
+      `${appSettings.apiBaseUrl}${apiEndpoints.platform.userPasswordReset('user-1')}`
+    );
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({});
+    request.flush({
+      success: true,
+      message: 'Password reset initiated successfully.',
+      data: {
+        userId: 'user-1',
+        email: 'staff@nytroz.local',
+        expiresAt: '2026-08-14T12:00:00Z',
+        deliveryMode: 'email',
+        resetUrl: null,
+        message: 'A password reset email has been sent to the user.'
       }
     });
   });
