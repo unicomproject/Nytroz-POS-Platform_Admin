@@ -17,6 +17,7 @@ import {
 import {
   AssignPlatformUserRolesRequest,
   CreatePlatformUserRequest,
+  InitiatePlatformPasswordResetResponse,
   PlatformUserDetail,
   PlatformUserListResponse,
   UpdatePlatformUserRequest
@@ -62,5 +63,14 @@ export class PlatformUserApiService {
         mapAssignPlatformUserRolesRequest(request)
       )
       .pipe(map((response) => mapPlatformUserDetail(response.data)));
+  }
+
+  initiatePasswordReset(userId: string): Observable<InitiatePlatformPasswordResetResponse> {
+    return this.http
+      .post<ApiResponse<InitiatePlatformPasswordResetResponse>>(
+        `${appSettings.apiBaseUrl}${apiEndpoints.platform.userPasswordReset(userId)}`,
+        {}
+      )
+      .pipe(map((response) => response.data));
   }
 }

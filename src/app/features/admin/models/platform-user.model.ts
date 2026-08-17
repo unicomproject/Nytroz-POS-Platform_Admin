@@ -20,8 +20,9 @@ export interface PlatformUserDetail extends PlatformUserSummary {
 }
 
 export interface CreatePlatformUserRequest {
+  fullName: string;
   email: string;
-  status: string;
+  phone?: string;
   roleIds: string[];
 }
 
@@ -31,6 +32,15 @@ export interface UpdatePlatformUserRequest {
 
 export interface AssignPlatformUserRolesRequest {
   roleIds: string[];
+}
+
+export interface InitiatePlatformPasswordResetResponse {
+  userId: string;
+  email: string;
+  expiresAt: string;
+  deliveryMode: string;
+  resetUrl: string | null;
+  message: string;
 }
 
 export type PlatformUserEditorMode = 'create' | 'edit';
