@@ -196,15 +196,45 @@ import { PlatformUserApiService } from '../../services/platform-user-api.service
                   type="search"
                   placeholder="Search by name or email..."
                   [ngModel]="searchTerm()"
-                  (ngModelChange)="searchTerm.set($event)"
+                  (ngModelChange)="onSearchInput($event)"
                 />
                 <svg viewBox="0 0 24 24" aria-hidden="true" class="icon-search"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
               </div>
-              <button type="button" class="btn outline btn-filter">
+              <button type="button" class="btn outline btn-filter" [class.active]="filterPanelOpen() || activeFilterCount() > 0" (click)="toggleFilterPanel()">
                 <svg viewBox="0 0 24 24" aria-hidden="true" class="icon-filter"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
                 Filters
+                @if (activeFilterCount() > 0) {
+                  <span class="filter-badge">{{ activeFilterCount() }}</span>
+                }
               </button>
             </div>
+
+            @if (filterPanelOpen()) {
+              <div class="filter-drawer card">
+                <div class="filter-group">
+                  <label>Status</label>
+                  <select [ngModel]="statusFilter()" (ngModelChange)="onStatusFilterChange($event)">
+                    <option value="">All Statuses</option>
+                    <option value="ACTIVE">Active</option>
+                    <option value="INACTIVE">Inactive</option>
+                    <option value="INVITED">Invited</option>
+                    <option value="LOCKED">Locked</option>
+                  </select>
+                </div>
+                <div class="filter-group">
+                  <label>Role</label>
+                  <select [ngModel]="roleFilter()" (ngModelChange)="onRoleFilterChange($event)">
+                    <option value="">All Roles</option>
+                    @for (role of availableRoles(); track role.id) {
+                      <option [value]="role.code">{{ role.name }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="filter-actions">
+                  <button type="button" class="btn outline btn-sm" (click)="resetFilters()" [disabled]="activeFilterCount() === 0">Reset Filters</button>
+                </div>
+              </div>
+            }
 
             @if (isLoading()) {
               <div class="state-card loading">Loading platform users...</div>
@@ -254,17 +284,25 @@ import { PlatformUserApiService } from '../../services/platform-user-api.service
                 </table>
               </div>
               <footer class="pagination-row">
-                <span class="pagination-count">Showing 1 to {{ filteredUsers().length }} of {{ filteredUsers().length }} users</span>
+                <span class="pagination-count">Showing {{ showingStart() }} to {{ showingEnd() }} of {{ totalCount() }} users</span>
                 <div class="pagination-controls">
-                  <button type="button" class="btn outline btn-icon" disabled>&lt;</button>
-                  <button type="button" class="btn primary btn-icon">1</button>
-                  <button type="button" class="btn outline btn-icon" disabled>&gt;</button>
+                  <select [value]="pageSize()" (change)="onPageSizeChange($event)" class="page-size-select">
+                    <option [value]="10">10 / page</option>
+                    <option [value]="25">25 / page</option>
+                    <option [value]="50">50 / page</option>
+                  </select>
+                  <button type="button" class="btn outline btn-icon" [disabled]="pageNumber() <= 1 || isLoading()" (click)="previousPage()">&lt;</button>
+                  <span class="page-current">Page {{ pageNumber() }} of {{ totalPages() || 1 }}</span>
+                  <button type="button" class="btn outline btn-icon" [disabled]="pageNumber() >= totalPages() || totalPages() === 0 || isLoading()" (click)="nextPage()">&gt;</button>
                 </div>
               </footer>
             } @else {
               <div class="state-card empty">
                 <strong>No platform users found</strong>
-                <span>Try a different search term.</span>
+                <span>{{ activeFilterCount() > 0 ? 'Try clearing or adjusting your filters.' : 'No platform users available.' }}</span>
+                @if (activeFilterCount() > 0) {
+                  <button type="button" class="btn outline btn-sm" (click)="resetFilters()">Clear Filters</button>
+                }
               </div>
             }
           </section>
@@ -272,18 +310,42 @@ import { PlatformUserApiService } from '../../services/platform-user-api.service
       } @else {
         <!-- Standard 100% Width Layout -->
         <section class="filters card">
-          <label class="filter-field search-field">
-            <span class="field-label">Search</span>
-            <span class="input-wrap">
-              <input
-                type="search"
-                placeholder="Search by name or email..."
-                [ngModel]="searchTerm()"
-                (ngModelChange)="searchTerm.set($event)"
-              />
-              <svg viewBox="0 0 24 24" aria-hidden="true" class="icon-search"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
-            </span>
-          </label>
+          <div class="filters-grid">
+            <label class="filter-field search-field">
+              <span class="field-label">Search</span>
+              <span class="input-wrap">
+                <input
+                  type="search"
+                  placeholder="Search by name or email..."
+                  [ngModel]="searchTerm()"
+                  (ngModelChange)="onSearchInput($event)"
+                />
+                <svg viewBox="0 0 24 24" aria-hidden="true" class="icon-search"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
+              </span>
+            </label>
+            <label class="filter-field">
+              <span class="field-label">Status</span>
+              <select [ngModel]="statusFilter()" (ngModelChange)="onStatusFilterChange($event)" class="select-input">
+                <option value="">All Statuses</option>
+                <option value="ACTIVE">Active</option>
+                <option value="INACTIVE">Inactive</option>
+                <option value="INVITED">Invited</option>
+                <option value="LOCKED">Locked</option>
+              </select>
+            </label>
+            <label class="filter-field">
+              <span class="field-label">Role</span>
+              <select [ngModel]="roleFilter()" (ngModelChange)="onRoleFilterChange($event)" class="select-input">
+                <option value="">All Roles</option>
+                @for (role of availableRoles(); track role.id) {
+                  <option [value]="role.code">{{ role.name }}</option>
+                }
+              </select>
+            </label>
+            <div class="filter-actions-col">
+              <button type="button" class="btn outline" (click)="resetFilters()" [disabled]="activeFilterCount() === 0">Reset Filters</button>
+            </div>
+          </div>
         </section>
 
         @if (isLoading()) {
@@ -332,12 +394,27 @@ import { PlatformUserApiService } from '../../services/platform-user-api.service
                 </tbody>
               </table>
             </div>
+            <footer class="pagination-row">
+              <span class="pagination-count">Showing {{ showingStart() }} to {{ showingEnd() }} of {{ totalCount() }} users</span>
+              <div class="pagination-controls">
+                <select [value]="pageSize()" (change)="onPageSizeChange($event)" class="page-size-select">
+                  <option [value]="10">10 / page</option>
+                  <option [value]="25">25 / page</option>
+                  <option [value]="50">50 / page</option>
+                </select>
+                <button type="button" class="btn outline btn-icon" [disabled]="pageNumber() <= 1 || isLoading()" (click)="previousPage()">&lt;</button>
+                <span class="page-current">Page {{ pageNumber() }} of {{ totalPages() || 1 }}</span>
+                <button type="button" class="btn outline btn-icon" [disabled]="pageNumber() >= totalPages() || totalPages() === 0 || isLoading()" (click)="nextPage()">&gt;</button>
+              </div>
+            </footer>
           </section>
         } @else {
           <div class="state-card card empty">
             <strong>No platform users found</strong>
-            <span>{{ searchTerm() ? 'Try a different search term.' : 'Add the first platform user to get started.' }}</span>
-            @if (canCreate() && !searchTerm()) {
+            <span>{{ activeFilterCount() > 0 ? 'Try clearing or adjusting your filter criteria.' : 'Add the first platform user to get started.' }}</span>
+            @if (activeFilterCount() > 0) {
+              <button type="button" class="btn outline" (click)="resetFilters()">Clear Filters</button>
+            } @else if (canCreate()) {
               <button type="button" class="btn primary" (click)="openCreate()">Add Platform User</button>
             }
           </div>
@@ -439,7 +516,7 @@ import { PlatformUserApiService } from '../../services/platform-user-api.service
         title="Send password reset?"
         [message]="resetConfirmMessage()"
         confirmLabel="Send Password Reset"
-        loadingLabel="Sending..."
+        cancelLabel="Cancel"
         [isLoading]="isResetting()"
         (confirm)="confirmPasswordReset()"
         (cancel)="closeResetConfirm()"
@@ -500,6 +577,7 @@ import { PlatformUserApiService } from '../../services/platform-user-api.service
     .btn.primary:hover:not(:disabled) { background: #004bdf; border-color: #004bdf; }
     .btn.outline { background: #fff; border: 1px solid #d0d5dd; color: #344054; }
     .btn.outline:hover:not(:disabled) { background: #f9fafb; border-color: #c3c9d6; }
+    .btn.outline.btn-filter.active { background: #eff8ff; border-color: #84caef; color: #175cd3; }
     .btn:disabled { cursor: not-allowed; opacity: 0.55; }
 
     .card { background: #fff; border: 1px solid #eaecf0; border-radius: 12px; box-shadow: 0 1px 3px rgba(16, 24, 40, 0.05), 0 1px 2px rgba(16, 24, 40, 0.03); }
@@ -549,6 +627,35 @@ import { PlatformUserApiService } from '../../services/platform-user-api.service
       stroke-width: 2;
     }
     .btn-filter { height: 40px; }
+    .filter-badge {
+      background: #0b5cff;
+      color: #fff;
+      border-radius: 99px;
+      padding: 1px 7px;
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+
+    .filter-drawer {
+      padding: 16px;
+      margin-bottom: 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: flex-end;
+      background: #f9fafb;
+    }
+    .filter-group { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 140px; }
+    .filter-group label { font-size: 0.78rem; font-weight: 600; color: #344054; }
+    .filter-group select {
+      height: 38px;
+      border: 1px solid #d0d5dd;
+      border-radius: 8px;
+      padding: 0 10px;
+      font: inherit;
+      background: #fff;
+      color: #101828;
+    }
 
     .r1-form { display: flex; flex-direction: column; gap: 20px; }
     .form-section { display: flex; flex-direction: column; gap: 16px; }
@@ -687,12 +794,14 @@ import { PlatformUserApiService } from '../../services/platform-user-api.service
       margin-top: 8px;
     }
 
-    .filters { display: grid; gap: 0.85rem; padding: 1rem; }
-    .filter-field { display: grid; gap: 0.35rem; }
+    .filters { padding: 1rem; }
+    .filters-grid { display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 1rem; align-items: end; }
+    .filter-field { display: flex; flex-direction: column; gap: 0.35rem; }
     .field-label { color: #667085; font-size: 0.78rem; font-weight: 600; }
     .input-wrap { position: relative; }
     .input-wrap input { border: 1px solid #d0d5dd; border-radius: 10px; font: inherit; padding: 0.62rem 2.2rem 0.62rem 0.75rem; width: 100%; }
     .input-wrap svg { height: 1rem; left: auto; position: absolute; right: 0.75rem; stroke: #98a2b3; stroke-width: 1.75; top: 50%; transform: translateY(-50%); width: 1rem; fill: none; }
+    .select-input { border: 1px solid #d0d5dd; border-radius: 10px; font: inherit; padding: 0.62rem 0.75rem; width: 100%; background: #fff; color: #101828; height: 42px; }
 
     .state-card { display: grid; gap: 0.65rem; padding: 1.5rem; text-align: center; font-size: 0.88rem; }
     .state-card.loading { color: #667085; }
@@ -728,12 +837,21 @@ import { PlatformUserApiService } from '../../services/platform-user-api.service
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 16px 0 0;
+      padding: 16px 24px;
       border-top: 1px solid #eaecf0;
-      margin-top: 16px;
     }
     .pagination-count { color: #475467; font-size: 0.84rem; }
-    .pagination-controls { display: flex; gap: 8px; }
+    .pagination-controls { display: flex; align-items: center; gap: 8px; }
+    .page-size-select {
+      height: 32px;
+      border: 1px solid #d0d5dd;
+      border-radius: 6px;
+      padding: 0 8px;
+      font-size: 0.8rem;
+      background: #fff;
+      color: #344054;
+    }
+    .page-current { font-size: 0.82rem; color: #344054; font-weight: 600; padding: 0 4px; }
 
     .editor-backdrop { background: rgba(16, 24, 40, 0.45); inset: 0; position: fixed; z-index: 20; }
     .editor-panel {
@@ -749,34 +867,28 @@ import { PlatformUserApiService } from '../../services/platform-user-api.service
       z-index: 21;
     }
 
-    .editor-header { align-items: flex-start; display: flex; justify-content: space-between; }
-    .editor-header h2 { font-size: 1.25rem; font-weight: 700; margin: 0; color: #101828; }
-    .editor-header p { color: #667085; font-size: 0.82rem; margin: 0.25rem 0 0; }
-    .icon-close { background: transparent; border: 0; color: #667085; cursor: pointer; font-size: 1.5rem; line-height: 1; }
+    .editor-header { display: flex; justify-content: space-between; align-items: flex-start; }
+    .editor-header h2 { margin: 0; font-size: 1.25rem; color: #101828; }
+    .editor-header p { margin: 0.25rem 0 0; color: #667085; font-size: 0.85rem; }
+    .icon-close { background: transparent; border: 0; font-size: 1.5rem; color: #667085; cursor: pointer; padding: 0; line-height: 1; }
+    .editor-error { background: #fef3f2; border: 1px solid #fecdca; border-radius: 8px; color: #b42318; font-size: 0.84rem; padding: 0.75rem 1rem; }
 
-    .editor-error { background: #fef3f2; border: 1px solid #fecdca; border-radius: 10px; color: #b42318; font-size: 0.84rem; padding: 0.75rem; }
-    .editor-form { display: grid; gap: 1rem; }
-    .editor-form label { display: grid; gap: 0.35rem; font-size: 0.82rem; font-weight: 600; }
-    .editor-form input, .editor-form select { border: 1px solid #d0d5dd; border-radius: 10px; font: inherit; padding: 0.62rem 0.75rem; }
+    .editor-form { display: grid; gap: 1.25rem; }
+    .editor-form label { display: grid; gap: 0.35rem; font-size: 0.85rem; color: #344054; font-weight: 600; }
+    .editor-form select { border: 1px solid #d0d5dd; border-radius: 8px; font: inherit; padding: 0.6rem 0.75rem; background: #fff; }
 
-    .roles-fieldset { border: 1px solid #eaecf0; border-radius: 12px; display: grid; gap: 0.55rem; margin: 0; padding: 0.85rem; }
-    .roles-fieldset legend { color: #344054; font-size: 0.82rem; font-weight: 700; padding: 0 0.25rem; }
-    .role-option { align-items: flex-start; display: flex; gap: 0.55rem; font-weight: 400; }
-    .role-option span { display: grid; gap: 0.1rem; }
-    .role-option small { color: #667085; font-size: 0.74rem; }
-    .muted { color: #667085; font-size: 0.82rem; margin: 0; }
+    .roles-fieldset { border: 1px solid #eaecf0; border-radius: 8px; display: grid; gap: 0.65rem; padding: 0.85rem; margin: 0; }
+    .roles-fieldset legend { color: #344054; font-size: 0.82rem; font-weight: 600; padding: 0 0.35rem; }
+    .role-option { display: flex; align-items: flex-start; gap: 0.6rem; cursor: pointer; font-weight: 400; }
+    .role-option input { margin-top: 0.25rem; }
+    .role-option span { display: grid; gap: 0.15rem; }
+    .role-option strong { color: #101828; font-size: 0.84rem; }
+    .role-option small { color: #667085; font-size: 0.75rem; }
 
-    .editor-actions { display: flex; gap: 0.65rem; justify-content: flex-end; }
-
-    .reset-section {
-      border-top: 1px solid #eaecf0;
-      display: grid;
-      gap: 0.65rem;
-      padding-top: 1rem;
-    }
-
-    .reset-section h3 { font-size: 0.92rem; margin: 0; }
-    .reset-section p, .reset-note { color: #667085; font-size: 0.82rem; font-weight: 500; margin: 0; }
+    .reset-section { border-top: 1px solid #eaecf0; display: grid; gap: 0.65rem; padding-top: 1rem; }
+    .reset-section h3 { color: #101828; font-size: 0.95rem; font-weight: 700; margin: 0; }
+    .reset-section p { color: #667085; font-size: 0.8rem; margin: 0; line-height: 1.4; }
+    .reset-note { color: #027a48; font-weight: 600; }
     .reset-link-box { display: grid; gap: 0.65rem; }
     .reset-link-box input { width: 100%; }
     .reset-link-actions { display: flex; flex-wrap: wrap; gap: 0.55rem; }
@@ -812,34 +924,26 @@ export class PlatformUsersPage {
   readonly isAddingUser = signal(false);
   readonly dropdownOpen = signal(false);
 
+  // Server-side pagination & filter state
+  readonly pageNumber = signal(1);
+  readonly pageSize = signal(10);
+  readonly totalCount = signal(0);
+  readonly totalPages = signal(0);
+  readonly statusFilter = signal('');
+  readonly roleFilter = signal('');
+  readonly filterPanelOpen = signal(false);
+
+  readonly showingStart = computed(() => (this.totalCount() === 0 ? 0 : (this.pageNumber() - 1) * this.pageSize() + 1));
+  readonly showingEnd = computed(() => Math.min(this.pageNumber() * this.pageSize(), this.totalCount()));
+  readonly activeFilterCount = computed(() => (this.statusFilter() ? 1 : 0) + (this.roleFilter() ? 1 : 0) + (this.searchTerm().trim() ? 1 : 0));
+
   readonly createForm = this.fb.nonNullable.group({
     fullName: ['', [Validators.required, Validators.maxLength(100)]],
     email: ['', [Validators.required, Validators.email, Validators.maxLength(255)]],
     phone: ['', [Validators.maxLength(20)]]
   });
 
-  readonly filteredUsers = computed(() => {
-    const term = this.searchTerm().trim().toLowerCase();
-    const items = this.users();
-
-    if (!term) {
-      return items;
-    }
-
-    return items.filter((user) => {
-      const haystack = [
-        user.email,
-        user.displayName ?? '',
-        ...user.roleNames,
-        ...user.roleCodes,
-        user.status
-      ]
-        .join(' ')
-        .toLowerCase();
-
-      return haystack.includes(term);
-    });
-  });
+  readonly filteredUsers = computed(() => this.users());
 
   constructor() {
     this.loadPage();
@@ -940,13 +1044,23 @@ export class PlatformUsersPage {
     this.errorMessage.set(null);
 
     forkJoin({
-      users: this.userApi.getUsers(),
+      usersResponse: this.userApi.getUsers({
+        pageNumber: this.pageNumber(),
+        pageSize: this.pageSize(),
+        search: this.searchTerm(),
+        status: this.statusFilter(),
+        role: this.roleFilter()
+      }),
       roles: this.roleApi.getRoles()
     })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: ({ users, roles }) => {
-          this.users.set(users.users);
+        next: ({ usersResponse, roles }) => {
+          this.users.set(usersResponse.users);
+          this.pageNumber.set(usersResponse.pageNumber ?? 1);
+          this.pageSize.set(usersResponse.pageSize ?? 10);
+          this.totalCount.set(usersResponse.totalCount ?? usersResponse.users.length);
+          this.totalPages.set(usersResponse.totalPages ?? (usersResponse.users.length > 0 ? 1 : 0));
           this.availableRoles.set(roles.roles.filter((role) => this.isRoleActive(role.status)));
           this.isLoading.set(false);
         },
@@ -955,6 +1069,90 @@ export class PlatformUsersPage {
           this.isLoading.set(false);
         }
       });
+  }
+
+  fetchUsers(): void {
+    this.isLoading.set(true);
+    this.errorMessage.set(null);
+
+    this.userApi
+      .getUsers({
+        pageNumber: this.pageNumber(),
+        pageSize: this.pageSize(),
+        search: this.searchTerm(),
+        status: this.statusFilter(),
+        role: this.roleFilter()
+      })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (res) => {
+          this.users.set(res.users);
+          this.pageNumber.set(res.pageNumber ?? 1);
+          this.pageSize.set(res.pageSize ?? 10);
+          this.totalCount.set(res.totalCount ?? res.users.length);
+          this.totalPages.set(res.totalPages ?? (res.users.length > 0 ? 1 : 0));
+          this.isLoading.set(false);
+        },
+        error: (error) => {
+          this.errorMessage.set(this.apiError.toSafeMessage(error));
+          this.isLoading.set(false);
+        }
+      });
+  }
+
+  onSearchInput(value: string): void {
+    this.searchTerm.set(value);
+    this.pageNumber.set(1);
+    this.fetchUsers();
+  }
+
+  onStatusFilterChange(value: string): void {
+    this.statusFilter.set(value);
+    this.pageNumber.set(1);
+    this.fetchUsers();
+  }
+
+  onRoleFilterChange(value: string): void {
+    this.roleFilter.set(value);
+    this.pageNumber.set(1);
+    this.fetchUsers();
+  }
+
+  toggleFilterPanel(): void {
+    this.filterPanelOpen.set(!this.filterPanelOpen());
+  }
+
+  resetFilters(): void {
+    this.searchTerm.set('');
+    this.statusFilter.set('');
+    this.roleFilter.set('');
+    this.pageNumber.set(1);
+    this.fetchUsers();
+  }
+
+  goToPage(page: number): void {
+    if (page < 1 || (this.totalPages() > 0 && page > this.totalPages()) || page === this.pageNumber()) {
+      return;
+    }
+    this.pageNumber.set(page);
+    this.fetchUsers();
+  }
+
+  previousPage(): void {
+    this.goToPage(this.pageNumber() - 1);
+  }
+
+  nextPage(): void {
+    this.goToPage(this.pageNumber() + 1);
+  }
+
+  onPageSizeChange(event: Event): void {
+    const size = Number((event.target as HTMLSelectElement).value);
+    if (size > 0 && size !== this.pageSize()) {
+      this.pageSize.set(size);
+      this.pageNumber.set(1);
+      this.fetchUsers();
+    }
   }
 
   openCreate(): void {
@@ -1035,10 +1233,10 @@ export class PlatformUsersPage {
       })
       .subscribe({
         next: (created) => {
-          this.users.set([created, ...this.users()]);
           this.successMessage.set(`Platform user ${created.displayName || created.email} created. Invitation queued.`);
           this.isSaving.set(false);
           this.cancelCreate();
+          this.fetchUsers();
         },
         error: (error) => {
           this.editorError.set(this.apiError.toSafeMessage(error));
@@ -1056,6 +1254,7 @@ export class PlatformUsersPage {
         this.applyUpdatedUser(updated);
         this.successMessage.set('Platform user status updated.');
         this.isSaving.set(false);
+        this.fetchUsers();
       },
       error: (error) => {
         this.editorError.set(this.apiError.toSafeMessage(error));
@@ -1077,6 +1276,7 @@ export class PlatformUsersPage {
         this.applyUpdatedUser(updated);
         this.successMessage.set('Platform user roles updated.');
         this.isSaving.set(false);
+        this.fetchUsers();
       },
       error: (error) => {
         this.editorError.set(this.apiError.toSafeMessage(error));
