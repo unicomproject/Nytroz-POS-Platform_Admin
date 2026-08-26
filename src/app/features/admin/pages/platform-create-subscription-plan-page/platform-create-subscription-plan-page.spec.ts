@@ -72,7 +72,7 @@ describe('PlatformCreateSubscriptionPlanPage', () => {
       getSubscriptionPlanDetail: vi.fn().mockReturnValue(of(planDetail())),
       createSubscriptionPlanDraft: vi.fn().mockReturnValue(of({ id: 'draft-1', planName: 'Plan', planCode: 'PLAN', status: 'draft' })),
       updateSubscriptionPlanDraft: vi.fn().mockReturnValue(of({ id: 'draft-1', planName: 'Plan', planCode: 'PLAN', status: 'draft' })),
-      updateSubscriptionPlanFeatures: vi.fn().mockReturnValue(of({ id: 'draft-1', includedFeatureIds: ['feature-pos-sale', 'feature-inventory'], status: 'draft' })),
+      updateSubscriptionPlanFeatures: vi.fn().mockReturnValue(of({ id: 'draft-1', includedFeatureIds: ['feature-pos-checkout', 'feature-inventory'], status: 'draft' })),
       updateSubscriptionPlanPricing: vi.fn().mockReturnValue(of({ id: 'draft-1', basePrice: 12900, status: 'draft' })),
       updateSubscriptionPlanLimits: vi.fn().mockReturnValue(of({ id: 'draft-1', maxOutlets: 5, maxTills: 10, maxUsers: 25, status: 'draft' })),
       publishSubscriptionPlan: vi.fn().mockReturnValue(of({ id: 'draft-1', planName: 'Plan', planCode: 'PLAN', status: 'active' }))
@@ -150,6 +150,15 @@ describe('PlatformCreateSubscriptionPlanPage', () => {
     fillBasics(component);
     component.savedPlanId.set('draft-1');
     component.basicsSaved.set(true);
+    component.moduleAvailability.set({
+      core_pos: 'included',
+      inventory: 'included'
+    });
+    component.featureAvailability.set({
+      'feature-pos-checkout': 'included',
+      'feature-inventory': 'included'
+    });
+    component.featuresSaved.set(true);
     component.basePriceInput.set('12900.00');
     component.onBasePriceBlur();
     component.pricingSaved.set(true);
@@ -172,11 +181,11 @@ describe('PlatformCreateSubscriptionPlanPage', () => {
           defaultAvailability: 'included',
           features: [
             {
-              id: 'feature-pos-sale',
-              code: 'pos.sales',
-              name: 'POS Sales',
-              description: 'Start POS sale',
-              entitlementKey: 'pos.sales',
+              id: 'feature-pos-checkout',
+              code: 'pos_checkout',
+              name: 'POS Checkout',
+              description: 'Canonical POS checkout entitlement',
+              entitlementKey: 'pos_checkout',
               sortOrder: 10,
               isCore: true,
               isLocked: true,
@@ -862,6 +871,7 @@ describe('PlatformCreateSubscriptionPlanPage', () => {
   });
 
   it('publishes once when the dialog is confirmed and navigates with the success message', () => {
+    mockCatalogSuccess();
     const fixture = createFixture();
     const component = fixture.componentInstance;
     readyForPublish(component);
@@ -890,6 +900,7 @@ describe('PlatformCreateSubscriptionPlanPage', () => {
   });
 
   it('guards double publish submissions while isSaving is true', () => {
+    mockCatalogSuccess();
     api.publishSubscriptionPlan.mockReturnValue(NEVER);
 
     const fixture = createFixture();
@@ -925,9 +936,9 @@ describe('PlatformCreateSubscriptionPlanPage', () => {
 
     expect(api.getSubscriptionCatalog).toHaveBeenCalledOnce();
     expect(component.modules().map((module) => module.name)).toEqual(['Core POS', 'Inventory']);
-    expect(component.features().map((feature) => feature.name)).toEqual(['POS Sales', 'Inventory Management']);
+    expect(component.features().map((feature) => feature.name)).toEqual(['POS Checkout', 'Inventory Management']);
     expect(component.moduleAvailability()['core_pos']).toBe('included');
-    expect(component.featureAvailability()['feature-pos-sale']).toBe('included');
+    expect(component.featureAvailability()['feature-pos-checkout']).toBe('included');
     expect(component.catalogError()).toBeNull();
     expect(fixture.componentInstance.isEditMode()).toBe(false);
   });
@@ -976,7 +987,7 @@ describe('PlatformCreateSubscriptionPlanPage', () => {
 
     expect(component.selectedModulesCount()).toBe(2);
     expect(component.featureGroups().map((group) => group.moduleName)).toEqual(['Core POS', 'Inventory']);
-    expect(component.isFeatureDisabled(component.features().find((feature) => feature.id === 'feature-pos-sale')!)).toBe(true);
+    expect(component.isFeatureDisabled(component.features().find((feature) => feature.id === 'feature-pos-checkout')!)).toBe(true);
     expect(component.isFeatureDisabled(component.features().find((feature) => feature.id === 'feature-inventory')!)).toBe(false);
   });
 
@@ -998,7 +1009,7 @@ describe('PlatformCreateSubscriptionPlanPage', () => {
 
     expect(api.updateSubscriptionPlanFeatures).toHaveBeenCalledWith('draft-1', {
       featureAvailability: {
-        'feature-pos-sale': 'included',
+        'feature-pos-checkout': 'included',
         'feature-inventory': 'included'
       }
     });
@@ -1066,7 +1077,7 @@ describe('PlatformCreateSubscriptionPlanPage', () => {
     expect(text).toContain('Core POS');
     expect(text).toContain('Inventory');
     expect(text).toContain('Selected Features');
-    expect(text).toContain('POS Sales');
+    expect(text).toContain('POS Checkout');
     expect(text).toContain('Inventory Management');
     expect(component.modulesSummary()).toBe('2 selected');
     expect(component.featuresSummary()).toBe('2 enabled');

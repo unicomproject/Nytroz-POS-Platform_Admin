@@ -222,16 +222,16 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
 
   billingCycleLabel(): string {
     const value = this.basicsForm.controls.billingCycle.value;
-    return this.billingCycleOptions.find((option) => option.value === value)?.label ?? '—';
+    return this.billingCycleOptions.find((option) => option.value === value)?.label ?? 'â€”';
   }
 
   currencyLabel(): string {
     const code = this.basicsForm.controls.baseCurrency.value;
-    return this.currencyLabels[code] ?? code ?? '—';
+    return this.currencyLabels[code] ?? code ?? 'â€”';
   }
 
   currencyCode(): string {
-    return this.basicsForm.controls.baseCurrency.value || '—';
+    return this.basicsForm.controls.baseCurrency.value || 'â€”';
   }
 
   descriptionHelperText(): string {
@@ -275,7 +275,7 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
     const price = this.pricingForm.controls.basePrice.value;
     const currency = this.basicsForm.controls.baseCurrency.value || 'LKR';
     if (price == null) {
-      return '—';
+      return 'â€”';
     }
 
     return `${currency} ${this.formatCurrencyAmount(price)}`;
@@ -858,6 +858,11 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
       return;
     }
 
+    if (!this.validateFeaturesStep() || !this.enabledFeaturesCount()) {
+      this.errorMessage.set('At least one included feature must be configured before publishing.');
+      return;
+    }
+
     if (!this.validatePricingStep()) {
       this.errorMessage.set('Base price is required before publishing.');
       return;
@@ -873,20 +878,38 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
     this.errorMessage.set(null);
 
     this.ensureDraftPlanId((planId) => {
-      this.api.updateSubscriptionPlanPricing(planId, {
-        basePrice: this.pricingForm.controls.basePrice.value!
+      this.api.updateSubscriptionPlanFeatures(planId, {
+        featureAvailability: this.buildFeatureAvailabilityRequest()
       }).subscribe({
-        next: () => {
-          this.pricingSaved.set(true);
-          this.api.updateSubscriptionPlanLimits(planId, this.buildLimitsRequest()).subscribe({
+        next: (response) => {
+          this.applyFeaturesResponse(response.includedFeatureIds);
+          this.featuresSaved.set(true);
+          if (!response.includedFeatureIds.length) {
+            this.errorMessage.set('At least one included feature must be configured before publishing.');
+            this.isSaving.set(false);
+            return;
+          }
+
+          this.api.updateSubscriptionPlanPricing(planId, {
+            basePrice: this.pricingForm.controls.basePrice.value!
+          }).subscribe({
             next: () => {
-              this.limitsSaved.set(true);
-              this.api.publishSubscriptionPlan(planId).subscribe({
+              this.pricingSaved.set(true);
+              this.api.updateSubscriptionPlanLimits(planId, this.buildLimitsRequest()).subscribe({
                 next: () => {
-                  this.isSaving.set(false);
-                  this.closePublishModal();
-                  void this.router.navigate(['/admin/subscriptions'], {
-                    state: { successMessage: 'Subscription plan published successfully.' }
+                  this.limitsSaved.set(true);
+                  this.api.publishSubscriptionPlan(planId).subscribe({
+                    next: () => {
+                      this.isSaving.set(false);
+                      this.closePublishModal();
+                      void this.router.navigate(['/admin/subscriptions'], {
+                        state: { successMessage: 'Subscription plan published successfully.' }
+                      });
+                    },
+                    error: (error) => {
+                      this.errorMessage.set(this.apiError.toSafeMessage(error));
+                      this.isSaving.set(false);
+                    }
                   });
                 },
                 error: (error) => {
@@ -928,6 +951,11 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
 
     if (!this.selectedModulesCount()) {
       this.errorMessage.set('Select at least one module before saving features.');
+      return false;
+    }
+
+    if (!this.enabledFeaturesCount()) {
+      this.errorMessage.set('Select at least one included feature before continuing.');
       return false;
     }
 
