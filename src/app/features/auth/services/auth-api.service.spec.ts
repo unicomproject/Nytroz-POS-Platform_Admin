@@ -170,7 +170,7 @@ describe('AuthApiService', () => {
       isValid = response.isValid;
     });
 
-    const request = httpTesting.expectOne('/api/v1/platform-auth/password-reset/validate');
+    const request = httpTesting.expectOne('/api/v1/auth/platform-password-reset/validate');
     expect(request.request.method).toBe('POST');
     expect(request.request.body).toEqual({ token: 'one-time-reset-token-fixture' });
     expect(request.request.withCredentials).not.toBe(true);
@@ -197,7 +197,7 @@ describe('AuthApiService', () => {
         message = response.message;
       });
 
-    const request = httpTesting.expectOne('/api/v1/platform-auth/password-reset/complete');
+    const request = httpTesting.expectOne('/api/v1/auth/platform-password-reset/complete');
     expect(request.request.method).toBe('POST');
     expect(request.request.body).toEqual({
       token: 'one-time-reset-token-fixture',

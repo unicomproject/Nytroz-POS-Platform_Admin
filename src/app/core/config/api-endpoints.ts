@@ -3,8 +3,8 @@ export const apiEndpoints = {
     login: '/auth/platform-login',
     logout: '/auth/platform-logout',
     refresh: '/auth/platform-refresh',
-    passwordResetValidate: '/platform-auth/password-reset/validate',
-    passwordResetComplete: '/platform-auth/password-reset/complete'
+    passwordResetValidate: '/auth/platform-password-reset/validate',
+    passwordResetComplete: '/auth/platform-password-reset/complete'
   },
   platform: {
     dashboard: '/platform-admin/dashboard',
