@@ -3,7 +3,6 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
-import { catalogPermissions, tenantPermissions } from '../../../../core/config/permission-keys';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import { TenantContextService } from '../../../../core/services/tenant-context.service';
 import { BreadcrumbItem, PageHeader } from '../../../../shared/components/page-header/page-header';
@@ -13,17 +12,6 @@ import { SelectedTenantContextBand } from '../../components/selected-tenant-cont
 import { SelectedTenantBootstrapApiService } from '../../services/selected-tenant-bootstrap-api.service';
 import { SelectedTenantContextService } from '../../services/selected-tenant-context.service';
 import { createIdempotencyKey } from '../../utils/idempotency-key.util';
-
-const bootstrapAssignablePermissions = [
-  { code: tenantPermissions.outletManage, label: 'Outlets — manage' },
-  { code: tenantPermissions.tillManage, label: 'Tills — manage' },
-  { code: tenantPermissions.userManage, label: 'Users — manage' },
-  { code: tenantPermissions.roleManage, label: 'Roles — manage' },
-  { code: catalogPermissions.productView, label: 'Products — view' },
-  { code: catalogPermissions.productCreate, label: 'Products — create' },
-  { code: catalogPermissions.productUpdate, label: 'Products — update' },
-  { code: tenantPermissions.productImport, label: 'Products — import' }
-];
 
 @Component({
   selector: 'app-create-role-page',
@@ -41,7 +29,7 @@ export class CreateRolePage {
   private readonly apiError = inject(ApiErrorService);
   private readonly destroyRef = inject(DestroyRef);
 
-  readonly permissionOptions = bootstrapAssignablePermissions;
+  readonly permissionOptions = signal<{ code: string; label: string }[]>([]);
   readonly tenantId = computed(() => this.route.snapshot.paramMap.get('tenantId') ?? '');
   readonly band = computed(() => {
     const summary = this.selectedTenantContext.summary()?.tenant;
@@ -56,8 +44,9 @@ export class CreateRolePage {
 
   readonly roleName = signal('');
   readonly description = signal('');
-  readonly selectedCodes = signal<string[]>([tenantPermissions.outletManage]);
+  readonly selectedCodes = signal<string[]>([]);
   readonly submitting = signal(false);
+  readonly loadingPermissions = signal(true);
   readonly errorMessage = signal<string | null>(null);
 
   readonly breadcrumbItems = computed<BreadcrumbItem[]>(() => [
@@ -66,13 +55,35 @@ export class CreateRolePage {
   ]);
 
   constructor() {
+    const tenantId = this.tenantId();
     const summary = this.selectedTenantContext.summary();
-    if (!summary || summary.tenant.tenantId !== this.tenantId()) {
+    if (!summary || summary.tenant.tenantId !== tenantId) {
       this.api
-        .getSummary(this.tenantId())
+        .getSummary(tenantId)
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe({ next: (loaded) => this.selectedTenantContext.setSummary(loaded) });
     }
+
+    this.api
+      .getPermissionOptions(tenantId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (options) => {
+          const mapped = options.map((option) => ({
+            code: option.permissionCode,
+            label: option.permissionCode
+          }));
+          this.permissionOptions.set(mapped);
+          if (mapped.length > 0) {
+            this.selectedCodes.set([mapped[0].code]);
+          }
+          this.loadingPermissions.set(false);
+        },
+        error: (error) => {
+          this.errorMessage.set(this.apiError.toSafeMessage(error));
+          this.loadingPermissions.set(false);
+        }
+      });
   }
 
   togglePermission(code: string, checked: boolean): void {

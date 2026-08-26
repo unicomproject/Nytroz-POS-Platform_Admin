@@ -3,6 +3,8 @@ export const apiEndpoints = {
     login: '/auth/platform-login',
     logout: '/auth/platform-logout',
     refresh: '/auth/platform-refresh',
+    passwordResetValidate: '/auth/platform-password-reset/validate',
+    passwordResetComplete: '/auth/platform-password-reset/complete'
   },
   platform: {
     dashboard: '/platform-admin/dashboard',
@@ -39,6 +41,8 @@ export const apiEndpoints = {
         `/platform-admin/billing/manual-payments/${paymentId}/notification/resend`,
     },
     users: '/platform-admin/users',
+    userPasswordReset: (userId: string) =>
+      `/platform-admin/users/${encodeURIComponent(userId)}/password-reset`,
     settings: '/platform-admin/settings',
     returnPolicyTemplates: '/platform/return-policy-templates',
     returnPolicyTemplate: (templateId: string) => `/platform/return-policy-templates/${templateId}`,

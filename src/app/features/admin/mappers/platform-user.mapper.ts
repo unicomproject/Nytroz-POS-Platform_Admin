@@ -21,7 +21,12 @@ export interface PlatformUserListItemApiDto {
 }
 
 export interface PlatformUserListResponseApiDto {
-  users: PlatformUserListItemApiDto[];
+  users?: PlatformUserListItemApiDto[];
+  items?: PlatformUserListItemApiDto[];
+  pageNumber?: number;
+  pageSize?: number;
+  totalCount?: number;
+  totalPages?: number;
 }
 
 export interface PlatformUserDetailApiDto extends PlatformUserListItemApiDto {
@@ -31,8 +36,20 @@ export interface PlatformUserDetailApiDto extends PlatformUserListItemApiDto {
 export function mapPlatformUserListResponse(
   dto: PlatformUserListResponseApiDto | null | undefined
 ): PlatformUserListResponse {
+  const rawList = dto?.users ?? dto?.items ?? [];
+  const users = rawList.map(mapPlatformUserSummary);
+  const totalCount = Number(dto?.totalCount ?? users.length);
+  const pageSize = Number(dto?.pageSize ?? 10);
+  const pageNumber = Number(dto?.pageNumber ?? 1);
+  const totalPages = Number(dto?.totalPages ?? (pageSize > 0 ? Math.ceil(totalCount / pageSize) : 0));
+
   return {
-    users: (dto?.users ?? []).map(mapPlatformUserSummary)
+    users,
+    items: users,
+    pageNumber,
+    pageSize,
+    totalCount,
+    totalPages
   };
 }
 

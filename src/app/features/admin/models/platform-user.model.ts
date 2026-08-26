@@ -11,8 +11,23 @@ export interface PlatformUserSummary {
   updatedAt: string;
 }
 
+export interface PlatformUserListQuery {
+  pageNumber?: number;
+  pageSize?: number;
+  search?: string;
+  status?: string;
+  role?: string;
+  sortBy?: string;
+  sortDirection?: string;
+}
+
 export interface PlatformUserListResponse {
   users: PlatformUserSummary[];
+  items?: PlatformUserSummary[];
+  pageNumber?: number;
+  pageSize?: number;
+  totalCount?: number;
+  totalPages?: number;
 }
 
 export interface PlatformUserDetail extends PlatformUserSummary {
@@ -48,5 +63,6 @@ export type PlatformUserEditorMode = 'create' | 'edit';
 export const platformUserStatusOptions = [
   { value: 'ACTIVE', label: 'Active' },
   { value: 'INACTIVE', label: 'Inactive' },
+  { value: 'INVITED', label: 'Invited' },
   { value: 'LOCKED', label: 'Locked' }
 ] as const;

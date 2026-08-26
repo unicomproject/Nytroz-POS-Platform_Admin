@@ -120,6 +120,9 @@ export class PlatformCreateTenantPage implements OnInit {
   readonly lastSavedAt = signal<string | null>(null);
   private finalizationKey: string | null = null;
 
+  readonly unavailablePlanMessage =
+    'The subscription plan previously selected for this draft is no longer available. Please select a valid subscription plan to continue.';
+
   readonly breadcrumbs = computed<BreadcrumbItem[]>(() => [
     { label: 'Tenants', path: '/admin/tenants' },
     { label: this.draftId() ? 'Resume' : 'Create' }
@@ -209,6 +212,16 @@ export class PlatformCreateTenantPage implements OnInit {
     return this.createOptions().plans.find((plan) => plan.id === planId) ?? null;
   }
 
+  /** Draft/resume still holds a plan id that create-options no longer returns. */
+  hasUnavailableSelectedPlan(): boolean {
+    const planId = this.planSelectionForm.controls.subscriptionPlanId.value?.trim();
+    if (!planId) {
+      return false;
+    }
+
+    return !this.createOptions().plans.some((plan) => plan.id === planId);
+  }
+
   ngOnInit(): void {
     this.loadCreateOptions();
     const draftId = this.route.snapshot.paramMap.get('draftId');
@@ -262,7 +275,7 @@ export class PlatformCreateTenantPage implements OnInit {
 
   displayValue(value: string | null | undefined): string {
     const trimmed = (value ?? '').trim();
-    return trimmed.length ? trimmed : '—';
+    return trimmed.length ? trimmed : 'â€”';
   }
 
   summaryValue(value: string | null | undefined, emptyLabel = 'Not entered'): string {
@@ -271,7 +284,7 @@ export class PlatformCreateTenantPage implements OnInit {
   }
 
   stepErrorAriaLabel(stepLabel: string, count: number): string {
-    return `${stepLabel} — ${count} validation error${count === 1 ? '' : 's'}`;
+    return `${stepLabel} â€” ${count} validation error${count === 1 ? '' : 's'}`;
   }
 
   adminDisplayName(): string {
@@ -379,6 +392,15 @@ export class PlatformCreateTenantPage implements OnInit {
     return plan.includedFeatureIds.includes(feature.id) || plan.includedFeatureCodes.includes(feature.featureCode);
   }
 
+  planHasAssignableFeatures(): boolean {
+    const plan = this.selectedPlan();
+    if (!plan) {
+      return false;
+    }
+
+    return plan.includedFeatureIds.length > 0 || plan.includedFeatureCodes.length > 0;
+  }
+
   isFeatureEnabled(featureId: string): boolean {
     return this.selectedFeatureIds().includes(featureId);
   }
@@ -472,12 +494,28 @@ export class PlatformCreateTenantPage implements OnInit {
     if (step === 'limits-addons') {
       this.planSelectionForm.markAllAsTouched();
       this.limitsAddonsForm.markAllAsTouched();
+      if (this.hasUnavailableSelectedPlan()) {
+        this.errorMessage.set(this.unavailablePlanMessage);
+        return false;
+      }
       return this.planSelectionForm.valid && this.limitsAddonsForm.valid;
     }
 
     if (step === 'feature-entitlements') {
+      if (this.hasUnavailableSelectedPlan()) {
+        this.errorMessage.set(this.unavailablePlanMessage);
+        return false;
+      }
+
       if (!this.selectedPlan()) {
         this.errorMessage.set('Please select a plan before configuring features.');
+        return false;
+      }
+
+      if (!this.planHasAssignableFeatures()) {
+        this.errorMessage.set(
+          'Unable to load feature entitlements. The selected subscription plan has no included features. Choose another plan or update the plan feature catalog, then retry.'
+        );
         return false;
       }
 
@@ -554,15 +592,25 @@ export class PlatformCreateTenantPage implements OnInit {
     }
 
     if (step === 'limits-addons') {
-      if (this.planSelectionForm.invalid) issues.push('Subscription plan is required.');
+      if (this.hasUnavailableSelectedPlan()) {
+        issues.push(this.unavailablePlanMessage);
+      } else if (this.planSelectionForm.invalid) {
+        issues.push('Subscription plan is required.');
+      }
       this.pushControlIssue(issues, this.limitsAddonsForm.controls.maxOutlets, 'Max outlets');
       this.pushControlIssue(issues, this.limitsAddonsForm.controls.maxTills, 'Max tills');
       this.pushControlIssue(issues, this.limitsAddonsForm.controls.maxUsers, 'Max users');
     }
 
     if (step === 'feature-entitlements') {
-      if (!this.selectedPlan()) {
+      if (this.hasUnavailableSelectedPlan()) {
+        issues.push(this.unavailablePlanMessage);
+      } else if (!this.selectedPlan()) {
         issues.push('Select a plan before configuring features.');
+      } else if (!this.planHasAssignableFeatures()) {
+        issues.push(
+          'Unable to load feature entitlements. The selected subscription plan has no included features. Choose another plan or update the plan feature catalog.'
+        );
       } else if (!this.selectedFeatureIds().length) {
         issues.push('Select at least one allowed feature.');
       }
@@ -755,6 +803,7 @@ export class PlatformCreateTenantPage implements OnInit {
     const entitlements = payload.entitlements as { featureIds?: string[] } | null;
     this.selectedFeatureIds.set(entitlements?.featureIds ?? []);
     this.tenantAdminForm.patchValue((payload.tenantAdmin ?? {}) as never);
+    this.reconcileSelectedPlanAvailability();
   }
 
   private finalizeDraft(): void {
@@ -789,6 +838,7 @@ export class PlatformCreateTenantPage implements OnInit {
         this.createOptions.set(options);
         this.applyLookupDefaults(options);
         this.syncCountryControlState(options);
+        this.reconcileSelectedPlanAvailability();
         this.optionsLoadFailed.set(false);
         this.isLoadingOptions.set(false);
       },
@@ -882,6 +932,22 @@ export class PlatformCreateTenantPage implements OnInit {
     }
 
     this.selectedFeatureIds.set(Array.from(new Set(selectedIds)));
+  }
+
+  private reconcileSelectedPlanAvailability(): void {
+    if (this.hasUnavailableSelectedPlan()) {
+      this.selectedFeatureIds.set([]);
+      this.errorMessage.set(this.unavailablePlanMessage);
+      const current = this.currentStep();
+      if (current === 'feature-entitlements' || current === 'tenant-admin' || current === 'review-create' || current === 'billing-subscription') {
+        this.currentStep.set('limits-addons');
+      }
+      return;
+    }
+
+    if (this.selectedPlan() && !this.selectedFeatureIds().length) {
+      this.syncFeaturesForPlan();
+    }
   }
 
   private buildWizardState(): TenantCreateWizardState {

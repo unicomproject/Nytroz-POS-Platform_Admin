@@ -166,6 +166,13 @@
 
           @case ('limits-addons') {
             <form [formGroup]="planSelectionForm" class="plan-section">
+              @if (hasUnavailableSelectedPlan()) {
+                <app-error-state
+                  title="Subscription plan unavailable"
+                  [message]="unavailablePlanMessage"
+                  [hasRetry]="false"
+                />
+              }
               @if (!createOptions().plans.length) {
                 <app-empty-state
                   title="No plans available"
@@ -177,7 +184,7 @@
                     <article class="plan-card" [class.selected]="planSelectionForm.controls.subscriptionPlanId.value === plan.id">
                       <header>
                         <strong>{{ plan.name }}</strong>
-                        <small>{{ plan.planCode }} · {{ plan.billingCycle }}</small>
+                        <small>{{ plan.planCode }} Â· {{ plan.billingCycle }}</small>
                       </header>
                       <p>{{ plan.description || 'No description provided.' }}</p>
                       <div class="plan-meta">
@@ -241,8 +248,20 @@
           }
 
           @case ('feature-entitlements') {
-            @if (!selectedPlan()) {
+            @if (hasUnavailableSelectedPlan()) {
+              <app-error-state
+                title="Subscription plan unavailable"
+                [message]="unavailablePlanMessage"
+                [hasRetry]="false"
+              />
+            } @else if (!selectedPlan()) {
               <p class="muted">Select a plan first to configure feature entitlements.</p>
+            } @else if (!planHasAssignableFeatures()) {
+              <app-error-state
+                title="Unable to load feature entitlements"
+                message="The selected subscription plan has no included features. Choose another plan or update the plan feature catalog, then retry."
+                [hasRetry]="false"
+              />
             } @else {
               @for (module of createOptions().catalogModules; track module.id) {
                 <section class="feature-group">
@@ -408,9 +427,9 @@
                 <h3>Subscription</h3>
                 <dl>
                   <div><dt>Plan</dt><dd>{{ displayValue(selectedPlan()?.name) }}</dd></div>
-                  <div><dt>Max outlets</dt><dd>{{ limitsAddonsForm.controls.maxOutlets.value ?? '—' }}</dd></div>
-                  <div><dt>Max tills</dt><dd>{{ limitsAddonsForm.controls.maxTills.value ?? '—' }}</dd></div>
-                  <div><dt>Max users</dt><dd>{{ limitsAddonsForm.controls.maxUsers.value ?? '—' }}</dd></div>
+                  <div><dt>Max outlets</dt><dd>{{ limitsAddonsForm.controls.maxOutlets.value ?? 'â€”' }}</dd></div>
+                  <div><dt>Max tills</dt><dd>{{ limitsAddonsForm.controls.maxTills.value ?? 'â€”' }}</dd></div>
+                  <div><dt>Max users</dt><dd>{{ limitsAddonsForm.controls.maxUsers.value ?? 'â€”' }}</dd></div>
                 </dl>
               </section>
 
@@ -449,12 +468,12 @@
       <aside class="setup-summary" aria-label="Setup summary">
         <div class="summary-head">
           <h2>Setup summary</h2>
-          <p class="summary-sub">Live context from this wizard — not provisioning status.</p>
+          <p class="summary-sub">Live context from this wizard â€” not provisioning status.</p>
         </div>
         <div class="summary-progress" aria-hidden="true">
           <div class="summary-progress-bar" [style.width.%]="wizardStepProgressPercent()"></div>
         </div>
-        <p class="summary-progress-text">Step {{ currentStepNumber() }} of {{ steps.length }} · {{ wizardStepProgressPercent() }}%</p>
+        <p class="summary-progress-text">Step {{ currentStepNumber() }} of {{ steps.length }} Â· {{ wizardStepProgressPercent() }}%</p>
         <dl>
           <div>
             <dt>Tenant</dt>

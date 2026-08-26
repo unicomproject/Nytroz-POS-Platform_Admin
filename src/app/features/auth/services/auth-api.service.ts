@@ -8,6 +8,11 @@ import { ApiResponse } from '../../../core/models/api-response.model';
 import { AuthSession } from '../../../core/models/auth-session.model';
 import { CurrentUser } from '../../../core/models/current-user.model';
 import { LoginRequest } from '../models/login-request.model';
+import {
+  CompletePlatformPasswordResetRequest,
+  CompletePlatformPasswordResetResponse,
+  ValidatePlatformPasswordResetTokenResponse
+} from '../models/password-reset.model';
 
 interface PlatformLoginResponse {
   accessToken: string;
@@ -55,6 +60,47 @@ export class AuthApiService {
         { withCredentials: true }
       )
       .pipe(map((response) => response.data === true));
+  }
+
+  validatePasswordResetToken(token: string): Observable<ValidatePlatformPasswordResetTokenResponse> {
+    return this.http
+      .post<ApiResponse<ValidatePlatformPasswordResetTokenResponse>>(
+        `${appSettings.apiBaseUrl}${apiEndpoints.auth.passwordResetValidate}`,
+        { token }
+      )
+      .pipe(
+        map(
+          (response) =>
+            response.data ?? {
+              isValid: false,
+              status: 'INVALID',
+              expiresAt: null
+            }
+        )
+      );
+  }
+
+  completePasswordReset(
+    request: CompletePlatformPasswordResetRequest
+  ): Observable<CompletePlatformPasswordResetResponse> {
+    return this.http
+      .post<ApiResponse<CompletePlatformPasswordResetResponse>>(
+        `${appSettings.apiBaseUrl}${apiEndpoints.auth.passwordResetComplete}`,
+        {
+          token: request.token,
+          newPassword: request.newPassword,
+          confirmPassword: request.confirmPassword
+        }
+      )
+      .pipe(
+        map(
+          (response) =>
+            response.data ?? {
+              success: false,
+              message: response.message
+            }
+        )
+      );
   }
 
   private toAuthSession(response: PlatformLoginResponse): AuthSession {
