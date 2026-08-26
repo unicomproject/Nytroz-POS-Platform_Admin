@@ -245,6 +245,151 @@ describe('PlatformCreateTenantPage durable onboarding', () => {
     expect(component.addonQuantity('addon-1')).toBe(3);
   });
 
+  it('auto-syncs plan features when draft entitlements are empty', () => {
+    const component = fixture().componentInstance;
+    const payload = {
+      basicDetails: null,
+      businessContact: null,
+      plan: {
+        subscriptionPlanId: 'plan-1',
+        subscriptionType: 'PAID',
+        billingCycle: 'monthly',
+        addons: [],
+        requestedLimits: { maxOutlets: 5, maxTills: 10, maxUsers: 20 }
+      },
+      billing: null,
+      entitlements: { featureIds: [] },
+      tenantAdmin: null
+    } as TenantOnboardingPayload;
+
+    (component as unknown as { applyDraftPayload: (value: TenantOnboardingPayload) => void }).applyDraftPayload(payload);
+    expect(component.selectedFeatureIds().length).toBeGreaterThan(0);
+    expect(component.selectedFeatureIds()).toEqual(expect.arrayContaining(['feature-1', 'feature-2']));
+  });
+
+  it('enables Feature Entitlements continue after plan selection syncs included features', () => {
+    const created = fixture();
+    const component = created.componentInstance;
+    fillValid(component);
+    component.currentStep.set('feature-entitlements');
+    created.detectChanges();
+    expect(component.planHasAssignableFeatures()).toBe(true);
+    expect(component.selectedFeatureIds().length).toBeGreaterThan(0);
+    expect(component.isCurrentStepValid()).toBe(true);
+    const checkboxes = Array.from(
+      (created.nativeElement as HTMLElement).querySelectorAll('input[type="checkbox"]')
+    ) as HTMLInputElement[];
+    expect(checkboxes.some((input) => !input.disabled)).toBe(true);
+  });
+
+  it('blocks Feature Entitlements when the selected plan has no included features', () => {
+    api['getCreateOptions'].mockReturnValueOnce(of(createTenantCreateOptions({
+      plans: [{
+        id: 'empty-plan',
+        planCode: 'EMPTY',
+        name: 'Empty Plan',
+        description: null,
+        status: 'active',
+        billingCycle: 'monthly',
+        baseCurrency: 'LKR',
+        basePrice: 10,
+        maxOutlets: 1,
+        maxTills: 1,
+        maxUsers: 1,
+        includedFeatureIds: [],
+        includedFeatureCodes: []
+      }]
+    })));
+    const created = fixture();
+    const component = created.componentInstance;
+    component.selectPlan('empty-plan');
+    component.currentStep.set('feature-entitlements');
+    created.detectChanges();
+    expect(component.planHasAssignableFeatures()).toBe(false);
+    expect(component.isCurrentStepValid()).toBe(false);
+    expect((created.nativeElement as HTMLElement).textContent).toContain('Unable to load feature entitlements');
+  });
+
+  it('directs draft resume to plan selection when the saved plan is unavailable', () => {
+    const created = fixture();
+    const component = created.componentInstance;
+    const payload = {
+      basicDetails: null,
+      businessContact: null,
+      plan: {
+        subscriptionPlanId: 'missing-plan',
+        subscriptionType: 'PAID',
+        billingCycle: 'monthly',
+        addons: [],
+        requestedLimits: { maxOutlets: 5, maxTills: 10, maxUsers: 20 }
+      },
+      billing: null,
+      entitlements: { featureIds: ['feature-1'] },
+      tenantAdmin: null
+    } as TenantOnboardingPayload;
+
+    component.currentStep.set('feature-entitlements');
+    (component as unknown as { applyDraftPayload: (value: TenantOnboardingPayload) => void }).applyDraftPayload(payload);
+    created.detectChanges();
+
+    expect(component.hasUnavailableSelectedPlan()).toBe(true);
+    expect(component.currentStep()).toBe('limits-addons');
+    expect(component.selectedFeatureIds()).toEqual([]);
+    expect(component.errorMessage()).toContain('no longer available');
+    expect(component.isCurrentStepValid()).toBe(false);
+    expect((created.nativeElement as HTMLElement).textContent).toContain('Subscription plan unavailable');
+  });
+
+  it('clears stale plan features when switching to another plan', () => {
+    api['getCreateOptions'].mockReturnValueOnce(of(createTenantCreateOptions({
+      plans: [
+        {
+          id: 'plan-a',
+          planCode: 'A',
+          name: 'Plan A',
+          description: null,
+          status: 'active',
+          billingCycle: 'monthly',
+          baseCurrency: 'LKR',
+          basePrice: 10,
+          maxOutlets: 1,
+          maxTills: 1,
+          maxUsers: 1,
+          includedFeatureIds: ['feature-1'],
+          includedFeatureCodes: ['online_store']
+        },
+        {
+          id: 'plan-b',
+          planCode: 'B',
+          name: 'Plan B',
+          description: null,
+          status: 'active',
+          billingCycle: 'monthly',
+          baseCurrency: 'LKR',
+          basePrice: 20,
+          maxOutlets: 2,
+          maxTills: 2,
+          maxUsers: 2,
+          includedFeatureIds: ['feature-2'],
+          includedFeatureCodes: ['inventory_management']
+        }
+      ]
+    })));
+    const component = fixture().componentInstance;
+    component.selectPlan('plan-a');
+    expect(component.selectedFeatureIds()).toEqual(['feature-1']);
+    component.selectPlan('plan-b');
+    expect(component.selectedFeatureIds()).toEqual(['feature-2']);
+  });
+
+  it('keeps Feature Entitlements valid when only plan-included features remain selected', () => {
+    const component = fixture().componentInstance;
+    component.selectPlan('plan-1');
+    component.currentStep.set('feature-entitlements');
+    expect(component.selectedFeatureIds().length).toBeGreaterThan(0);
+    expect(component.isCurrentStepValid()).toBe(true);
+  });
+
   it('navigates Cancel to the tenant list', () => {
     const component = fixture().componentInstance;
     component.cancelWizard();
