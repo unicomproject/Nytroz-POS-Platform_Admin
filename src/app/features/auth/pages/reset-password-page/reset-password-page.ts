@@ -1,23 +1,22 @@
-import { Component, DestroyRef, inject, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import {
-  AbstractControl,
-  NonNullableFormBuilder,
-  ReactiveFormsModule,
-  ValidationErrors,
-  Validators
-} from '@angular/forms';
+import { Component, inject, signal } from '@angular/core';
+import { NonNullableFormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import { AuthApiService } from '../../services/auth-api.service';
-import { PlatformPasswordResetStatus } from '../../models/password-reset.model';
 import {
-  passwordPolicyGuidance,
-  platformPasswordPolicyValidator
-} from '../../validators/password-policy.validator';
-
-type ResetPageView = 'loading' | 'invalid' | 'expired' | 'used' | 'revoked' | 'form' | 'success';
+  extractResetErrorCode,
+  isRateLimited,
+  mapCompleteResetErrorCode,
+  mapValidateTokenResponse,
+  resetPasswordStateMessage,
+  ResetPasswordViewState
+} from '../../utils/password-reset-error.util';
+import {
+  platformPasswordErrorMessage,
+  platformPasswordPolicyValidator,
+  passwordsMatchValidator
+} from '../../validators/platform-password.validators';
 
 @Component({
   selector: 'app-reset-password-page',
@@ -25,228 +24,167 @@ type ResetPageView = 'loading' | 'invalid' | 'expired' | 'used' | 'revoked' | 'f
   imports: [ReactiveFormsModule, RouterLink],
   template: `
     <main class="reset-page">
-      <section class="brand-panel" aria-label="SCS-TIX Platform Administration">
-        <div class="brand-content">
-          <a class="brand-mark" href="/" aria-label="SCS-TIX Platform Administration">
-            <span class="shield" aria-hidden="true">
-              <svg viewBox="0 0 32 38" role="img">
-                <path d="M16 2 29 7v10c0 8.6-5.1 15.5-13 19-7.9-3.5-13-10.4-13-19V7l13-5Z" />
-                <rect x="10.5" y="16" width="11" height="9" rx="1.7" />
-                <path d="M12.8 16v-3.1a3.2 3.2 0 0 1 6.4 0V16" />
-              </svg>
-            </span>
-            <span>
-              <strong>SCS-TIX</strong>
-              <small>Platform Administration</small>
-            </span>
-          </a>
+      <section class="reset-card" [attr.aria-busy]="viewState() === 'validating' || isSubmitting()">
+        <a class="brand-mark" routerLink="/login" aria-label="OneVerz Platform Administration">
+          <span class="shield" aria-hidden="true">
+            <svg viewBox="0 0 32 38" role="img">
+              <path d="M16 2 29 7v10c0 8.6-5.1 15.5-13 19-7.9-3.5-13-10.4-13-19V7l13-5Z" />
+              <rect x="10.5" y="16" width="11" height="9" rx="1.7" />
+              <path d="M12.8 16v-3.1a3.2 3.2 0 0 1 6.4 0V16" />
+            </svg>
+          </span>
+          <span>
+            <strong>OneVerz</strong>
+            <small>Platform Administration</small>
+          </span>
+        </a>
 
-          <div class="brand-copy">
-            <h1>
-              Secure access.<br />
-              <span>Reset your password.</span>
-            </h1>
-            <div class="accent-line" aria-hidden="true"></div>
-            <p>
-              Use the secure link provided by a Platform Admin to set a new password for your account.
-            </p>
-          </div>
-        </div>
-      </section>
+        @if (viewState() === 'validating') {
+          <h1>Reset your password</h1>
+          <p class="subtitle">Checking your reset linkâ€¦</p>
+          <div class="loading-row" role="status">Validating reset link</div>
+        } @else if (viewState() === 'success') {
+          <h1>Password reset successful</h1>
+          <p class="subtitle">You can now sign in with your new password.</p>
+          <p class="success-banner" role="status">{{ successMessage() }}</p>
+          <a class="submit-button" routerLink="/login">Back to Sign In</a>
+        } @else if (viewState() === 'valid') {
+          <h1>Reset your password</h1>
+          <p class="subtitle">Choose a new password for your Platform Admin account.</p>
 
-      <section class="auth-panel" aria-label="Reset platform admin password">
-        <section class="reset-card">
-          @switch (view()) {
-            @case ('loading') {
-              <h2>Checking reset link</h2>
-              <p class="subtitle">Please wait while we validate your password reset link.</p>
-              <div class="state-message loading" role="status">Validating reset link...</div>
-            }
-            @case ('invalid') {
-              <h2>Invalid reset link</h2>
-              <p class="subtitle">This password reset link is not valid.</p>
-              <div class="state-message error" role="alert">
-                The link may be malformed or no longer available. Ask a Platform Admin to send a new
-                password reset.
-              </div>
-              <a class="link-button" routerLink="/login">Back to sign in</a>
-            }
-            @case ('expired') {
-              <h2>Reset link expired</h2>
-              <p class="subtitle">This password reset link has expired.</p>
-              <div class="state-message error" role="alert">
-                Ask a Platform Admin to send a new password reset link.
-              </div>
-              <a class="link-button" routerLink="/login">Back to sign in</a>
-            }
-            @case ('used') {
-              <h2>Reset link already used</h2>
-              <p class="subtitle">This password reset link has already been used.</p>
-              <div class="state-message error" role="alert">
-                Sign in with your new password or ask a Platform Admin to send another reset link.
-              </div>
-              <a class="link-button" routerLink="/login">Back to sign in</a>
-            }
-            @case ('revoked') {
-              <h2>Reset link revoked</h2>
-              <p class="subtitle">This password reset link is no longer active.</p>
-              <div class="state-message error" role="alert">
-                Ask a Platform Admin to send a new password reset link.
-              </div>
-              <a class="link-button" routerLink="/login">Back to sign in</a>
-            }
-            @case ('success') {
-              <h2>Password updated</h2>
-              <p class="subtitle">Your platform admin password has been reset successfully.</p>
-              <div class="state-message success" role="status">
-                You can now sign in with your new password.
-              </div>
-              <a class="link-button primary" routerLink="/login">Go to sign in</a>
-            }
-            @case ('form') {
-              <h2>Set a new password</h2>
-              <p class="subtitle">Choose a strong password for your Platform Admin account.</p>
-
-              <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
-                <div class="field-group">
-                  <label for="new-password">New password</label>
-                  <div class="input-shell">
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <rect x="5" y="11" width="14" height="10" rx="2" />
-                      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-                    </svg>
-                    <input
-                      id="new-password"
-                      [type]="isNewPasswordVisible() ? 'text' : 'password'"
-                      formControlName="newPassword"
-                      autocomplete="new-password"
-                      placeholder="Enter your new password"
-                      [attr.aria-invalid]="showNewPasswordError()"
-                      aria-describedby="new-password-guidance new-password-error"
-                    />
-                    <button
-                      class="icon-button"
-                      type="button"
-                      [attr.aria-label]="isNewPasswordVisible() ? 'Hide password' : 'Show password'"
-                      (click)="toggleNewPasswordVisibility()"
-                    >
-                      <svg viewBox="0 0 24 24" aria-hidden="true">
-                        @if (isNewPasswordVisible()) {
-                          <path d="m3 3 18 18" />
-                          <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
-                          <path d="M9.9 4.2A10.5 10.5 0 0 1 12 4c5 0 8.8 4 10 8a11.8 11.8 0 0 1-3 4.7" />
-                          <path d="M6.4 6.4A11.8 11.8 0 0 0 2 12c1.2 4 5 8 10 8 1.7 0 3.3-.5 4.7-1.3" />
-                        } @else {
-                          <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
-                          <circle cx="12" cy="12" r="3" />
-                        }
-                      </svg>
-                    </button>
-                  </div>
-                  <p class="field-hint" id="new-password-guidance">{{ passwordGuidance }}</p>
-                  @if (showNewPasswordError()) {
-                    <p class="field-error" id="new-password-error">{{ newPasswordErrorMessage() }}</p>
-                  }
-                </div>
-
-                <div class="field-group">
-                  <label for="confirm-password">Confirm password</label>
-                  <div class="input-shell">
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <rect x="5" y="11" width="14" height="10" rx="2" />
-                      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-                    </svg>
-                    <input
-                      id="confirm-password"
-                      [type]="isConfirmPasswordVisible() ? 'text' : 'password'"
-                      formControlName="confirmPassword"
-                      autocomplete="new-password"
-                      placeholder="Confirm your new password"
-                      [attr.aria-invalid]="showConfirmPasswordError()"
-                      aria-describedby="confirm-password-error"
-                    />
-                    <button
-                      class="icon-button"
-                      type="button"
-                      [attr.aria-label]="isConfirmPasswordVisible() ? 'Hide password' : 'Show password'"
-                      (click)="toggleConfirmPasswordVisibility()"
-                    >
-                      <svg viewBox="0 0 24 24" aria-hidden="true">
-                        @if (isConfirmPasswordVisible()) {
-                          <path d="m3 3 18 18" />
-                          <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
-                          <path d="M9.9 4.2A10.5 10.5 0 0 1 12 4c5 0 8.8 4 10 8a11.8 11.8 0 0 1-3 4.7" />
-                          <path d="M6.4 6.4A11.8 11.8 0 0 0 2 12c1.2 4 5 8 10 8 1.7 0 3.3-.5 4.7-1.3" />
-                        } @else {
-                          <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
-                          <circle cx="12" cy="12" r="3" />
-                        }
-                      </svg>
-                    </button>
-                  </div>
-                  @if (showConfirmPasswordError()) {
-                    <p class="field-error" id="confirm-password-error">{{ confirmPasswordErrorMessage() }}</p>
-                  }
-                </div>
-
-                @if (errorMessage()) {
-                  <p class="form-error" role="alert">{{ errorMessage() }}</p>
-                }
-
-                <button class="submit-button" type="submit" [disabled]="isSubmitting()">
-                  {{ isSubmitting() ? 'Updating Password' : 'Update Password' }}
+          <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+            <div class="field-group">
+              <label for="newPassword">New Password</label>
+              <div class="input-shell">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="5" y="11" width="14" height="10" rx="2" />
+                  <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                </svg>
+                <input
+                  id="newPassword"
+                  [type]="isNewPasswordVisible() ? 'text' : 'password'"
+                  formControlName="newPassword"
+                  autocomplete="new-password"
+                  placeholder="Enter a new password"
+                  [attr.aria-invalid]="showNewPasswordError()"
+                  aria-describedby="new-password-error"
+                />
+                <button
+                  class="icon-button"
+                  type="button"
+                  [attr.aria-label]="isNewPasswordVisible() ? 'Hide password' : 'Show password'"
+                  (click)="toggleNewPasswordVisibility()"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    @if (isNewPasswordVisible()) {
+                      <path d="m3 3 18 18" />
+                      <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+                      <path d="M9.9 4.2A10.5 10.5 0 0 1 12 4c5 0 8.8 4 10 8a11.8 11.8 0 0 1-3 4.7" />
+                      <path d="M6.4 6.4A11.8 11.8 0 0 0 2 12c1.2 4 5 8 10 8 1.7 0 3.3-.5 4.7-1.3" />
+                    } @else {
+                      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+                      <circle cx="12" cy="12" r="3" />
+                    }
+                  </svg>
                 </button>
-              </form>
-            }
-          }
-        </section>
+              </div>
+              @if (showNewPasswordError()) {
+                <p class="field-error" id="new-password-error">{{ newPasswordErrorMessage() }}</p>
+              }
+            </div>
 
-        <footer class="auth-footer">
-          <span>&copy; 2025 SCS-TIX. All rights reserved.</span>
-        </footer>
+            <div class="field-group">
+              <label for="confirmPassword">Confirm Password</label>
+              <div class="input-shell">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="5" y="11" width="14" height="10" rx="2" />
+                  <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                </svg>
+                <input
+                  id="confirmPassword"
+                  [type]="isConfirmPasswordVisible() ? 'text' : 'password'"
+                  formControlName="confirmPassword"
+                  autocomplete="new-password"
+                  placeholder="Confirm your new password"
+                  [attr.aria-invalid]="showConfirmPasswordError()"
+                  aria-describedby="confirm-password-error"
+                />
+                <button
+                  class="icon-button"
+                  type="button"
+                  [attr.aria-label]="isConfirmPasswordVisible() ? 'Hide confirm password' : 'Show confirm password'"
+                  (click)="toggleConfirmPasswordVisibility()"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    @if (isConfirmPasswordVisible()) {
+                      <path d="m3 3 18 18" />
+                      <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+                      <path d="M9.9 4.2A10.5 10.5 0 0 1 12 4c5 0 8.8 4 10 8a11.8 11.8 0 0 1-3 4.7" />
+                      <path d="M6.4 6.4A11.8 11.8 0 0 0 2 12c1.2 4 5 8 10 8 1.7 0 3.3-.5 4.7-1.3" />
+                    } @else {
+                      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+                      <circle cx="12" cy="12" r="3" />
+                    }
+                  </svg>
+                </button>
+              </div>
+              @if (showConfirmPasswordError()) {
+                <p class="field-error" id="confirm-password-error">{{ confirmPasswordErrorMessage() }}</p>
+              }
+            </div>
+
+            @if (formError()) {
+              <p class="form-error" role="alert">{{ formError() }}</p>
+            }
+
+            <button class="submit-button" type="submit" [disabled]="isSubmitting()">
+              {{ isSubmitting() ? 'Resetting Password' : 'Reset Password' }}
+            </button>
+          </form>
+        } @else {
+          <h1>{{ errorTitle() }}</h1>
+          <p class="subtitle">{{ resetPasswordStateMessage(viewState()) }}</p>
+          @if (viewState() === 'failure') {
+            <p class="form-error" role="alert">{{ formError() || resetPasswordStateMessage('failure') }}</p>
+            <button class="submit-button" type="button" (click)="retryValidation()">Try again</button>
+          }
+          <a class="text-link" routerLink="/login">Back to Sign In</a>
+        }
       </section>
     </main>
   `,
   styles: `
     :host {
       display: block;
-      height: 100vh;
-      overflow: hidden;
+      min-height: 100dvh;
     }
 
     .reset-page {
       background: #f6f8fc;
       display: grid;
-      grid-template-columns: minmax(28rem, 45%) minmax(32rem, 55%);
-      height: 100vh;
-      overflow: hidden;
+      min-height: 100dvh;
+      overflow-x: hidden;
+      padding: clamp(1rem, 4vh, 3rem) clamp(1rem, 4vw, 2.5rem);
+      place-items: center;
     }
 
-    .brand-panel {
-      background:
-        radial-gradient(circle at 48% 72%, rgba(19, 91, 255, 0.46), transparent 24rem),
-        linear-gradient(145deg, #04142d 0%, #061b3a 44%, #082a5a 100%);
-      color: #fff;
+    .reset-card {
+      background: #fff;
+      border: 1px solid rgba(217, 225, 236, 0.9);
+      border-radius: 18px;
+      box-shadow: 0 24px 70px rgba(15, 35, 71, 0.11);
       display: grid;
-      height: 100%;
-      min-height: 0;
-      overflow: hidden;
-      position: relative;
-    }
-
-    .brand-content {
-      display: grid;
-      gap: clamp(1.4rem, 3.8vh, 3.25rem);
-      padding: clamp(1.45rem, 4vh, 3.1rem) clamp(2rem, 4vw, 3.8rem);
-      position: relative;
-      z-index: 2;
+      gap: clamp(0.85rem, 1.8vh, 1.25rem);
+      max-width: 32.5rem;
+      padding: clamp(1.5rem, 4vh, 3rem) clamp(1.4rem, 4vw, 2.75rem);
+      width: min(100%, 32.5rem);
     }
 
     .brand-mark {
       align-items: center;
       color: inherit;
       display: inline-flex;
-      gap: 0.9rem;
+      gap: 0.75rem;
       justify-self: start;
       text-decoration: none;
     }
@@ -257,28 +195,22 @@ type ResetPageView = 'loading' | 'invalid' | 'expired' | 'used' | 'revoked' | 'f
     }
 
     .brand-mark strong {
-      font-size: clamp(1.7rem, 2.7vw, 2.35rem);
-      letter-spacing: 0;
+      color: #0f2347;
+      font-size: 1.35rem;
       line-height: 1;
     }
 
     .brand-mark small {
-      color: rgba(219, 231, 255, 0.72);
-      font-size: clamp(0.95rem, 1.4vw, 1.2rem);
+      color: #6b7280;
+      font-size: 0.85rem;
       font-weight: 600;
-      margin-top: 0.25rem;
+      margin-top: 0.2rem;
     }
 
     .shield {
       color: #3b82ff;
       display: inline-flex;
-      width: clamp(3rem, 4.7vw, 4.2rem);
-    }
-
-    .shield svg,
-    .input-shell svg,
-    .icon-button svg {
-      width: 100%;
+      width: 2.6rem;
     }
 
     svg {
@@ -287,75 +219,26 @@ type ResetPageView = 'loading' | 'invalid' | 'expired' | 'used' | 'revoked' | 'f
       stroke-linecap: round;
       stroke-linejoin: round;
       stroke-width: 2;
+      width: 100%;
     }
 
-    .brand-copy h1 {
-      color: #fff;
-      font-size: clamp(2rem, 4vw, 3.5rem);
-      line-height: 1.16;
-      margin: 0;
-    }
-
-    .brand-copy h1 span {
-      color: #2f7dff;
-    }
-
-    .accent-line {
-      background: #2f7dff;
-      border-radius: 99px;
-      box-shadow: 0 0 22px rgba(47, 125, 255, 0.75);
-      height: 0.22rem;
-      margin: clamp(1rem, 2.3vh, 1.9rem) 0 clamp(0.95rem, 2.1vh, 1.7rem);
-      width: 4rem;
-    }
-
-    .brand-copy p {
-      color: rgba(230, 238, 255, 0.82);
-      font-size: clamp(1rem, 1.45vw, 1.15rem);
-      line-height: 1.58;
-      margin: 0;
-      max-width: 35rem;
-    }
-
-    .auth-panel {
-      display: grid;
-      grid-template-rows: minmax(0, 1fr) auto;
-      height: 100%;
-      min-height: 0;
-      overflow: hidden;
-      padding: clamp(0.75rem, 2.3vh, 2rem) clamp(1.25rem, 5vw, 5rem);
-    }
-
-    .reset-card {
-      align-self: center;
-      background: #fff;
-      border: 1px solid rgba(217, 225, 236, 0.9);
-      border-radius: 18px;
-      box-shadow: 0 24px 70px rgba(15, 35, 71, 0.11);
-      justify-self: center;
-      max-width: 45.5rem;
-      max-height: 100%;
-      padding: clamp(1.5rem, 4vh, 3.45rem) clamp(2rem, 4.6vw, 4.25rem);
-      width: min(100%, 45.5rem);
-    }
-
-    .reset-card h2 {
+    h1 {
       color: #0f2347;
-      font-size: clamp(2rem, 3.1vw, 2.6rem);
-      line-height: 1.1;
-      margin: 0 0 0.8rem;
+      font-size: clamp(1.7rem, 3vw, 2.15rem);
+      line-height: 1.15;
+      margin: 0.35rem 0 0;
     }
 
     .subtitle {
       color: #6b7280;
-      font-size: clamp(1rem, 1.35vw, 1.17rem);
+      font-size: 1rem;
       font-weight: 600;
-      margin: 0 0 clamp(1.15rem, 2.8vh, 2.2rem);
+      margin: 0;
     }
 
     form {
       display: grid;
-      gap: clamp(0.85rem, 1.85vh, 1.35rem);
+      gap: 1rem;
     }
 
     .field-group {
@@ -366,7 +249,6 @@ type ResetPageView = 'loading' | 'invalid' | 'expired' | 'used' | 'revoked' | 'f
     label {
       color: #17233d;
       font-weight: 800;
-      letter-spacing: 0;
     }
 
     .input-shell {
@@ -376,19 +258,18 @@ type ResetPageView = 'loading' | 'invalid' | 'expired' | 'used' | 'revoked' | 'f
       display: grid;
       gap: 0.8rem;
       grid-template-columns: 1.25rem 1fr auto;
-      min-height: clamp(3rem, 6.6vh, 3.75rem);
+      min-height: 3.25rem;
       padding: 0 1.1rem;
     }
 
     .input-shell:focus-within {
-      border-color: #0b5cff;
-      box-shadow: 0 0 0 4px rgba(11, 92, 255, 0.12);
+      border-color: var(--border-focus, #0b5cff);
+      box-shadow: var(--shadow-focus);
     }
 
     .input-shell svg {
       color: #7b8aa4;
       height: 1.25rem;
-      stroke-width: 2;
     }
 
     input[type='password'],
@@ -427,13 +308,6 @@ type ResetPageView = 'loading' | 'invalid' | 'expired' | 'used' | 'revoked' | 'f
       outline: 0;
     }
 
-    .field-hint {
-      color: #667085;
-      font-size: 0.88rem;
-      font-weight: 600;
-      margin: 0;
-    }
-
     .field-error,
     .form-error {
       color: #b42318;
@@ -449,121 +323,62 @@ type ResetPageView = 'loading' | 'invalid' | 'expired' | 'used' | 'revoked' | 'f
       padding: 0.85rem 1rem;
     }
 
-    .state-message {
-      border-radius: 10px;
-      font-size: 0.95rem;
-      font-weight: 650;
-      margin-bottom: 1.25rem;
-      padding: 0.95rem 1rem;
-    }
-
-    .state-message.loading {
-      background: #f8fafc;
-      border: 1px solid #e4e7ec;
-      color: #344054;
-    }
-
-    .state-message.error {
-      background: #fff1f0;
-      border: 1px solid #ffd3cf;
-      color: #b42318;
-    }
-
-    .state-message.success {
+    .success-banner {
       background: #ecfdf3;
       border: 1px solid #abefc6;
+      border-radius: 8px;
       color: #027a48;
+      font-weight: 650;
+      margin: 0;
+      padding: 0.85rem 1rem;
     }
 
-    .submit-button,
-    .link-button {
+    .loading-row {
+      color: #344054;
+      font-weight: 650;
+    }
+
+    .submit-button {
       align-items: center;
-      border-radius: 8px;
+      background: var(--primary, #0b5cff);
+      border: 0;
+      border-radius: var(--radius-md, 8px);
+      box-shadow: var(--shadow-md);
+      color: var(--text-inverse, #fff);
       cursor: pointer;
       display: inline-flex;
       font: inherit;
       font-size: 1.05rem;
       font-weight: 850;
       justify-content: center;
-      min-height: clamp(3.3rem, 6.9vh, 4rem);
+      min-height: 3.4rem;
       padding: 0 1.4rem;
       text-decoration: none;
       width: 100%;
     }
 
-    .submit-button {
-      background: #0b5cff;
-      border: 0;
-      box-shadow: 0 12px 24px rgba(11, 92, 255, 0.22);
-      color: #fff;
-    }
-
     .submit-button:hover,
     .submit-button:focus-visible {
-      background: #084fe1;
+      background: var(--primary-hover, #084fe1);
       outline: 0;
     }
 
     .submit-button:disabled {
-      background: #8fb2ff;
+      background: var(--text-disabled, #8fb2ff);
       box-shadow: none;
       cursor: not-allowed;
     }
 
-    .link-button {
-      background: #fff;
-      border: 1px solid #d0d5dd;
-      color: #344054;
+    .text-link {
+      color: #0b5cff;
+      font-weight: 800;
+      justify-self: start;
+      text-decoration: none;
     }
 
-    .link-button.primary {
-      background: #0b5cff;
-      border-color: #0b5cff;
-      box-shadow: 0 12px 24px rgba(11, 92, 255, 0.22);
-      color: #fff;
-    }
-
-    .auth-footer {
-      align-items: center;
-      color: #6b7280;
-      display: flex;
-      flex-wrap: wrap;
-      font-size: 0.88rem;
-      font-weight: 650;
-      gap: 0.55rem 1.35rem;
-      justify-content: center;
-      padding-top: clamp(0.55rem, 1.6vh, 1.25rem);
-    }
-
-    @media (max-width: 68rem) {
-      :host {
-        height: auto;
-        min-height: 100dvh;
-        overflow: visible;
-      }
-
-      .reset-page {
-        grid-template-columns: 1fr;
-        height: auto;
-        min-height: 100dvh;
-        overflow-x: hidden;
-        overflow-y: auto;
-      }
-
-      .brand-panel,
-      .auth-panel {
-        height: auto;
-        min-height: auto;
-        overflow: visible;
-      }
-
-      .auth-panel {
-        padding-top: 1.25rem;
-      }
-
-      .reset-card {
-        margin: 2rem 0;
-      }
+    .text-link:hover,
+    .text-link:focus-visible {
+      text-decoration: underline;
     }
   `
 })
@@ -572,37 +387,45 @@ export class ResetPasswordPage {
   private readonly route = inject(ActivatedRoute);
   private readonly authApi = inject(AuthApiService);
   private readonly apiError = inject(ApiErrorService);
-  private readonly destroyRef = inject(DestroyRef);
+  private resetToken = '';
 
-  readonly passwordGuidance = passwordPolicyGuidance();
-  readonly view = signal<ResetPageView>('loading');
-  readonly errorMessage = signal<string | null>(null);
+  readonly viewState = signal<ResetPasswordViewState>('validating');
   readonly isSubmitting = signal(false);
   readonly wasSubmitted = signal(false);
+  readonly formError = signal<string | null>(null);
+  readonly successMessage = signal('Password reset successful');
   readonly isNewPasswordVisible = signal(false);
   readonly isConfirmPasswordVisible = signal(false);
-  readonly token = signal('');
+  readonly resetPasswordStateMessage = resetPasswordStateMessage;
 
   readonly form = this.formBuilder.group(
     {
-      newPassword: ['', [Validators.required, platformPasswordPolicyValidator]],
-      confirmPassword: ['', Validators.required]
+      newPassword: ['', [platformPasswordPolicyValidator()]],
+      confirmPassword: ['', [platformPasswordPolicyValidator()]]
     },
-    { validators: ResetPasswordPage.passwordsMatchValidator }
+    { validators: passwordsMatchValidator('newPassword', 'confirmPassword') }
   );
 
   constructor() {
-    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
-      const token = params.get('token')?.trim() ?? '';
-      this.token.set(token);
+    this.resetToken = this.route.snapshot.queryParamMap.get('token')?.trim() ?? '';
+    this.validateToken();
+  }
 
-      if (!token) {
-        this.view.set('invalid');
-        return;
-      }
-
-      this.validateToken(token);
-    });
+  errorTitle(): string {
+    switch (this.viewState()) {
+      case 'expired':
+        return 'Reset link expired';
+      case 'used':
+        return 'Reset link already used';
+      case 'revoked':
+        return 'Reset link no longer valid';
+      case 'unavailable':
+        return 'Account cannot be reset';
+      case 'failure':
+        return 'Password reset failed';
+      default:
+        return 'Invalid reset link';
+    }
   }
 
   showNewPasswordError(): boolean {
@@ -612,43 +435,24 @@ export class ResetPasswordPage {
 
   showConfirmPasswordError(): boolean {
     const control = this.form.controls.confirmPassword;
-    return (
-      (control.invalid && (control.touched || this.wasSubmitted())) ||
-      (this.form.hasError('passwordMismatch') && (control.touched || this.wasSubmitted()))
-    );
+    const mismatch = this.form.hasError('passwordMismatch');
+    return (control.invalid || mismatch) && (control.touched || this.wasSubmitted());
   }
 
   newPasswordErrorMessage(): string {
-    const control = this.form.controls.newPassword;
-
-    if (control.hasError('required')) {
-      return 'New password is required.';
-    }
-
-    const policyError = control.getError('passwordPolicy') as string | undefined;
-    if (policyError === 'minLength') {
-      return 'Password must be at least 8 characters.';
-    }
-    if (policyError === 'maxLength') {
-      return 'Password must be 128 characters or fewer.';
-    }
-    if (policyError === 'complexity') {
-      return 'Password must include uppercase, lowercase, and a digit.';
-    }
-
-    return 'Enter a valid password.';
+    return platformPasswordErrorMessage(this.form.controls.newPassword);
   }
 
   confirmPasswordErrorMessage(): string {
-    if (this.form.hasError('passwordMismatch')) {
-      return 'Passwords do not match.';
+    if (this.form.hasError('passwordMismatch') && this.form.controls.confirmPassword.value) {
+      return 'Passwords must match.';
     }
 
     if (this.form.controls.confirmPassword.hasError('required')) {
       return 'Confirm password is required.';
     }
 
-    return 'Enter a valid confirmation password.';
+    return platformPasswordErrorMessage(this.form.controls.confirmPassword);
   }
 
   toggleNewPasswordVisibility(): void {
@@ -659,76 +463,109 @@ export class ResetPasswordPage {
     this.isConfirmPasswordVisible.update((current) => !current);
   }
 
+  retryValidation(): void {
+    this.formError.set(null);
+    this.viewState.set('validating');
+    this.validateToken();
+  }
+
   submit(): void {
     this.wasSubmitted.set(true);
+    this.formError.set(null);
+
+    if (this.isSubmitting() || this.viewState() !== 'valid') {
+      return;
+    }
 
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       return;
     }
 
-    this.isSubmitting.set(true);
-    this.errorMessage.set(null);
+    if (!this.resetToken) {
+      this.viewState.set('invalid');
+      return;
+    }
 
+    this.isSubmitting.set(true);
     const { newPassword, confirmPassword } = this.form.getRawValue();
 
     this.authApi
       .completePasswordReset({
-        token: this.token(),
+        token: this.resetToken,
         newPassword,
         confirmPassword
       })
       .subscribe({
-        next: () => {
-          this.view.set('success');
+        next: (response) => {
           this.isSubmitting.set(false);
+          this.resetToken = '';
+          this.successMessage.set(response.message || 'Password reset successful');
+          this.viewState.set('success');
         },
-        error: (error) => {
-          this.errorMessage.set(this.apiError.toSafeMessage(error));
+        error: (error: unknown) => {
           this.isSubmitting.set(false);
+          this.applyCompleteError(error);
         }
       });
   }
 
-  private validateToken(token: string): void {
-    this.view.set('loading');
+  private validateToken(): void {
+    if (!this.resetToken) {
+      this.viewState.set('invalid');
+      return;
+    }
 
-    this.authApi.validatePasswordResetToken(token).subscribe({
-      next: (validation) => {
-        if (validation.isValid && validation.status === 'PENDING') {
-          this.view.set('form');
-          return;
-        }
-
-        this.view.set(this.mapInvalidStatus(validation.status));
+    this.authApi.validatePasswordResetToken(this.resetToken).subscribe({
+      next: (response) => {
+        this.viewState.set(mapValidateTokenResponse(response));
       },
-      error: () => {
-        this.view.set('invalid');
+      error: (error: unknown) => {
+        if (isRateLimited(error)) {
+          this.formError.set('Too many attempts. Please wait a moment and try again.');
+        } else {
+          this.formError.set(this.apiError.toSafeMessage(error));
+        }
+        this.viewState.set('failure');
       }
     });
   }
 
-  private mapInvalidStatus(status: PlatformPasswordResetStatus): ResetPageView {
-    switch (status) {
-      case 'EXPIRED':
-        return 'expired';
-      case 'USED':
-        return 'used';
-      case 'REVOKED':
-        return 'revoked';
-      default:
-        return 'invalid';
-    }
-  }
-
-  private static passwordsMatchValidator(control: AbstractControl): ValidationErrors | null {
-    const newPassword = control.get('newPassword')?.value as string | undefined;
-    const confirmPassword = control.get('confirmPassword')?.value as string | undefined;
-
-    if (!newPassword || !confirmPassword) {
-      return null;
+  private applyCompleteError(error: unknown): void {
+    if (isRateLimited(error)) {
+      this.formError.set('Too many attempts. Please wait a moment and try again.');
+      return;
     }
 
-    return newPassword === confirmPassword ? null : { passwordMismatch: true };
+    const mapped = mapCompleteResetErrorCode(extractResetErrorCode(error));
+
+    if (mapped === 'mismatch') {
+      this.formError.set('Passwords must match.');
+      return;
+    }
+
+    if (mapped === 'password') {
+      const message = this.apiError.toSafeMessage(error);
+      this.form.controls.newPassword.setErrors({
+        ...(this.form.controls.newPassword.errors ?? {}),
+        server: message
+      });
+      this.form.controls.newPassword.markAsTouched();
+      return;
+    }
+
+    if (
+      mapped === 'invalid' ||
+      mapped === 'expired' ||
+      mapped === 'used' ||
+      mapped === 'revoked' ||
+      mapped === 'unavailable'
+    ) {
+      this.viewState.set(mapped);
+      this.resetToken = '';
+      return;
+    }
+
+    this.formError.set(this.apiError.toSafeMessage(error));
   }
 }

@@ -10,7 +10,8 @@ import { CurrentUser } from '../../../core/models/current-user.model';
 import { LoginRequest } from '../models/login-request.model';
 import {
   CompletePlatformPasswordResetRequest,
-  PlatformPasswordResetValidation
+  CompletePlatformPasswordResetResponse,
+  ValidatePlatformPasswordResetTokenResponse
 } from '../models/password-reset.model';
 
 interface PlatformLoginResponse {
@@ -61,22 +62,45 @@ export class AuthApiService {
       .pipe(map((response) => response.data === true));
   }
 
-  validatePasswordResetToken(token: string): Observable<PlatformPasswordResetValidation> {
+  validatePasswordResetToken(token: string): Observable<ValidatePlatformPasswordResetTokenResponse> {
     return this.http
-      .post<ApiResponse<PlatformPasswordResetValidation>>(
+      .post<ApiResponse<ValidatePlatformPasswordResetTokenResponse>>(
         `${appSettings.apiBaseUrl}${apiEndpoints.auth.passwordResetValidate}`,
         { token }
       )
-      .pipe(map((response) => response.data));
+      .pipe(
+        map(
+          (response) =>
+            response.data ?? {
+              isValid: false,
+              status: 'INVALID',
+              expiresAt: null
+            }
+        )
+      );
   }
 
-  completePasswordReset(request: CompletePlatformPasswordResetRequest): Observable<boolean> {
+  completePasswordReset(
+    request: CompletePlatformPasswordResetRequest
+  ): Observable<CompletePlatformPasswordResetResponse> {
     return this.http
-      .post<ApiResponse<boolean>>(
+      .post<ApiResponse<CompletePlatformPasswordResetResponse>>(
         `${appSettings.apiBaseUrl}${apiEndpoints.auth.passwordResetComplete}`,
-        request
+        {
+          token: request.token,
+          newPassword: request.newPassword,
+          confirmPassword: request.confirmPassword
+        }
       )
-      .pipe(map((response) => response.data === true));
+      .pipe(
+        map(
+          (response) =>
+            response.data ?? {
+              success: false,
+              message: response.message
+            }
+        )
+      );
   }
 
   private toAuthSession(response: PlatformLoginResponse): AuthSession {

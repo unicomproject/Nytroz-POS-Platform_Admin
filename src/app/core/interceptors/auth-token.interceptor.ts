@@ -66,7 +66,9 @@ function isPlatformAuthEndpoint(url: string): boolean {
   const authPaths = [
     apiEndpoints.auth.login,
     apiEndpoints.auth.refresh,
-    apiEndpoints.auth.logout
+    apiEndpoints.auth.logout,
+    apiEndpoints.auth.passwordResetValidate,
+    apiEndpoints.auth.passwordResetComplete
   ].map((path) => `${appSettings.apiBaseUrl}${path}`);
 
   return authPaths.some((path) => url.includes(path));
