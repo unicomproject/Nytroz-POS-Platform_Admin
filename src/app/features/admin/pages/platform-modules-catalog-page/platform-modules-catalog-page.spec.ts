@@ -20,14 +20,17 @@ describe('PlatformModulesCatalogPage', () => {
       description: 'Core point of sale module',
       sortOrder: 1,
       status: 'ACTIVE',
+      scope: 'TENANT',
       features: [
         {
           id: 'feature-1',
-          featureCode: 'pos.sales',
-          name: 'POS Sales',
-          description: 'Start sale',
+          featureCode: 'pos_checkout',
+          name: 'POS Checkout',
+          description: 'Canonical POS checkout entitlement',
           sortOrder: 1,
-          status: 'ACTIVE'
+          status: 'ACTIVE',
+          scope: 'TENANT',
+          permissions: []
         }
       ]
     },
@@ -38,18 +41,22 @@ describe('PlatformModulesCatalogPage', () => {
       description: null,
       sortOrder: 2,
       status: 'ACTIVE',
+      scope: 'TENANT',
       features: [
         {
           id: 'feature-2',
-          featureCode: 'inventory_management',
-          name: 'Inventory Management',
+          featureCode: 'inventory_tracking',
+          name: 'Inventory Tracking',
           description: 'Manage stock',
           sortOrder: 1,
-          status: 'ACTIVE'
+          status: 'ACTIVE',
+          scope: 'TENANT',
+          permissions: []
         }
       ]
     }
   ];
+
 
   async function createComponent(): Promise<ComponentFixture<PlatformModulesCatalogPage>> {
     await TestBed.configureTestingModule({
@@ -95,9 +102,9 @@ describe('PlatformModulesCatalogPage', () => {
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(api.getCatalog).toHaveBeenCalled();
     expect(text).toContain('Core POS');
-    expect(text).toContain('POS Sales');
-    expect(text).toContain('pos.sales');
-    expect(text).toContain('Inventory Management');
+    expect(text).toContain('POS Checkout');
+    expect(text).toContain('pos_checkout');
+    expect(text).toContain('Inventory Tracking');
   });
 
   it('filters modules and features by search term', async () => {
@@ -107,12 +114,12 @@ describe('PlatformModulesCatalogPage', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    fixture.componentInstance.searchTerm.set('inventory_management');
+    fixture.componentInstance.searchTerm.set('inventory_tracking');
     fixture.detectChanges();
 
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-    expect(text).toContain('Inventory Management');
-    expect(text).not.toContain('POS Sales');
+    expect(text).toContain('Inventory Tracking');
+    expect(text).not.toContain('POS Checkout');
   });
 
   it('shows an empty state when the backend returns no modules', async () => {
@@ -150,6 +157,6 @@ describe('PlatformModulesCatalogPage', () => {
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain('Core POS');
     expect(text).toContain('platform.features.view');
-    expect(text).not.toContain('pos.sales');
+    expect(text).not.toContain('pos_checkout');
   });
 });

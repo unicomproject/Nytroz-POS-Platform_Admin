@@ -47,9 +47,9 @@ describe('PlatformModulesCatalogApiService', () => {
             features: [
               {
                 id: 'feature-1',
-                featureCode: 'pos.sales',
-                name: 'POS Sales',
-                description: 'Start sale',
+                featureCode: 'pos_checkout',
+                name: 'POS Checkout',
+                description: 'Canonical POS checkout entitlement',
                 sortOrder: 1,
                 status: 'ACTIVE'
               }
@@ -60,6 +60,6 @@ describe('PlatformModulesCatalogApiService', () => {
     });
 
     expect(moduleCode).toBe('core_pos');
-    expect(featureCode).toBe('pos.sales');
+    expect(featureCode).toBe('pos_checkout');
   });
 });

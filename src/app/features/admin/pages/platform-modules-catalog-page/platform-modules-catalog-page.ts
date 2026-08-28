@@ -7,9 +7,12 @@ import { AccessControlService } from '../../../../core/services/access-control.s
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import {
   PlatformModulesCatalogFeature,
-  PlatformModulesCatalogModule
+  PlatformModulesCatalogModule,
+  PlatformModulesCatalogPermission
 } from '../../models/platform-modules-catalog.model';
 import { PlatformModulesCatalogApiService } from '../../services/platform-modules-catalog-api.service';
+
+type ScopeTab = 'all' | 'platform' | 'tenant';
 
 @Component({
   selector: 'app-platform-modules-catalog-page',
@@ -25,18 +28,51 @@ import { PlatformModulesCatalogApiService } from '../../services/platform-module
             <span class="current">Modules &amp; Features</span>
           </nav>
           <h1>Modules &amp; Features</h1>
-          <p>Platform module and feature catalog returned by the backend.</p>
+          <p>Canonical platform capability registry returned by the backend.</p>
           <span class="title-accent" aria-hidden="true"></span>
         </div>
       </header>
 
       <section class="filters card">
+        <div class="scope-tabs" role="tablist" aria-label="Scope Filter">
+          <button
+            type="button"
+            role="tab"
+            class="tab-btn"
+            [class.active]="scopeFilter() === 'all'"
+            [attr.aria-selected]="scopeFilter() === 'all'"
+            (click)="setScope('all')"
+          >
+            All Scopes
+          </button>
+          <button
+            type="button"
+            role="tab"
+            class="tab-btn"
+            [class.active]="scopeFilter() === 'platform'"
+            [attr.aria-selected]="scopeFilter() === 'platform'"
+            (click)="setScope('platform')"
+          >
+            Platform Scope
+          </button>
+          <button
+            type="button"
+            role="tab"
+            class="tab-btn"
+            [class.active]="scopeFilter() === 'tenant'"
+            [attr.aria-selected]="scopeFilter() === 'tenant'"
+            (click)="setScope('tenant')"
+          >
+            Tenant Scope
+          </button>
+        </div>
+
         <label class="filter-field search-field">
           <span class="field-label">Search</span>
           <span class="input-wrap">
             <input
               type="search"
-              placeholder="Search by module name, feature name, or feature code..."
+              placeholder="Search by module, feature, code, or permission..."
               [ngModel]="searchTerm()"
               (ngModelChange)="searchTerm.set($event)"
             />
@@ -46,22 +82,22 @@ import { PlatformModulesCatalogApiService } from '../../services/platform-module
       </section>
 
       @if (isLoading()) {
-        <div class="state-card card">Loading modules and features from the backend...</div>
+        <div class="state-card card">Loading capability registry from the backend...</div>
       } @else if (errorMessage()) {
         <div class="state-card card error">
-          <strong>Modules and features could not be loaded</strong>
+          <strong>Capability registry could not be loaded</strong>
           <span>{{ errorMessage() }}</span>
           <button type="button" class="btn primary" (click)="loadCatalog()">Try again</button>
         </div>
       } @else if (!(catalog()?.modules?.length)) {
         <div class="state-card card empty">
           <strong>No modules found</strong>
-          <span>The backend catalog did not return any platform modules.</span>
+          <span>The backend catalog did not return any capability modules for this filter.</span>
         </div>
       } @else if (!filteredModules().length) {
         <div class="state-card card empty">
           <strong>No matching modules or features</strong>
-          <span>Try a different search term.</span>
+          <span>Try a different search term or scope tab.</span>
         </div>
       } @else {
         <section class="summary-grid">
@@ -73,6 +109,10 @@ import { PlatformModulesCatalogApiService } from '../../services/platform-module
             <span class="label">Features</span>
             <strong>{{ filteredFeatureCount() }}</strong>
           </article>
+          <article class="summary-card card">
+            <span class="label">Permissions</span>
+            <strong>{{ filteredPermissionCount() }}</strong>
+          </article>
         </section>
 
         <section class="catalog-list">
@@ -80,8 +120,11 @@ import { PlatformModulesCatalogApiService } from '../../services/platform-module
             <article class="module-card card">
               <header class="module-header">
                 <div>
-                  <h2>{{ module.name }}</h2>
-                  <p>{{ module.moduleCode }}</p>
+                  <div class="module-title-row">
+                    <h2>{{ module.name }}</h2>
+                    <span class="scope-tag" [class.platform]="module.scope === 'PLATFORM'">{{ module.scope }}</span>
+                  </div>
+                  <p><code>{{ module.moduleCode }}</code></p>
                   @if (module.description) {
                     <p class="module-description">{{ module.description }}</p>
                   }
@@ -103,7 +146,9 @@ import { PlatformModulesCatalogApiService } from '../../services/platform-module
                       <tr>
                         <th>Feature</th>
                         <th>Code</th>
+                        <th>Scope</th>
                         <th>Description</th>
+                        <th>Permissions</th>
                         <th>Status</th>
                       </tr>
                     </thead>
@@ -112,7 +157,22 @@ import { PlatformModulesCatalogApiService } from '../../services/platform-module
                         <tr>
                           <td><strong>{{ feature.name }}</strong></td>
                           <td><code>{{ feature.featureCode }}</code></td>
+                          <td><span class="scope-tag small" [class.platform]="feature.scope === 'PLATFORM'">{{ feature.scope }}</span></td>
                           <td>{{ feature.description || '—' }}</td>
+                          <td>
+                            @if (feature.permissions?.length) {
+                              <div class="permission-pill-list">
+                                @for (perm of feature.permissions; track perm.id) {
+                                  <span class="permission-pill" [title]="perm.description || perm.permissionCode">
+                                    <code>{{ perm.permissionCode }}</code>
+                                    <small>({{ perm.actionType }})</small>
+                                  </span>
+                                }
+                              </div>
+                            } @else {
+                              <span class="muted">—</span>
+                            }
+                          </td>
                           <td><span class="status-badge active">{{ feature.status }}</span></td>
                         </tr>
                       }
@@ -174,7 +234,36 @@ import { PlatformModulesCatalogApiService } from '../../services/platform-module
       box-shadow: 0 1px 3px rgba(16, 24, 40, 0.04), 0 8px 24px rgba(16, 24, 40, 0.06);
     }
 
-    .filters { padding: 1rem; }
+    .filters {
+      display: grid;
+      gap: 1rem;
+      padding: 1rem;
+    }
+
+    .scope-tabs {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .tab-btn {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      color: #475569;
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 700;
+      padding: 0.5rem 0.9rem;
+      transition: all 0.15s ease;
+    }
+
+    .tab-btn:hover { background: #f1f5f9; }
+
+    .tab-btn.active {
+      background: #0b5cff;
+      border-color: #0b5cff;
+      color: #ffffff;
+    }
 
     .filter-field {
       display: grid;
@@ -217,7 +306,7 @@ import { PlatformModulesCatalogApiService } from '../../services/platform-module
     .summary-grid {
       display: grid;
       gap: 0.85rem;
-      grid-template-columns: repeat(2, minmax(0, 12rem));
+      grid-template-columns: repeat(3, minmax(0, 12rem));
     }
 
     .summary-card {
@@ -251,11 +340,36 @@ import { PlatformModulesCatalogApiService } from '../../services/platform-module
       margin-bottom: 0.85rem;
     }
 
+    .module-title-row {
+      align-items: center;
+      display: flex;
+      gap: 0.5rem;
+    }
+
     .module-header h2 {
       color: #101a38;
-      font-size: 1rem;
+      font-size: 1.1rem;
       margin: 0;
     }
+
+    .scope-tag {
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      color: #475569;
+      font-size: 0.68rem;
+      font-weight: 800;
+      padding: 0.15rem 0.45rem;
+      letter-spacing: 0.03em;
+    }
+
+    .scope-tag.platform {
+      background: #eff6ff;
+      border-color: #bfdbfe;
+      color: #1d4ed8;
+    }
+
+    .scope-tag.small { font-size: 0.64rem; padding: 0.1rem 0.35rem; }
 
     .module-header p {
       color: #667085;
@@ -320,6 +434,28 @@ import { PlatformModulesCatalogApiService } from '../../services/platform-module
       padding: 0.15rem 0.4rem;
     }
 
+    .permission-pill-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      max-width: 26rem;
+    }
+
+    .permission-pill {
+      align-items: center;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      display: inline-flex;
+      gap: 0.25rem;
+      padding: 0.2rem 0.4rem;
+    }
+
+    .permission-pill small {
+      color: #64748b;
+      font-size: 0.68rem;
+    }
+
     .status-badge {
       border-radius: 999px;
       display: inline-block;
@@ -370,7 +506,7 @@ import { PlatformModulesCatalogApiService } from '../../services/platform-module
 
     @media (max-width: 760px) {
       .module-header { flex-direction: column; }
-      .summary-grid { grid-template-columns: 1fr 1fr; }
+      .summary-grid { grid-template-columns: 1fr 1fr 1fr; }
     }
   `
 })
@@ -381,17 +517,34 @@ export class PlatformModulesCatalogPage implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
 
   readonly searchTerm = signal('');
+  readonly scopeFilter = signal<ScopeTab>('all');
   readonly catalog = signal<{ modules: PlatformModulesCatalogModule[] } | null>(null);
   readonly isLoading = signal(true);
   readonly errorMessage = signal<string | null>(null);
 
-  readonly filteredModules = computed(() => filterModules(this.catalog()?.modules ?? [], this.searchTerm()));
+  readonly filteredModules = computed(() =>
+    filterModules(this.catalog()?.modules ?? [], this.searchTerm())
+  );
 
   readonly filteredFeatureCount = computed(() =>
     this.filteredModules().reduce((total, module) => total + module.features.length, 0)
   );
 
+  readonly filteredPermissionCount = computed(() =>
+    this.filteredModules().reduce(
+      (total, module) =>
+        total +
+        module.features.reduce((fTotal, feature) => fTotal + (feature.permissions?.length ?? 0), 0),
+      0
+    )
+  );
+
   ngOnInit(): void {
+    this.loadCatalog();
+  }
+
+  setScope(scope: ScopeTab): void {
+    this.scopeFilter.set(scope);
     this.loadCatalog();
   }
 
@@ -399,8 +552,10 @@ export class PlatformModulesCatalogPage implements OnInit {
     this.isLoading.set(true);
     this.errorMessage.set(null);
 
+    const scopeParam = this.scopeFilter() === 'all' ? undefined : this.scopeFilter();
+
     this.api
-      .getCatalog()
+      .getCatalog(scopeParam)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (response) => {
@@ -432,7 +587,9 @@ function filterModules(
   return modules
     .map((module) => ({
       ...module,
-      features: module.features.filter((feature) => matchesFeature(feature, term) || matchesModule(module, term))
+      features: module.features.filter(
+        (feature) => matchesFeature(feature, term) || matchesModule(module, term)
+      )
     }))
     .filter((module) => matchesModule(module, term) || module.features.length > 0);
 }
@@ -442,9 +599,16 @@ function matchesModule(module: PlatformModulesCatalogModule, term: string): bool
 }
 
 function matchesFeature(feature: PlatformModulesCatalogFeature, term: string): boolean {
-  return (
+  const matchesSelf =
     feature.name.toLowerCase().includes(term) ||
     feature.featureCode.toLowerCase().includes(term) ||
-    (feature.description?.toLowerCase().includes(term) ?? false)
+    (feature.description?.toLowerCase().includes(term) ?? false);
+
+  const matchesPermissions = (feature.permissions ?? []).some(
+    (perm) =>
+      perm.name.toLowerCase().includes(term) ||
+      perm.permissionCode.toLowerCase().includes(term)
   );
+
+  return matchesSelf || matchesPermissions;
 }

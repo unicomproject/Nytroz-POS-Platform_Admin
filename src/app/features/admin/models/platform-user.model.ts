@@ -30,6 +30,16 @@ export interface PlatformUserListResponse {
   totalPages?: number;
 }
 
+export interface PlatformUserListQuery {
+  pageNumber?: number;
+  pageSize?: number;
+  search?: string;
+  status?: string;
+  role?: string;
+  sortBy?: string;
+  sortDirection?: string;
+}
+
 export interface PlatformUserDetail extends PlatformUserSummary {
   invitePending: boolean;
 }
