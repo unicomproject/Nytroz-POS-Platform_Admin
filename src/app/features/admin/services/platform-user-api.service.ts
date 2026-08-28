@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { map, Observable } from 'rxjs';
 
@@ -19,6 +19,7 @@ import {
   CreatePlatformUserRequest,
   InitiatePlatformPasswordResetResponse,
   PlatformUserDetail,
+  PlatformUserListQuery,
   PlatformUserListResponse,
   UpdatePlatformUserRequest
 } from '../models/platform-user.model';
@@ -29,9 +30,34 @@ export class PlatformUserApiService {
 
   constructor(private readonly http: HttpClient) {}
 
-  getUsers(): Observable<PlatformUserListResponse> {
+  getUsers(query?: PlatformUserListQuery): Observable<PlatformUserListResponse> {
+    let params = new HttpParams();
+    if (query) {
+      if (query.pageNumber !== undefined && query.pageNumber !== null) {
+        params = params.set('pageNumber', query.pageNumber.toString());
+      }
+      if (query.pageSize !== undefined && query.pageSize !== null) {
+        params = params.set('pageSize', query.pageSize.toString());
+      }
+      if (query.search?.trim()) {
+        params = params.set('search', query.search.trim());
+      }
+      if (query.status?.trim()) {
+        params = params.set('status', query.status.trim());
+      }
+      if (query.role?.trim()) {
+        params = params.set('role', query.role.trim());
+      }
+      if (query.sortBy?.trim()) {
+        params = params.set('sortBy', query.sortBy.trim());
+      }
+      if (query.sortDirection?.trim()) {
+        params = params.set('sortDirection', query.sortDirection.trim());
+      }
+    }
+
     return this.http
-      .get<ApiResponse<PlatformUserListResponseApiDto>>(this.baseUrl)
+      .get<ApiResponse<PlatformUserListResponseApiDto>>(this.baseUrl, { params })
       .pipe(map((response) => mapPlatformUserListResponse(response.data)));
   }
 

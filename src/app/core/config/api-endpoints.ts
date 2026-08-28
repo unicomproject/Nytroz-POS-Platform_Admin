@@ -39,6 +39,7 @@ export const apiEndpoints = {
         `/platform-admin/billing/manual-payments/${paymentId}/notification/resend`,
     },
     users: '/platform-admin/users',
+    userPasswordReset: (userId: string) => `/platform-admin/users/${userId}/password-reset`,
     settings: '/platform-admin/settings',
     returnPolicyTemplates: '/platform/return-policy-templates',
     returnPolicyTemplate: (templateId: string) => `/platform/return-policy-templates/${templateId}`,
