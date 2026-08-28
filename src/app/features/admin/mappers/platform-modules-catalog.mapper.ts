@@ -1,8 +1,19 @@
 import {
   PlatformModulesCatalogFeature,
   PlatformModulesCatalogModule,
+  PlatformModulesCatalogPermission,
   PlatformModulesCatalogResponse
 } from '../models/platform-modules-catalog.model';
+
+export interface PlatformModulesCatalogPermissionApiDto {
+  id: string;
+  permissionCode: string;
+  name: string;
+  description?: string | null;
+  actionType: string;
+  scope?: string | null;
+  isActive?: boolean | null;
+}
 
 export interface PlatformModulesCatalogFeatureApiDto {
   id: string;
@@ -11,6 +22,8 @@ export interface PlatformModulesCatalogFeatureApiDto {
   description?: string | null;
   sortOrder: number;
   status: string;
+  scope?: string | null;
+  permissions?: PlatformModulesCatalogPermissionApiDto[] | null;
 }
 
 export interface PlatformModulesCatalogModuleApiDto {
@@ -20,6 +33,7 @@ export interface PlatformModulesCatalogModuleApiDto {
   description?: string | null;
   sortOrder: number;
   status: string;
+  scope?: string | null;
   features: PlatformModulesCatalogFeatureApiDto[];
 }
 
@@ -45,6 +59,7 @@ export function mapPlatformModulesCatalogModule(
     description: dto.description ?? null,
     sortOrder: dto.sortOrder,
     status: dto.status,
+    scope: dto.scope ?? 'TENANT',
     features: (dto.features ?? []).map(mapPlatformModulesCatalogFeature)
   };
 }
@@ -58,6 +73,23 @@ export function mapPlatformModulesCatalogFeature(
     name: dto.name,
     description: dto.description ?? null,
     sortOrder: dto.sortOrder,
-    status: dto.status
+    status: dto.status,
+    scope: dto.scope ?? 'TENANT',
+    permissions: (dto.permissions ?? []).map(mapPlatformModulesCatalogPermission)
   };
 }
+
+export function mapPlatformModulesCatalogPermission(
+  dto: PlatformModulesCatalogPermissionApiDto
+): PlatformModulesCatalogPermission {
+  return {
+    id: String(dto.id),
+    permissionCode: dto.permissionCode,
+    name: dto.name,
+    description: dto.description ?? null,
+    actionType: dto.actionType,
+    scope: dto.scope ?? 'TENANT',
+    isActive: dto.isActive ?? true
+  };
+}
+

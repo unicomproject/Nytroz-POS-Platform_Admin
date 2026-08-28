@@ -15,11 +15,13 @@ import { PlatformModulesCatalogResponse } from '../models/platform-modules-catal
 export class PlatformModulesCatalogApiService {
   constructor(private readonly http: HttpClient) {}
 
-  getCatalog(): Observable<PlatformModulesCatalogResponse> {
+  getCatalog(scope?: string): Observable<PlatformModulesCatalogResponse> {
+    const url = scope
+      ? `${appSettings.apiBaseUrl}${apiEndpoints.platform.modulesCatalog}?scope=${encodeURIComponent(scope)}`
+      : `${appSettings.apiBaseUrl}${apiEndpoints.platform.modulesCatalog}`;
     return this.http
-      .get<ApiResponse<PlatformModulesCatalogResponseApiDto>>(
-        `${appSettings.apiBaseUrl}${apiEndpoints.platform.modulesCatalog}`
-      )
+      .get<ApiResponse<PlatformModulesCatalogResponseApiDto>>(url)
       .pipe(map((response) => mapPlatformModulesCatalogResponse(response.data)));
   }
+
 }
