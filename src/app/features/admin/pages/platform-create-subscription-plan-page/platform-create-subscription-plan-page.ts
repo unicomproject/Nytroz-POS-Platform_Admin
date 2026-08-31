@@ -1,6 +1,6 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { AbstractControl, FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import { ConfirmationDialog } from '../../../../shared/components/confirmation-dialog/confirmation-dialog';
@@ -57,6 +57,7 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
   private readonly api = inject(PlatformSubscriptionPlanApiService);
   private readonly apiError = inject(ApiErrorService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   readonly steps = [
     { key: 'basics' as WizardStep, label: 'Basics' },
@@ -328,10 +329,13 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
 
   ngOnInit(): void {
     this.loadCatalogs();
+    const routePlanId = this.route.snapshot.paramMap.get('planId');
     const state = history.state as { planId?: string; mode?: 'view' | 'edit' };
-    if (state?.planId) {
+    const planId = routePlanId || state?.planId;
+
+    if (planId) {
       this.isEditMode.set(true);
-      this.loadPlanForEdit(state.planId);
+      this.loadPlanForEdit(planId);
     }
   }
 
@@ -422,6 +426,10 @@ export class PlatformCreateSubscriptionPlanPage implements OnInit {
 
   goBack(): void {
     if (this.currentStep() === 'basics') {
+      if (this.isEditMode() && this.savedPlanId()) {
+        void this.router.navigate(['/admin/subscriptions', this.savedPlanId()]);
+        return;
+      }
       void this.router.navigate(['/admin/subscriptions']);
       return;
     }

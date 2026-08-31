@@ -246,7 +246,8 @@ export class Header {
   }
 
   private isSubscriptionCreateRoute(): boolean {
-    return this.router.url.split('?')[0] === '/admin/subscriptions/create';
+    const path = this.router.url.split('?')[0];
+    return path === '/admin/subscriptions/create' || (path.startsWith('/admin/subscriptions/') && path.endsWith('/edit'));
   }
 }
 
