@@ -175,15 +175,13 @@ describe('PlatformSubscriptionPlanDetailPage', () => {
     expect(fixture.nativeElement.textContent).toContain('Subscription plan not found');
   });
 
-  it('navigates Edit Plan to the wizard with edit state', async () => {
+  it('navigates Edit Plan to dedicated edit route', async () => {
     const fixture = await createComponent();
     const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
     fixture.componentInstance.edit(planFixture());
 
-    expect(navigate).toHaveBeenCalledWith(['/admin/subscriptions/create'], {
-      state: { planId: PLAN_ID, mode: 'edit' }
-    });
+    expect(navigate).toHaveBeenCalledWith(['/admin/subscriptions', PLAN_ID, 'edit']);
   });
 
   it('opens ConfirmationDialog and confirms Publish once', async () => {

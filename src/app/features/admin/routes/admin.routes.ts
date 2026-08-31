@@ -58,6 +58,14 @@ const adminPageRoutes: Routes = [
     data: { title: 'Create Subscription Plan', requiredPermission: platformPermissions.subscriptionPlansCreate }
   },
   {
+    path: 'subscriptions/:planId/edit',
+    loadComponent: () =>
+      import('../pages/platform-create-subscription-plan-page/platform-create-subscription-plan-page').then(
+        (m) => m.PlatformCreateSubscriptionPlanPage
+      ),
+    data: { title: 'Edit Subscription Plan', requiredPermission: platformPermissions.subscriptionPlansEdit }
+  },
+  {
     path: 'subscriptions/:planId',
     loadComponent: () =>
       import('../pages/platform-subscription-plan-detail-page/platform-subscription-plan-detail-page').then(

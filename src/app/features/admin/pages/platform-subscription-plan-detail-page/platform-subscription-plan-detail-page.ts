@@ -202,9 +202,7 @@ export class PlatformSubscriptionPlanDetailPage {
       return;
     }
 
-    this.router.navigate(['/admin/subscriptions/create'], {
-      state: { planId: plan.id, mode: 'edit' }
-    });
+    void this.router.navigate(['/admin/subscriptions', plan.id, 'edit']);
   }
 
   requestPublish(plan: SubscriptionPlanDetail): void {

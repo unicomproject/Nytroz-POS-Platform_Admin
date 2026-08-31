@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter, Router } from '@angular/router';
+import { ActivatedRoute, provideRouter, Router } from '@angular/router';
 import { NEVER, of, throwError } from 'rxjs';
 
 import { ApiErrorService } from '../../../../core/services/api-error.service';
@@ -1081,5 +1081,49 @@ describe('PlatformCreateSubscriptionPlanPage', () => {
     expect(text).toContain('Inventory Management');
     expect(component.modulesSummary()).toBe('2 selected');
     expect(component.featuresSummary()).toBe('2 enabled');
+  });
+
+  it('loads plan for edit when planId route param is present (refresh & deep-link safe)', async () => {
+    TestBed.resetTestingModule();
+    api.getSubscriptionCatalog.mockReturnValue(of({ modules: [] }));
+    api.getSubscriptionPlanDetail.mockReturnValue(of(planDetail({ id: 'route-plan-123', planName: 'Route Plan' })));
+
+    await TestBed.configureTestingModule({
+      imports: [PlatformCreateSubscriptionPlanPage],
+      providers: [
+        provideRouter([]),
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: {
+              paramMap: {
+                get: (key: string) => (key === 'planId' ? 'route-plan-123' : null)
+              }
+            }
+          }
+        },
+        { provide: PlatformSubscriptionPlanApiService, useValue: api },
+        { provide: ApiErrorService, useValue: { toSafeMessage: () => 'Save failed safely' } }
+      ]
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(PlatformCreateSubscriptionPlanPage);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+
+    expect(component.isEditMode()).toBe(true);
+    expect(api.getSubscriptionPlanDetail).toHaveBeenCalledWith('route-plan-123');
+    expect(api.createSubscriptionPlanDraft).not.toHaveBeenCalled();
+    expect(component.editPlanName()).toBe('Route Plan');
+  });
+
+  it('returns to plan detail page on goBack when in edit mode', () => {
+    const fixture = createEditFixture();
+    const component = fixture.componentInstance;
+    component.currentStep.set('basics');
+
+    component.goBack();
+
+    expect(router.navigate).toHaveBeenCalledWith(['/admin/subscriptions', 'draft-1']);
   });
 });
