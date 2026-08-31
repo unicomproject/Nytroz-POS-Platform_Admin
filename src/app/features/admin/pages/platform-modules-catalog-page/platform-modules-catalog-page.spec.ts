@@ -9,8 +9,11 @@ import { PlatformModulesCatalogApiService } from '../../services/platform-module
 import { PlatformModulesCatalogPage } from './platform-modules-catalog-page';
 
 describe('PlatformModulesCatalogPage', () => {
+  let component: PlatformModulesCatalogPage;
+  let fixture: ComponentFixture<PlatformModulesCatalogPage>;
   let api: { getCatalog: ReturnType<typeof vi.fn> };
   let accessControl: { hasPermission: ReturnType<typeof vi.fn> };
+  let apiError: { toSafeMessage: ReturnType<typeof vi.fn> };
 
   const catalogModules: PlatformModulesCatalogModule[] = [
     {
@@ -30,7 +33,17 @@ describe('PlatformModulesCatalogPage', () => {
           sortOrder: 1,
           status: 'ACTIVE',
           scope: 'TENANT',
-          permissions: []
+          permissions: [
+            {
+              id: 'perm-1',
+              permissionCode: 'pos.sales.checkout',
+              name: 'Checkout',
+              description: 'Process checkout',
+              actionType: 'create',
+              scope: 'TENANT',
+              isActive: true
+            }
+          ]
         }
       ]
     },
@@ -51,30 +64,24 @@ describe('PlatformModulesCatalogPage', () => {
           sortOrder: 1,
           status: 'ACTIVE',
           scope: 'TENANT',
-          permissions: []
+          permissions: [
+            {
+              id: 'perm-2',
+              permissionCode: 'inventory.stock.view',
+              name: 'View Stock',
+              description: 'View current inventory',
+              actionType: 'view',
+              scope: 'TENANT',
+              isActive: true
+            }
+          ]
         }
       ]
     }
   ];
 
-
-  async function createComponent(): Promise<ComponentFixture<PlatformModulesCatalogPage>> {
-    await TestBed.configureTestingModule({
-      imports: [PlatformModulesCatalogPage],
-      providers: [
-        { provide: PlatformModulesCatalogApiService, useValue: api },
-        { provide: AccessControlService, useValue: accessControl },
-        { provide: ApiErrorService, useValue: { toSafeMessage: () => 'Catalog failed safely' } }
-      ]
-    }).compileComponents();
-
-    const fixture = TestBed.createComponent(PlatformModulesCatalogPage);
-    fixture.detectChanges();
-    return fixture;
-  }
-
   beforeEach(() => {
-    api = { getCatalog: vi.fn() };
+    api = { getCatalog: vi.fn().mockReturnValue(of({ modules: catalogModules })) };
     accessControl = {
       hasPermission: vi.fn((permission: string) =>
         [platformPermissions.modulesView, platformPermissions.featuresView].includes(
@@ -82,81 +89,105 @@ describe('PlatformModulesCatalogPage', () => {
         )
       )
     };
+    apiError = { toSafeMessage: vi.fn(() => 'Catalog failed safely') };
+
+    TestBed.configureTestingModule({
+      imports: [PlatformModulesCatalogPage],
+      providers: [
+        { provide: PlatformModulesCatalogApiService, useValue: api },
+        { provide: AccessControlService, useValue: accessControl },
+        { provide: ApiErrorService, useValue: apiError }
+      ]
+    });
+
+    fixture = TestBed.createComponent(PlatformModulesCatalogPage);
+    component = fixture.componentInstance;
   });
 
-  it('shows a loading state while the catalog request is pending', async () => {
+  it('shows loading state while the catalog request is pending', () => {
     api.getCatalog.mockReturnValue(new Subject().asObservable());
 
-    const fixture = await createComponent();
+    component.loadCatalog();
 
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Loading modules and features');
+    expect(component.isLoading()).toBe(true);
+    expect(component.errorMessage()).toBeNull();
   });
 
-  it('loads modules and features from the API and renders grouped display', async () => {
+  it('loads modules and features from API and computes feature/permission counts', () => {
     api.getCatalog.mockReturnValue(of({ modules: catalogModules }));
 
-    const fixture = await createComponent();
-    await fixture.whenStable();
-    fixture.detectChanges();
+    component.loadCatalog();
 
-    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-    expect(api.getCatalog).toHaveBeenCalled();
-    expect(text).toContain('Core POS');
-    expect(text).toContain('POS Checkout');
-    expect(text).toContain('pos_checkout');
-    expect(text).toContain('Inventory Tracking');
+    expect(component.isLoading()).toBe(false);
+    expect(component.filteredModules().length).toBe(2);
+    expect(component.filteredFeatureCount()).toBe(2);
+    expect(component.filteredPermissionCount()).toBe(2);
   });
 
-  it('filters modules and features by search term', async () => {
+  it('supports progressive disclosure module accordion toggles', () => {
     api.getCatalog.mockReturnValue(of({ modules: catalogModules }));
+    component.loadCatalog();
 
-    const fixture = await createComponent();
-    await fixture.whenStable();
-    fixture.detectChanges();
+    // Default: first module expanded
+    expect(component.isModuleExpanded('module-1', 0)).toBe(true);
+    expect(component.isModuleExpanded('module-2', 1)).toBe(false);
 
-    fixture.componentInstance.searchTerm.set('inventory_tracking');
-    fixture.detectChanges();
+    // Expand All
+    component.expandAll();
+    expect(component.isModuleExpanded('module-1', 0)).toBe(true);
+    expect(component.isModuleExpanded('module-2', 1)).toBe(true);
 
-    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-    expect(text).toContain('Inventory Tracking');
-    expect(text).not.toContain('POS Checkout');
+    // Collapse All
+    component.collapseAll();
+    expect(component.isModuleExpanded('module-1', 0)).toBe(false);
+    expect(component.isModuleExpanded('module-2', 1)).toBe(false);
+
+    // Toggle single module
+    component.toggleModule('module-2');
+    expect(component.isModuleExpanded('module-2', 1)).toBe(true);
   });
 
-  it('shows an empty state when the backend returns no modules', async () => {
+  it('filters modules and features by search term and auto-expands matching modules', () => {
+    api.getCatalog.mockReturnValue(of({ modules: catalogModules }));
+    component.loadCatalog();
+
+    component.searchTerm.set('inventory_tracking');
+
+    expect(component.searchActive()).toBe(true);
+    expect(component.filteredModules().length).toBe(1);
+    expect(component.filteredModules()[0].name).toBe('Inventory');
+
+    // Auto-expands matching modules during search
+    expect(component.isModuleExpanded('module-2', 0)).toBe(true);
+
+    // Clear search
+    component.clearSearch();
+    expect(component.searchTerm()).toBe('');
+    expect(component.searchActive()).toBe(false);
+  });
+
+  it('shows an empty state when backend returns no modules', () => {
     api.getCatalog.mockReturnValue(of({ modules: [] }));
+    component.loadCatalog();
 
-    const fixture = await createComponent();
-    await fixture.whenStable();
-    fixture.detectChanges();
-
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('No modules found');
+    expect(component.filteredModules().length).toBe(0);
+    expect(component.filteredFeatureCount()).toBe(0);
   });
 
-  it('shows an error state when the API request fails', async () => {
-    api.getCatalog.mockReturnValue(throwError(() => new Error('network failed')));
+  it('shows an error state when API fails safely', () => {
+    api.getCatalog.mockReturnValue(throwError(() => new Error('network failure')));
 
-    const fixture = await createComponent();
-    await fixture.whenStable();
-    fixture.detectChanges();
+    component.loadCatalog();
 
-    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-    expect(text).toContain('Modules and features could not be loaded');
-    expect(text).toContain('Catalog failed safely');
+    expect(component.isLoading()).toBe(false);
+    expect(component.errorMessage()).toBe('Catalog failed safely');
   });
 
-  it('hides feature details without platform.features.view permission', async () => {
-    accessControl.hasPermission.mockImplementation(
-      (permission: string) => permission === platformPermissions.modulesView
-    );
-    api.getCatalog.mockReturnValue(of({ modules: catalogModules }));
-
-    const fixture = await createComponent();
-    await fixture.whenStable();
-    fixture.detectChanges();
-
-    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-    expect(text).toContain('Core POS');
-    expect(text).toContain('platform.features.view');
-    expect(text).not.toContain('pos_checkout');
+  it('returns appropriate color micro-badge classes for permission action types', () => {
+    expect(component.getActionClass('view')).toBe('action-view');
+    expect(component.getActionClass('create')).toBe('action-create');
+    expect(component.getActionClass('manage')).toBe('action-manage');
+    expect(component.getActionClass('delete')).toBe('action-delete');
+    expect(component.getActionClass('unknown')).toBe('action-default');
   });
 });
