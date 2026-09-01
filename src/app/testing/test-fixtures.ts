@@ -571,19 +571,37 @@ export function createTenantEntitlementOptionsApiDto(
             id: 'feature-offline',
             code: 'offline_operation_sync',
             name: 'Offline Operation Sync',
-            description: 'Offline sync capability'
+            description: 'Offline sync capability',
+            planIncluded: true,
+            isOverridden: false,
+            sourceType: 'PLAN',
+            overrideReason: null,
+            effectiveFrom: null,
+            effectiveUntil: null
           },
           {
             id: 'feature-online',
             code: 'online_store',
             name: 'Online Store',
-            description: 'Online storefront'
+            description: 'Online storefront',
+            planIncluded: true,
+            isOverridden: true,
+            sourceType: 'OVERRIDE',
+            overrideReason: 'Disabled for compliance audit',
+            effectiveFrom: null,
+            effectiveUntil: null
           },
           {
             id: 'feature-click',
             code: 'click_collect',
             name: 'Click & Collect',
-            description: 'Click and collect orders'
+            description: 'Click and collect orders',
+            planIncluded: false,
+            isOverridden: false,
+            sourceType: null,
+            overrideReason: null,
+            effectiveFrom: null,
+            effectiveUntil: null
           }
         ]
       }

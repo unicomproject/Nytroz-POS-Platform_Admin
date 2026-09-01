@@ -11,6 +11,12 @@ export interface PlatformTenantEntitlementCatalogFeatureApiDto {
   code: string;
   name: string;
   description?: string | null;
+  planIncluded?: boolean;
+  isOverridden?: boolean;
+  sourceType?: string | null;
+  overrideReason?: string | null;
+  effectiveFrom?: string | null;
+  effectiveUntil?: string | null;
 }
 
 export interface PlatformTenantEntitlementCatalogModuleApiDto {
@@ -94,17 +100,38 @@ export function mapPlatformTenantEntitlementCatalogFeature(
     id: String(dto.id),
     code: dto.code,
     name: dto.name,
-    description: dto.description ?? null
+    description: dto.description ?? null,
+    planIncluded: Boolean(dto.planIncluded),
+    isOverridden: Boolean(dto.isOverridden),
+    sourceType: dto.sourceType ?? null,
+    overrideReason: dto.overrideReason ?? null,
+    effectiveFrom: dto.effectiveFrom ?? null,
+    effectiveUntil: dto.effectiveUntil ?? null
   };
 }
 
 export function mapUpdatePlatformTenantEntitlementsRequest(
   request: UpdatePlatformTenantEntitlementsRequest
 ): Record<string, unknown> {
-  return {
+  const payload: Record<string, unknown> = {
     subscriptionPlanId: request.subscriptionPlanId,
     enabledFeatureIds: request.enabledFeatureIds,
     enabledFeatureCodes: request.enabledFeatureCodes,
     concurrencyVersion: request.concurrencyVersion
   };
+
+  if (request.sourceType) {
+    payload['sourceType'] = request.sourceType;
+  }
+  if (request.overrideReason !== undefined) {
+    payload['overrideReason'] = request.overrideReason;
+  }
+  if (request.effectiveFrom !== undefined) {
+    payload['effectiveFrom'] = request.effectiveFrom;
+  }
+  if (request.effectiveUntil !== undefined) {
+    payload['effectiveUntil'] = request.effectiveUntil;
+  }
+
+  return payload;
 }
