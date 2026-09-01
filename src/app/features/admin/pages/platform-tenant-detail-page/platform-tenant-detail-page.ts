@@ -402,18 +402,72 @@ import { StatusBadge } from '../../../../shared/ui/status-badge/status-badge';
                 <div class="panel-heading">
                   <h2 id="entitlements-heading">Entitlements</h2>
                   @if (data.canManageEntitlements && canManageEntitlements()) {
-                    <app-button variant="secondary" size="compact" (click)="openEntitlementEditor()">
-                      Edit Entitlements
-                    </app-button>
+                    <div class="panel-actions">
+                      <app-button variant="secondary" size="compact" (click)="openEntitlementEditor()">
+                        Edit Entitlements
+                      </app-button>
+                      <app-button variant="secondary" size="compact" (click)="confirmRestoreToPlan()">
+                        Restore to Plan Baseline
+                      </app-button>
+                    </div>
                   }
                 </div>
-                <p class="section-note">Enabled features returned by the tenant detail API.</p>
-                @if (data.enabledFeatureCodes.length) {
+                <p class="section-note">Authoritative feature entitlements returned by the backend.</p>
+                @if (entitlementOptions(); as options) {
+                  <div class="catalog-modules-list">
+                    @for (module of options.catalogModules; track module.id) {
+                      <div class="module-group">
+                        <h3 class="module-title">{{ module.name }}</h3>
+                        <ul class="feature-catalog-list">
+                          @for (feature of module.features; track feature.id) {
+                            <li class="feature-card">
+                              <div class="feature-info">
+                                <div class="feature-header">
+                                  <strong>{{ feature.name }}</strong>
+                                  <code class="feature-code">{{ feature.code }}</code>
+                                </div>
+                                @if (feature.description) {
+                                  <p class="feature-desc">{{ feature.description }}</p>
+                                }
+                                @if (feature.overrideReason || feature.effectiveFrom || feature.effectiveUntil) {
+                                  <div class="override-meta-note">
+                                    @if (feature.overrideReason) {
+                                      <span><strong>Reason:</strong> {{ feature.overrideReason }}</span>
+                                    }
+                                    @if (feature.effectiveFrom) {
+                                      <span><strong>From:</strong> {{ feature.effectiveFrom | date: 'short' }}</span>
+                                    }
+                                    @if (feature.effectiveUntil) {
+                                      <span><strong>Until:</strong> {{ feature.effectiveUntil | date: 'short' }}</span>
+                                    }
+                                  </div>
+                                }
+                              </div>
+                              <div class="feature-badges">
+                                <span class="badge" [class.badge-success]="feature.planIncluded" [class.badge-secondary]="!feature.planIncluded">
+                                  {{ feature.planIncluded ? 'Included in Plan' : 'Not in Plan' }}
+                                </span>
+                                @if (feature.isOverridden) {
+                                  <span class="badge badge-warning">Overridden</span>
+                                }
+                                <span class="badge badge-info">{{ feature.sourceType || 'PLAN' }}</span>
+                                <span class="badge" [class.badge-success]="data.enabledFeatureCodes.includes(feature.code)" [class.badge-danger]="!data.enabledFeatureCodes.includes(feature.code)">
+                                  {{ data.enabledFeatureCodes.includes(feature.code) ? 'Enabled' : 'Disabled' }}
+                                </span>
+                              </div>
+                            </li>
+                          }
+                        </ul>
+                      </div>
+                    }
+                  </div>
+                } @else if (data.enabledFeatureCodes.length) {
                   <ul class="feature-list">
                     @for (code of data.enabledFeatureCodes; track code) {
                       <li>
                         <span>{{ featureLabelForCode(code) }}</span>
                         <code class="feature-code">{{ code }}</code>
+                        <span class="badge badge-success">Enabled</span>
                       </li>
                     }
                   </ul>
@@ -519,6 +573,9 @@ import { StatusBadge } from '../../../../shared/ui/status-badge/status-badge';
             @if (editorSaveError()) {
               <div class="editor-error" role="alert">{{ editorSaveError() }}</div>
             }
+            @if (restoreError()) {
+              <div class="editor-error" role="alert">{{ restoreError() }}</div>
+            }
 
             @if (!options.plans.length) {
               <div class="editor-state empty">
@@ -532,7 +589,7 @@ import { StatusBadge } from '../../../../shared/ui/status-badge/status-badge';
                     id="select-plan"
                     [ngModel]="selectedPlanId()"
                     (ngModelChange)="onPlanChange($event)"
-                    [disabled]="editorSaving()"
+                    [disabled]="editorSaving() || isRestoring()"
                   >
                     @for (plan of options.plans; track plan.id) {
                       <option [value]="plan.id">{{ plan.name }} ({{ plan.code }})</option>
@@ -542,8 +599,8 @@ import { StatusBadge } from '../../../../shared/ui/status-badge/status-badge';
 
                 @if (selectedPlan(); as plan) {
                   <fieldset class="features-fieldset">
-                    <legend>Enabled Features</legend>
-                    <p class="muted">Only features included in the selected plan can be enabled.</p>
+                    <legend>Feature Catalog & Custom Overrides</legend>
+                    <p class="muted">Features can be enabled or disabled. Custom overrides beyond plan baseline require a reason.</p>
                     @if (!options.catalogModules.length) {
                       <p class="muted">No catalog modules returned from the backend.</p>
                     } @else {
@@ -552,12 +609,12 @@ import { StatusBadge } from '../../../../shared/ui/status-badge/status-badge';
                           <h3>{{ module.name }}</h3>
                           <ul class="feature-options">
                             @for (feature of module.features; track feature.id) {
-                              <li [class.disabled]="!isFeatureAllowed(feature, plan)">
-                                <label>
+                              <li class="feature-editor-row">
+                                <label class="feature-option-label">
                                   <input
                                     type="checkbox"
                                     [checked]="isFeatureEnabled(feature.id)"
-                                    [disabled]="!isFeatureAllowed(feature, plan) || editorSaving()"
+                                    [disabled]="isFeatureDisabledInEditor(feature)"
                                     (change)="toggleFeature(feature, $event)"
                                   />
                                   <span class="feature-label">
@@ -565,6 +622,15 @@ import { StatusBadge } from '../../../../shared/ui/status-badge/status-badge';
                                     <small>{{ feature.code }}</small>
                                   </span>
                                 </label>
+                                <div class="feature-badges">
+                                  <span class="badge" [class.badge-success]="feature.planIncluded" [class.badge-secondary]="!feature.planIncluded">
+                                    {{ feature.planIncluded ? 'Included in Plan' : 'Not in Plan' }}
+                                  </span>
+                                  @if (feature.isOverridden) {
+                                    <span class="badge badge-warning">Overridden</span>
+                                  }
+                                  <span class="badge badge-info">{{ feature.sourceType || 'PLAN' }}</span>
+                                </div>
                               </li>
                             }
                           </ul>
@@ -572,13 +638,65 @@ import { StatusBadge } from '../../../../shared/ui/status-badge/status-badge';
                       }
                     }
                   </fieldset>
+
+                  <fieldset class="override-controls">
+                    <legend>Override Configuration</legend>
+                    <app-form-field id="override-reason" label="Override Reason" [required]="sourceType() === 'OVERRIDE'">
+                      <textarea
+                        id="override-reason"
+                        rows="2"
+                        [ngModel]="overrideReason()"
+                        (ngModelChange)="overrideReason.set($event)"
+                        [disabled]="editorSaving() || isRestoring()"
+                        maxlength="500"
+                        placeholder="Specify reason for custom entitlement override (required for OVERRIDE, max 500 characters)..."
+                      ></textarea>
+                    </app-form-field>
+
+                    <div class="date-fields-grid">
+                      <app-form-field id="effective-from" label="Effective From">
+                        <input
+                          type="datetime-local"
+                          id="effective-from"
+                          [ngModel]="effectiveFrom()"
+                          (ngModelChange)="effectiveFrom.set($event)"
+                          [disabled]="editorSaving() || isRestoring()"
+                        />
+                      </app-form-field>
+
+                      <app-form-field id="effective-until" label="Effective Until (Optional)">
+                        <input
+                          type="datetime-local"
+                          id="effective-until"
+                          [ngModel]="effectiveUntil()"
+                          (ngModelChange)="effectiveUntil.set($event)"
+                          [disabled]="editorSaving() || isRestoring()"
+                        />
+                      </app-form-field>
+                    </div>
+                  </fieldset>
                 }
 
                 <footer class="editor-actions">
-                  <app-button variant="secondary" [disabled]="editorSaving()" (click)="closeEntitlementEditor()">
+                  <app-button
+                    variant="secondary"
+                    [disabled]="editorSaving() || isRestoring()"
+                    (click)="confirmRestoreToPlan()"
+                  >
+                    Restore to Plan Baseline
+                  </app-button>
+                  <app-button
+                    variant="secondary"
+                    [disabled]="editorSaving() || isRestoring()"
+                    (click)="closeEntitlementEditor()"
+                  >
                     Cancel
                   </app-button>
-                  <app-button variant="primary" [disabled]="editorSaving()" (click)="saveEntitlements()">
+                  <app-button
+                    variant="primary"
+                    [disabled]="editorSaving() || isRestoring()"
+                    (click)="saveEntitlements()"
+                  >
                     {{ editorSaving() ? 'Saving...' : 'Save Entitlements' }}
                   </app-button>
                 </footer>
@@ -587,6 +705,19 @@ import { StatusBadge } from '../../../../shared/ui/status-badge/status-badge';
           }
         </aside>
       }
+
+      <app-confirmation-dialog
+        [isOpen]="isRestoreConfirmOpen()"
+        title="Restore Entitlements to Plan Baseline"
+        message="Are you sure you want to restore tenant entitlements to the current subscription plan baseline? All custom tenant overrides will be removed. Add-on entitlements are preserved."
+        confirmLabel="Restore Baseline"
+        cancelLabel="Cancel"
+        loadingLabel="Restoring..."
+        variant="default"
+        [isLoading]="isRestoring()"
+        (confirm)="onRestoreConfirmed()"
+        (cancel)="onRestoreCancelled()"
+      />
 
       <app-confirmation-dialog
         [isOpen]="isConfirmDialogOpen()"
@@ -604,6 +735,140 @@ import { StatusBadge } from '../../../../shared/ui/status-badge/status-badge';
   `,
   styles: `
     :host { color: var(--text-primary); display: block; }
+
+    .panel-actions {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .catalog-modules-list,
+    .module-group,
+    .feature-catalog-list {
+      display: grid;
+      gap: 0.5rem;
+    }
+
+    .module-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin: 0.5rem 0 0.25rem 0;
+    }
+
+    .feature-catalog-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .feature-card {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.6rem 0.8rem;
+      background: var(--bg-subtle, #f9fafb);
+      border: 1px solid var(--border-subtle, #e5e7eb);
+      border-radius: 6px;
+      gap: 1rem;
+    }
+
+    .feature-info {
+      display: grid;
+      gap: 0.2rem;
+    }
+
+    .feature-header {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .feature-desc {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      margin: 0;
+    }
+
+    .override-meta-note {
+      display: flex;
+      gap: 0.8rem;
+      font-size: 0.75rem;
+      color: var(--text-muted, #6b7280);
+      margin-top: 0.2rem;
+    }
+
+    .feature-badges {
+      display: flex;
+      gap: 0.35rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.45rem;
+      font-size: 0.72rem;
+      font-weight: 600;
+      border-radius: 4px;
+      line-height: 1.2;
+    }
+
+    .badge-success {
+      background-color: #d1fae5;
+      color: #065f46;
+    }
+
+    .badge-secondary {
+      background-color: #f3f4f6;
+      color: #374151;
+    }
+
+    .badge-warning {
+      background-color: #fef3c7;
+      color: #92400e;
+    }
+
+    .badge-info {
+      background-color: #e0e7ff;
+      color: #3730a3;
+    }
+
+    .badge-danger {
+      background-color: #fee2e2;
+      color: #991b1b;
+    }
+
+    .feature-editor-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.4rem 0.5rem;
+      border-bottom: 1px solid var(--border-subtle, #f3f4f6);
+    }
+
+    .feature-option-label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+    }
+
+    .override-controls {
+      display: grid;
+      gap: 0.8rem;
+      padding: 0.8rem 1rem;
+      border: 1px dashed var(--border-subtle, #cbd5e1);
+      border-radius: 6px;
+      background: var(--bg-subtle, #f8fafc);
+      margin-top: 0.5rem;
+    }
+
+    .date-fields-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.8rem;
+    }
 
     .tenant-detail-page,
     .setup-section,
@@ -1027,6 +1292,13 @@ export class PlatformTenantDetailPage {
   readonly entitlementOptions = signal<PlatformTenantEntitlementOptions | null>(null);
   readonly selectedPlanId = signal('');
   readonly selectedFeatureIds = signal<string[]>([]);
+  readonly overrideReason = signal('');
+  readonly effectiveFrom = signal('');
+  readonly effectiveUntil = signal('');
+  readonly sourceType = signal('OVERRIDE');
+  readonly isRestoreConfirmOpen = signal(false);
+  readonly isRestoring = signal(false);
+  readonly restoreError = signal<string | null>(null);
 
   readonly selectedPlan = computed<PlatformTenantEntitlementPlanOption | null>(() => {
     const options = this.entitlementOptions();
@@ -1058,6 +1330,7 @@ export class PlatformTenantDetailPage {
           this.hydrateEditDraft(tenant);
           this.editMode.set(false);
           this.isLoading.set(false);
+          this.loadEntitlementOptionsSilently(tenant.id);
         },
         error: (error) => {
           this.tenant.set(null);
@@ -1081,10 +1354,23 @@ export class PlatformTenantDetailPage {
         this.hydrateEditDraft(tenant);
         this.editMode.set(false);
         this.isLoading.set(false);
+        this.loadEntitlementOptionsSilently(tenant.id);
       },
       error: (error) => {
         this.errorMessage.set(this.apiError.toSafeMessage(error));
         this.isLoading.set(false);
+      }
+    });
+  }
+
+  private loadEntitlementOptionsSilently(tenantId: string): void {
+    this.api.getEntitlementOptions(tenantId)?.subscribe({
+      next: (options) => {
+        this.entitlementOptions.set(options);
+        this.cacheFeatureNames(options);
+      },
+      error: () => {
+        // Silently ignore background catalog load errors for main detail display
       }
     });
   }
@@ -1101,6 +1387,7 @@ export class PlatformTenantDetailPage {
     this.editorError.set(null);
     this.editorSaveError.set(null);
     this.editorValidationError.set(null);
+    this.restoreError.set(null);
     this.entitlementOptions.set(null);
 
     this.api.getEntitlementOptions(tenantId).subscribe({
@@ -1109,6 +1396,7 @@ export class PlatformTenantDetailPage {
         this.selectedPlanId.set(options.currentSubscriptionPlanId ?? options.plans[0]?.id ?? '');
         this.selectedFeatureIds.set([...options.enabledFeatureIds]);
         this.cacheFeatureNames(options);
+        this.hydrateExistingOverrideMetadata(options);
         this.editorLoading.set(false);
       },
       error: (error) => {
@@ -1118,8 +1406,49 @@ export class PlatformTenantDetailPage {
     });
   }
 
+  private hydrateExistingOverrideMetadata(options: PlatformTenantEntitlementOptions): void {
+    let existingReason = '';
+    let existingFrom = '';
+    let existingUntil = '';
+    let existingSourceType = 'OVERRIDE';
+
+    for (const module of options.catalogModules) {
+      for (const feature of module.features) {
+        if (feature.overrideReason) {
+          existingReason = feature.overrideReason;
+        }
+        if (feature.effectiveFrom) {
+          existingFrom = this.toDatetimeLocalFormat(feature.effectiveFrom);
+        }
+        if (feature.effectiveUntil) {
+          existingUntil = this.toDatetimeLocalFormat(feature.effectiveUntil);
+        }
+        if (feature.sourceType) {
+          existingSourceType = feature.sourceType;
+        }
+      }
+    }
+
+    this.overrideReason.set(existingReason);
+    this.effectiveFrom.set(existingFrom);
+    this.effectiveUntil.set(existingUntil);
+    this.sourceType.set(existingSourceType === 'MANUAL' ? 'MANUAL' : 'OVERRIDE');
+  }
+
+  private toDatetimeLocalFormat(dateIso: string): string {
+    try {
+      const date = new Date(dateIso);
+      if (isNaN(date.getTime())) {
+        return '';
+      }
+      return date.toISOString().slice(0, 16);
+    } catch {
+      return '';
+    }
+  }
+
   closeEntitlementEditor(): void {
-    if (this.editorSaving()) {
+    if (this.editorSaving() || this.isRestoring()) {
       return;
     }
 
@@ -1128,45 +1457,53 @@ export class PlatformTenantDetailPage {
     this.editorError.set(null);
     this.editorSaveError.set(null);
     this.editorValidationError.set(null);
-    this.entitlementOptions.set(null);
+    this.restoreError.set(null);
     this.selectedPlanId.set('');
     this.selectedFeatureIds.set([]);
+    this.overrideReason.set('');
+    this.effectiveFrom.set('');
+    this.effectiveUntil.set('');
+    this.sourceType.set('OVERRIDE');
   }
 
   onPlanChange(planId: string): void {
     this.selectedPlanId.set(planId);
-    this.syncFeaturesForPlan();
     this.editorValidationError.set(null);
   }
 
   isFeatureAllowed(
-    feature: PlatformTenantEntitlementCatalogFeature,
-    plan: PlatformTenantEntitlementPlanOption
+    _feature: PlatformTenantEntitlementCatalogFeature,
+    _plan: PlatformTenantEntitlementPlanOption
   ): boolean {
-    return plan.includedFeatureIds.includes(feature.id) || plan.includedFeatureCodes.includes(feature.code);
+    return true;
   }
 
   isFeatureEnabled(featureId: string): boolean {
     return this.selectedFeatureIds().includes(featureId);
   }
 
+  isFeatureDisabledInEditor(feature: PlatformTenantEntitlementCatalogFeature): boolean {
+    return feature.sourceType === 'ADDON' || this.editorSaving() || this.isRestoring();
+  }
+
   toggleFeature(feature: PlatformTenantEntitlementCatalogFeature, event: Event): void {
-    const plan = this.selectedPlan();
-    if (!plan || !this.isFeatureAllowed(feature, plan)) {
+    if (feature.sourceType === 'ADDON') {
       return;
     }
-
     const input = event.target as HTMLInputElement;
     if (input.checked) {
       this.selectedFeatureIds.update((items) => (items.includes(feature.id) ? items : [...items, feature.id]));
-      return;
+    } else {
+      this.selectedFeatureIds.update((items) => items.filter((id) => id !== feature.id));
     }
-
-    this.selectedFeatureIds.update((items) => items.filter((id) => id !== feature.id));
     this.editorValidationError.set(null);
   }
 
   saveEntitlements(): void {
+    if (this.editorSaving() || this.isRestoring()) {
+      return;
+    }
+
     const tenantId = this.route.snapshot.paramMap.get('tenantId');
     const planId = this.selectedPlanId();
     const options = this.entitlementOptions();
@@ -1179,8 +1516,23 @@ export class PlatformTenantDetailPage {
       return;
     }
 
-    if (!this.selectedFeatureIds().length) {
-      this.editorValidationError.set('Select at least one enabled feature before saving.');
+    const currentSource = this.sourceType();
+    const reason = this.overrideReason().trim();
+    if (currentSource === 'OVERRIDE' && !reason) {
+      this.editorValidationError.set('Override reason is required when custom overrides are applied (max 500 characters).');
+      return;
+    }
+
+    if (reason.length > 500) {
+      this.editorValidationError.set('Override reason cannot exceed 500 characters.');
+      return;
+    }
+
+    const fromVal = this.effectiveFrom() ? new Date(this.effectiveFrom()).toISOString() : null;
+    const untilVal = this.effectiveUntil() ? new Date(this.effectiveUntil()).toISOString() : null;
+
+    if (fromVal && untilVal && new Date(untilVal) <= new Date(fromVal)) {
+      this.editorValidationError.set('Effective Until date must be strictly after Effective From date.');
       return;
     }
 
@@ -1198,6 +1550,10 @@ export class PlatformTenantDetailPage {
         subscriptionPlanId: planId,
         enabledFeatureIds: [...this.selectedFeatureIds()],
         enabledFeatureCodes,
+        sourceType: currentSource,
+        overrideReason: reason || undefined,
+        effectiveFrom: fromVal,
+        effectiveUntil: untilVal,
         concurrencyVersion: this.tenant()?.concurrencyVersion ?? undefined
       })
       .subscribe({
@@ -1207,12 +1563,64 @@ export class PlatformTenantDetailPage {
           this.editorSaving.set(false);
           this.closeEntitlementEditor();
           this.successMessage.set('Tenant entitlements updated successfully.');
+          this.loadEntitlementOptionsSilently(tenant.id);
         },
         error: (error) => {
           this.editorSaveError.set(this.apiError.toSafeMessage(error));
           this.editorSaving.set(false);
         }
       });
+  }
+
+  confirmRestoreToPlan(): void {
+    if (this.isRestoring() || this.editorSaving()) {
+      return;
+    }
+    this.isRestoreConfirmOpen.set(true);
+    this.restoreError.set(null);
+  }
+
+  onRestoreCancelled(): void {
+    if (this.isRestoring()) {
+      return;
+    }
+    this.isRestoreConfirmOpen.set(false);
+    this.restoreError.set(null);
+  }
+
+  onRestoreConfirmed(): void {
+    if (this.isRestoring() || this.editorSaving()) {
+      return;
+    }
+    const tenantId = this.route.snapshot.paramMap.get('tenantId');
+    if (!tenantId) {
+      return;
+    }
+
+    this.isRestoring.set(true);
+    this.restoreError.set(null);
+    this.actionError.set(null);
+
+    this.api.restoreEntitlementsToPlan(tenantId).subscribe({
+      next: (tenant) => {
+        this.tenant.set(tenant);
+        this.isRestoring.set(false);
+        this.isRestoreConfirmOpen.set(false);
+        if (this.editorOpen()) {
+          this.closeEntitlementEditor();
+        }
+        this.successMessage.set('Tenant entitlements restored to plan baseline successfully.');
+        this.loadEntitlementOptionsSilently(tenant.id);
+      },
+      error: (error) => {
+        this.isRestoring.set(false);
+        const safeMsg = this.apiError.toSafeMessage(error);
+        this.restoreError.set(safeMsg);
+        if (!this.isRestoreConfirmOpen()) {
+          this.actionError.set(safeMsg);
+        }
+      }
+    });
   }
 
   featureLabelForCode(code: string): string {

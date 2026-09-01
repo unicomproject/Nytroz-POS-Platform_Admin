@@ -18,6 +18,7 @@ describe('PlatformTenantDetailPage', () => {
     updateTenant: ReturnType<typeof vi.fn>;
     getEntitlementOptions: ReturnType<typeof vi.fn>;
     updateEntitlements: ReturnType<typeof vi.fn>;
+    restoreEntitlementsToPlan: ReturnType<typeof vi.fn>;
     getTenantAuditLogs: ReturnType<typeof vi.fn>;
   };
   let accessControl: { hasPermission: ReturnType<typeof vi.fn> };
@@ -65,8 +66,9 @@ describe('PlatformTenantDetailPage', () => {
       reactivateTenant: vi.fn(),
       suspendTenant: vi.fn(),
       updateTenant: vi.fn(),
-      getEntitlementOptions: vi.fn(),
+      getEntitlementOptions: vi.fn().mockReturnValue(of(createTenantEntitlementOptions())),
       updateEntitlements: vi.fn(),
+      restoreEntitlementsToPlan: vi.fn(),
       getTenantAuditLogs: vi.fn().mockReturnValue(
         of({
           data: {
@@ -436,11 +438,11 @@ describe('PlatformTenantDetailPage', () => {
     fixture.componentInstance.onPlanChange('plan-2');
     fixture.detectChanges();
 
-    expect(fixture.componentInstance.selectedFeatureIds()).toEqual(['feature-offline']);
+    expect(fixture.componentInstance.selectedPlanId()).toBe('plan-2');
     const onlineCheckbox = Array.from(
       (fixture.nativeElement as HTMLElement).querySelectorAll('input[type="checkbox"]')
     ).find((input) => input.closest('li')?.textContent?.includes('Online Store')) as HTMLInputElement | undefined;
-    expect(onlineCheckbox?.disabled).toBe(true);
+    expect(onlineCheckbox?.disabled).toBe(false);
   });
 
   it('calls PUT entitlements with subscriptionPlanId and enabled feature arrays', async () => {
@@ -480,8 +482,9 @@ describe('PlatformTenantDetailPage', () => {
   });
 
   it('shows entitlement editor loading and error states', async () => {
+    const loadingSubject = new Subject<never>();
     api.getTenantById.mockReturnValue(of(createTenantDetail()));
-    api.getEntitlementOptions.mockReturnValueOnce(new Subject().asObservable());
+    api.getEntitlementOptions.mockReturnValue(loadingSubject.asObservable());
 
     const fixture = await createComponent();
     await fixture.whenStable();
@@ -676,5 +679,125 @@ describe('PlatformTenantDetailPage', () => {
     await fixture.whenStable();
 
     expect(api.getTenantAuditLogs).toHaveBeenCalledTimes(1);
+  });
+
+  describe('PS-4B Entitlement Overrides & Restore to Plan Baseline', () => {
+    it('blocks saving override if overrideReason is empty when sourceType is OVERRIDE', async () => {
+      api.getTenantById.mockReturnValue(of(createTenantDetail()));
+      api.getEntitlementOptions.mockReturnValue(of(createTenantEntitlementOptions()));
+
+      const fixture = await createComponent();
+      await fixture.whenStable();
+
+      fixture.componentInstance.openEntitlementEditor();
+      await fixture.whenStable();
+
+      fixture.componentInstance.overrideReason.set('');
+      fixture.componentInstance.sourceType.set('OVERRIDE');
+      fixture.componentInstance.saveEntitlements();
+
+      expect(fixture.componentInstance.editorValidationError()).toContain('Override reason is required');
+      expect(api.updateEntitlements).not.toHaveBeenCalled();
+    });
+
+    it('blocks saving if effectiveUntil is before effectiveFrom', async () => {
+      api.getTenantById.mockReturnValue(of(createTenantDetail()));
+      api.getEntitlementOptions.mockReturnValue(of(createTenantEntitlementOptions()));
+
+      const fixture = await createComponent();
+      await fixture.whenStable();
+
+      fixture.componentInstance.openEntitlementEditor();
+      await fixture.whenStable();
+
+      fixture.componentInstance.overrideReason.set('Valid override reason');
+      fixture.componentInstance.effectiveFrom.set('2026-09-10T12:00');
+      fixture.componentInstance.effectiveUntil.set('2026-09-01T12:00');
+      fixture.componentInstance.saveEntitlements();
+
+      expect(fixture.componentInstance.editorValidationError()).toContain('Effective Until date must be strictly after Effective From date.');
+      expect(api.updateEntitlements).not.toHaveBeenCalled();
+    });
+
+    it('sends overrideReason, effectiveFrom, effectiveUntil, and sourceType when saving valid override', async () => {
+      api.getTenantById.mockReturnValue(of(createTenantDetail()));
+      api.getEntitlementOptions.mockReturnValue(of(createTenantEntitlementOptions()));
+      api.updateEntitlements.mockReturnValue(of(createTenantDetail()));
+
+      const fixture = await createComponent();
+      await fixture.whenStable();
+
+      fixture.componentInstance.openEntitlementEditor();
+      await fixture.whenStable();
+
+      fixture.componentInstance.overrideReason.set('Custom compliance pilot override');
+      fixture.componentInstance.effectiveFrom.set('2026-09-01T10:00');
+      fixture.componentInstance.effectiveUntil.set('2026-09-30T10:00');
+      fixture.componentInstance.saveEntitlements();
+
+      expect(api.updateEntitlements).toHaveBeenCalledTimes(1);
+      const callArgs = api.updateEntitlements.mock.calls[0];
+      expect(callArgs[0]).toBe('tenant-1');
+      expect(callArgs[1].sourceType).toBe('OVERRIDE');
+      expect(callArgs[1].overrideReason).toBe('Custom compliance pilot override');
+      expect(callArgs[1].effectiveFrom).toBeTruthy();
+      expect(callArgs[1].effectiveUntil).toBeTruthy();
+    });
+
+    it('shows confirmation dialog when Restore to Plan Baseline is clicked', async () => {
+      api.getTenantById.mockReturnValue(of(createTenantDetail()));
+
+      const fixture = await createComponent();
+      await fixture.whenStable();
+
+      fixture.componentInstance.confirmRestoreToPlan();
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.isRestoreConfirmOpen()).toBe(true);
+      expect(api.restoreEntitlementsToPlan).not.toHaveBeenCalled();
+    });
+
+    it('calls restoreEntitlementsToPlan on confirmation and updates state', async () => {
+      api.getTenantById.mockReturnValue(of(createTenantDetail()));
+      api.getEntitlementOptions.mockReturnValue(of(createTenantEntitlementOptions()));
+      api.restoreEntitlementsToPlan.mockReturnValue(of(createTenantDetail()));
+
+      const fixture = await createComponent();
+      await fixture.whenStable();
+
+      fixture.componentInstance.confirmRestoreToPlan();
+      fixture.componentInstance.onRestoreConfirmed();
+
+      expect(api.restoreEntitlementsToPlan).toHaveBeenCalledWith('tenant-1');
+      expect(fixture.componentInstance.isRestoreConfirmOpen()).toBe(false);
+      expect(fixture.componentInstance.successMessage()).toContain('restored to plan baseline');
+    });
+
+    it('does not call restoreEntitlementsToPlan when restore confirmation is cancelled', async () => {
+      api.getTenantById.mockReturnValue(of(createTenantDetail()));
+
+      const fixture = await createComponent();
+      await fixture.whenStable();
+
+      fixture.componentInstance.confirmRestoreToPlan();
+      fixture.componentInstance.onRestoreCancelled();
+
+      expect(api.restoreEntitlementsToPlan).not.toHaveBeenCalled();
+      expect(fixture.componentInstance.isRestoreConfirmOpen()).toBe(false);
+    });
+
+    it('displays error when restoreEntitlementsToPlan fails (e.g. subscriptionless tenant)', async () => {
+      api.getTenantById.mockReturnValue(of(createTenantDetail()));
+      api.restoreEntitlementsToPlan.mockReturnValue(throwError(() => new Error('Subscription not found')));
+
+      const fixture = await createComponent();
+      await fixture.whenStable();
+
+      fixture.componentInstance.confirmRestoreToPlan();
+      fixture.componentInstance.onRestoreConfirmed();
+
+      expect(api.restoreEntitlementsToPlan).toHaveBeenCalledWith('tenant-1');
+      expect(fixture.componentInstance.restoreError()).toBeTruthy();
+    });
   });
 });

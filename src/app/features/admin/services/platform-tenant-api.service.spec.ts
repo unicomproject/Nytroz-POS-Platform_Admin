@@ -239,6 +239,20 @@ describe('PlatformTenantApiService', () => {
     expect(enabledFeatureCount).toBe(1);
   });
 
+  it('calls POST /api/v1/platform-admin/tenants/{tenantId}/entitlements/restore-to-plan and maps response data', () => {
+    let restoredTenantCode = '';
+
+    service.restoreEntitlementsToPlan('tenant-1').subscribe((tenant) => {
+      restoredTenantCode = tenant.code;
+    });
+
+    const request = httpTesting.expectOne('/api/v1/platform-admin/tenants/tenant-1/entitlements/restore-to-plan');
+    expect(request.request.method).toBe('POST');
+
+    request.flush({ success: true, message: 'ok', data: createTenantDetailApiDto() });
+    expect(restoredTenantCode).toBe('demo-alpha');
+  });
+
   it('lists onboarding drafts with mine query and discards with If-Match', () => {
     let itemCount = 0;
     service.listOnboardingDrafts(false).subscribe((items) => {

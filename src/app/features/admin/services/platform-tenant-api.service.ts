@@ -235,6 +235,15 @@ export class PlatformTenantApiService {
       .pipe(map((response) => mapPlatformTenantDetail(response.data)));
   }
 
+  restoreEntitlementsToPlan(tenantId: string): Observable<PlatformTenantDetail> {
+    return this.http
+      .post<ApiResponse<PlatformTenantDetailApiDto>>(
+        `${appSettings.apiBaseUrl}${apiEndpoints.platform.tenants}/${tenantId}/entitlements/restore-to-plan`,
+        {}
+      )
+      .pipe(map((response) => mapPlatformTenantDetail(response.data)));
+  }
+
   private toParams(query: PlatformTenantListQuery): HttpParams {
     let params = new HttpParams();
 
