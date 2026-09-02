@@ -104,11 +104,12 @@ describe('Sidebar', () => {
     fixture.detectChanges();
 
     const menuItems = (fixture.nativeElement as HTMLElement).querySelectorAll('a.menu-item');
-    expect(menuItems.length).toBe(11);
+    expect(menuItems.length).toBe(12);
 
     const labels = [...menuItems].map((link) => link.textContent?.trim());
     expect(labels.some((label) => label?.includes('Return Policy Templates'))).toBe(true);
     expect(labels.some((label) => label?.includes('Modules & Features'))).toBe(true);
+    expect(labels.some((label) => label?.includes('Business Capability Map'))).toBe(true);
     expect(labels.some((label) => label?.includes('Onboarding Drafts'))).toBe(true);
     expect(labels.some((label) => label?.includes('Outlets'))).toBe(false);
     expect(labels.some((label) => label?.includes('Tills'))).toBe(false);
