@@ -90,6 +90,14 @@ const adminPageRoutes: Routes = [
     data: { title: 'Modules and Features', requiredPermission: platformPermissions.modulesView }
   },
   {
+    path: 'business-capability-map',
+    loadComponent: () =>
+      import('../pages/platform-business-capability-map-page/platform-business-capability-map-page').then(
+        (m) => m.PlatformBusinessCapabilityMapPage
+      ),
+    data: { title: 'Business Capability Map', requiredPermission: platformPermissions.modulesView }
+  },
+  {
     path: 'return-policy-templates/create',
     loadComponent: () =>
       import('../pages/platform-create-return-policy-template-page/platform-create-return-policy-template-page').then(

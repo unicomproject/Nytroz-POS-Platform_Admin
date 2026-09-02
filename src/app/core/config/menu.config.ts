@@ -73,6 +73,13 @@ export const platformMenuConfig: MenuSectionConfig[] = [
         requiredPermission: platformPermissions.modulesView
       },
       {
+        label: 'Business Capability Map',
+        path: '/admin/business-capability-map',
+        requiresTenant: false,
+        icon: 'products',
+        requiredPermission: platformPermissions.modulesView
+      },
+      {
         label: 'Return Policy Templates',
         path: '/admin/return-policy-templates',
         requiresTenant: false,
